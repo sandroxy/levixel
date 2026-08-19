@@ -15,6 +15,7 @@ provenance:
   commit: 3285cc933e04c1772acb4c9e3b5610ae8cee86a5
   paths:
     - Android/Galeria
+    - Harmony/Galeria
     - IOS/galeria
     - ReactNativePlugins/galeria
     - UniappNativePlugins/ChrisUniPlugin-Galeria
@@ -74,3 +75,28 @@ targets:
     constraints:
       - name: minimum-ios
         value: '13.0'
+  - id: native-harmonyos
+    kind: native
+    platform: harmonyos
+    sourceRoot: native/harmonyos/levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - shared-transition
+      - video-preview
+    build:
+      command: ./scripts/package-native-harmonyos.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-harmonyos.sh
+    artifacts:
+      - id: har
+        format: har
+        output: dist/native-harmonyos/levixel-0.1.0.har
+        distribution:
+          channel: ohpm
+          packageId: '@sandrox/levixel'
+    constraints:
+      - name: minimum-api
+        value: 23
