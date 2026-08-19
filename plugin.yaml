@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=../../standards/plugin-manifest.schema.yaml
+
+schemaVersion: 1
+id: levixel
+displayName: Levixel
+version: 0.1.0
+summary: Shared-transition image and video viewer for native, React Native, UniApp, and web applications.
+
+contract:
+  version: 1
+  schema: contract/open.schema.json
+
+provenance:
+  repository: https://gitee.com/chrisJxc/native-plugins.git
+  commit: 3285cc933e04c1772acb4c9e3b5610ae8cee86a5
+  paths:
+    - Android/Galeria
+    - ReactNativePlugins/galeria
+    - UniappNativePlugins/ChrisUniPlugin-Galeria
+
+targets:
+  - id: native-android
+    kind: native
+    platform: android
+    sourceRoot: native/android/levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-native-android.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-android.sh
+    artifacts:
+      - id: aar
+        format: aar
+        output: dist/native-android/levixel-0.1.0.aar
+        distribution:
+          channel: github-release
+          packageId: com.sandrox.levixel:levixel
+    constraints:
+      - name: minimum-sdk
+        value: 21

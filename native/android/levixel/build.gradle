@@ -1,0 +1,59 @@
+plugins {
+    id "com.android.library"
+    id "maven-publish"
+}
+
+group = "com.sandrox.levixel"
+version = rootProject.ext.levixelVersion
+
+base {
+    archivesName = "levixel"
+}
+
+android {
+    namespace = "com.sandrox.levixel"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 21
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+}
+
+dependencies {
+    api "androidx.appcompat:appcompat:1.7.0"
+    api "androidx.recyclerview:recyclerview:1.4.0"
+    api "androidx.viewpager2:viewpager2:1.1.0"
+    api "androidx.media3:media3-exoplayer:1.5.1"
+    api "androidx.media3:media3-ui:1.5.1"
+    api "com.github.bumptech.glide:glide:4.16.0"
+    api "com.github.chrisbanes:PhotoView:2.3.0"
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                artifactId = "levixel"
+            }
+        }
+    }
+}

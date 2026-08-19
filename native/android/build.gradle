@@ -1,0 +1,20 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.yaml:snakeyaml:2.3"
+    }
+}
+
+plugins {
+    id "com.android.library" version "8.12.3" apply false
+}
+
+def manifestFile = file("../../plugin.yaml")
+def manifest = new org.yaml.snakeyaml.Yaml().load(manifestFile.text)
+if (!(manifest.version instanceof String)) {
+    throw new GradleException("plugin.yaml must contain a string version")
+}
+
+ext.levixelVersion = manifest.version
