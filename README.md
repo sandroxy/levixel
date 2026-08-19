@@ -17,3 +17,17 @@ Verify the packaged AAR in the shared Android test host:
 ```sh
 ./scripts/verify-native-android.sh
 ```
+
+## iOS
+
+Package the device and simulator slices as a release XCFramework ZIP:
+
+```sh
+./scripts/package-native-ios.sh
+```
+
+Verify the packaged ZIP in the shared iOS test host:
+
+```sh
+./scripts/verify-native-ios.sh
+```

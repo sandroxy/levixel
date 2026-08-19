@@ -15,6 +15,7 @@ provenance:
   commit: 3285cc933e04c1772acb4c9e3b5610ae8cee86a5
   paths:
     - Android/Galeria
+    - IOS/galeria
     - ReactNativePlugins/galeria
     - UniappNativePlugins/ChrisUniPlugin-Galeria
 
@@ -46,3 +47,30 @@ targets:
     constraints:
       - name: minimum-sdk
         value: 21
+  - id: native-ios
+    kind: native
+    platform: ios
+    sourceRoot: native/ios/Levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-native-ios.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-ios.sh
+    artifacts:
+      - id: xcframework
+        format: xcframework-zip
+        output: dist/native-ios/levixel-0.1.0.xcframework.zip
+        distribution:
+          channel: github-release
+          packageId: com.sandrox.levixel
+    constraints:
+      - name: minimum-ios
+        value: '13.0'
