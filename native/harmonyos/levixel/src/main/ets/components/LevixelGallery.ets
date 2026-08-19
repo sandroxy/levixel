@@ -43,6 +43,10 @@ enum TransitionImageFit {
 @Component
 export struct LevixelGallery {
   @Prop items: LevixelMediaItem[] = [];
+  @Prop showsNavigationHeader: boolean = false;
+  @Prop navigationTitle: string = 'Levixel';
+  @Prop navigationTopInset: number = 0;
+  onNavigateBack: () => void = (): void => {};
   private readonly tileRectsInWindow: Map<string, RectMetrics> = new Map<string, RectMetrics>();
   private readonly imageResourceCache: Map<string, TransitionImageResource> = new Map<string, TransitionImageResource>();
   private readonly imageResourceRequests: Map<string, Promise<TransitionImageResource | null>> =
@@ -98,43 +102,83 @@ export struct LevixelGallery {
 
   @Builder
   private GridSurface() {
-    Scroll() {
-      Column() {
-        Row() {
-          Column() {
-            Text('Levixel')
-              .fontSize(28)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#101828')
-              .width('100%')
-            Text('Shared transition gallery')
-              .fontSize(13)
-              .fontColor('#667085')
-              .margin({ top: 4 })
-              .width('100%')
-          }
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 18, bottom: 14 })
-
-        Grid() {
-          ForEach(this.items, (item: LevixelMediaItem, index: number) => {
-            GridItem() {
-              this.ThumbnailTile(item, index)
-            }
-          }, (item: LevixelMediaItem) => item.id)
-        }
-        .columnsTemplate('1fr 1fr')
-        .columnsGap(12)
-        .rowsGap(12)
-        .padding({ left: 12, right: 12, bottom: 28 })
-        .width('100%')
+    Column() {
+      if (this.showsNavigationHeader) {
+        this.NavigationHeader()
       }
+
+      Scroll() {
+        Column() {
+          if (!this.showsNavigationHeader) {
+            Row() {
+              Column() {
+                Text('Levixel')
+                  .fontSize(28)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#101828')
+                  .width('100%')
+                Text('Shared transition gallery')
+                  .fontSize(13)
+                  .fontColor('#667085')
+                  .margin({ top: 4 })
+                  .width('100%')
+              }
+              .layoutWeight(1)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 18, bottom: 14 })
+          }
+
+          Grid() {
+            ForEach(this.items, (item: LevixelMediaItem, index: number) => {
+              GridItem() {
+                this.ThumbnailTile(item, index)
+              }
+            }, (item: LevixelMediaItem) => item.id)
+          }
+          .columnsTemplate('1fr 1fr')
+          .columnsGap(12)
+          .rowsGap(12)
+          .padding({ left: 12, right: 12, top: 12, bottom: 28 })
+          .width('100%')
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Start)
+      }
+      .layoutWeight(1)
       .width('100%')
     }
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  private NavigationHeader() {
+    Row() {
+      Stack({ alignContent: Alignment.Center }) {
+        Image($r('app.media.levixel_arrow_back'))
+          .width(24)
+          .height(24)
+      }
+      .width(56)
+      .height(56)
+      .onClick(() => {
+        this.onNavigateBack();
+      })
+
+      Text(this.navigationTitle)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .height(56 + this.navigationTopInset)
+    .padding({ top: this.navigationTopInset, right: 16 })
+    .backgroundColor('#172A48')
   }
 
   @Builder
