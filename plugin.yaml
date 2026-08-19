@@ -84,7 +84,7 @@ targets:
       - horizontal-paging
       - image-viewing
       - shared-transition
-      - video-preview
+      - video-viewing
     build:
       command: ./scripts/package-native-harmonyos.sh
     verify:

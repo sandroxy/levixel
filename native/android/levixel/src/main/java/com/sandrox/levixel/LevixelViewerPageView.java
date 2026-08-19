@@ -32,6 +32,7 @@ public final class LevixelViewerPageView extends FrameLayout {
 
     private final FrameLayout mediaContainer;
     private final PhotoView photoView;
+    private final ImageView previewImageView;
     private final LevixelVideoPlayerView videoPlayerView;
     private final FrameLayout loadingContainer;
     private final ObjectAnimator loadingPulseAnimator;
@@ -41,6 +42,8 @@ public final class LevixelViewerPageView extends FrameLayout {
     private Listener listener;
     private boolean active;
     private boolean allowParentInterceptOnImageEdge;
+    private boolean fullImageReady;
+    private int bindGeneration;
 
     public LevixelViewerPageView(@NonNull Context context) {
         super(context);
@@ -72,6 +75,16 @@ public final class LevixelViewerPageView extends FrameLayout {
             }
         });
         mediaContainer.addView(photoView);
+
+        previewImageView = new ImageView(context);
+        previewImageView.setLayoutParams(new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        previewImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewImageView.setBackgroundColor(Color.TRANSPARENT);
+        previewImageView.setVisibility(GONE);
+        mediaContainer.addView(previewImageView);
 
         videoPlayerView = new LevixelVideoPlayerView(context);
         videoPlayerView.setVisibility(GONE);
@@ -107,7 +120,9 @@ public final class LevixelViewerPageView extends FrameLayout {
     }
 
     public void bind(@NonNull LevixelMediaItem item) {
+        bindGeneration += 1;
         this.item = item;
+        fullImageReady = false;
         if (item.getMediaType() == LevixelMediaItem.MediaType.IMAGE) {
             bindImage(item);
         } else {
@@ -124,14 +139,19 @@ public final class LevixelViewerPageView extends FrameLayout {
     }
 
     public void release() {
+        bindGeneration += 1;
         Glide.with(photoView.getContext().getApplicationContext()).clear(photoView);
+        Glide.with(previewImageView.getContext().getApplicationContext()).clear(previewImageView);
         photoView.setImageDrawable(null);
+        previewImageView.setImageDrawable(null);
+        previewImageView.setVisibility(GONE);
         photoView.setScale(1f, false);
         photoView.setVisibility(GONE);
         videoPlayerView.release();
         videoPlayerView.setVisibility(GONE);
         item = null;
         active = false;
+        fullImageReady = false;
         setLoadingVisible(false);
     }
 
@@ -168,26 +188,38 @@ public final class LevixelViewerPageView extends FrameLayout {
         return !videoPlayerView.isTouchOnInteractiveControls(rawX, rawY);
     }
 
+    public boolean isTouchOnInteractiveVideoControls(float rawX, float rawY) {
+        return item != null
+                && item.getMediaType() == LevixelMediaItem.MediaType.VIDEO
+                && videoPlayerView.isTouchOnInteractiveControls(rawX, rawY);
+    }
+
     public void setMediaHidden(boolean hidden) {
         if (item == null) {
             return;
         }
         if (item.getMediaType() == LevixelMediaItem.MediaType.IMAGE) {
             photoView.setAlpha(hidden ? 0f : 1f);
+            previewImageView.setAlpha(hidden ? 0f : 1f);
         } else {
             videoPlayerView.setMediaHidden(hidden);
         }
     }
 
-    public void setImagePlaceholderIfEmpty(@Nullable Drawable drawable) {
-        if (item == null || item.getMediaType() != LevixelMediaItem.MediaType.IMAGE) {
+    public void setSourcePlaceholderIfNeeded(@Nullable Drawable drawable) {
+        if (item == null || drawable == null) {
             return;
         }
-        if (drawable == null || photoView.getDrawable() != null) {
+        if (item.getMediaType() == LevixelMediaItem.MediaType.VIDEO) {
+            videoPlayerView.setPosterPlaceholder(drawable);
             return;
         }
-        photoView.setVisibility(VISIBLE);
-        photoView.setImageDrawable(drawable);
+        if (fullImageReady) {
+            return;
+        }
+        Glide.with(previewImageView).clear(previewImageView);
+        previewImageView.setImageDrawable(drawable);
+        previewImageView.setVisibility(VISIBLE);
         setLoadingVisible(true);
     }
 
@@ -197,6 +229,9 @@ public final class LevixelViewerPageView extends FrameLayout {
             return null;
         }
         if (item.getMediaType() == LevixelMediaItem.MediaType.IMAGE) {
+            if (previewImageView.getVisibility() == VISIBLE && previewImageView.getDrawable() != null) {
+                return LevixelLayoutSupport.captureImageViewState(previewImageView);
+            }
             return LevixelLayoutSupport.captureImageViewState(photoView);
         }
         return videoPlayerView.sharedElementState();
@@ -263,13 +298,37 @@ public final class LevixelViewerPageView extends FrameLayout {
     }
 
     private void bindImage(@NonNull LevixelMediaItem item) {
+        final int generation = bindGeneration;
         photoView.setVisibility(VISIBLE);
+        photoView.setAlpha(1f);
         videoPlayerView.release();
         videoPlayerView.setVisibility(GONE);
         photoView.setScale(1f, false);
         photoView.setAllowParentInterceptOnEdge(allowParentInterceptOnImageEdge);
         Glide.with(photoView).clear(photoView);
         photoView.setImageDrawable(null);
+        Glide.with(previewImageView).clear(previewImageView);
+        previewImageView.setAlpha(1f);
+        previewImageView.setVisibility(VISIBLE);
+        previewImageView.setImageDrawable(null);
+        Glide.with(previewImageView)
+                .load(item.getThumbnailUrl())
+                .dontAnimate()
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+                        if (generation == bindGeneration && !fullImageReady) {
+                            previewImageView.setVisibility(GONE);
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
+                        return generation != bindGeneration || fullImageReady;
+                    }
+                })
+                .into(previewImageView);
         setLoadingVisible(true);
         Glide.with(photoView)
                 .load(item.getSourceUrl())
@@ -277,25 +336,33 @@ public final class LevixelViewerPageView extends FrameLayout {
                 .listener(new RequestListener<Drawable>() {
                     @Override
                     public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                        setLoadingVisible(false);
+                        if (generation == bindGeneration) {
+                            setLoadingVisible(false);
+                        }
                         return false;
                     }
 
                     @Override
                     public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
-                        setLoadingVisible(false);
-                        applyDynamicPhotoScaleBounds();
+                        if (generation != bindGeneration) {
+                            return true;
+                        }
+                        fullImageReady = true;
+                        applyDynamicPhotoScaleBounds(generation, true);
                         return false;
                     }
                 })
                 .into(photoView);
     }
 
-    private void applyDynamicPhotoScaleBounds() {
+    private void applyDynamicPhotoScaleBounds(int generation, boolean completePreviewHandoff) {
         photoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {
                 photoView.getViewTreeObserver().removeOnPreDrawListener(this);
+                if (generation != bindGeneration) {
+                    return true;
+                }
                 RectF displayRect = photoView.getDisplayRect();
                 if (displayRect == null || displayRect.width() <= 0f || displayRect.height() <= 0f) {
                     return true;
@@ -308,6 +375,16 @@ public final class LevixelViewerPageView extends FrameLayout {
                 float mediumScale = Math.min(Math.max(2f, coverViewportScale), maximumScale * 0.5f);
 
                 photoView.setScaleLevels(1f, mediumScale, maximumScale);
+                if (completePreviewHandoff) {
+                    photoView.postOnAnimation(() -> {
+                        if (generation != bindGeneration) {
+                            return;
+                        }
+                        previewImageView.setVisibility(GONE);
+                        previewImageView.setImageDrawable(null);
+                        setLoadingVisible(false);
+                    });
+                }
                 return true;
             }
         });
@@ -317,7 +394,11 @@ public final class LevixelViewerPageView extends FrameLayout {
         photoView.setVisibility(GONE);
         Glide.with(photoView).clear(photoView);
         photoView.setImageDrawable(null);
+        Glide.with(previewImageView).clear(previewImageView);
+        previewImageView.setImageDrawable(null);
+        previewImageView.setVisibility(GONE);
         videoPlayerView.setVisibility(VISIBLE);
+        videoPlayerView.setMediaHidden(false);
         videoPlayerView.bind(item);
         videoPlayerView.setActive(active);
         setLoadingVisible(true);
@@ -329,6 +410,9 @@ public final class LevixelViewerPageView extends FrameLayout {
             return null;
         }
         if (item.getMediaType() == LevixelMediaItem.MediaType.IMAGE) {
+            if (previewImageView.getVisibility() == VISIBLE && previewImageView.getDrawable() != null) {
+                return previewImageView.getDrawable();
+            }
             return photoView.getDrawable();
         }
         return videoPlayerView.getPosterDrawable();

@@ -26,6 +26,7 @@ final class LevixelVideoPlayerView: UIView {
     var onControlsInteractStart: (() -> Void)?
     var onControlsInteractEnd: (() -> Void)?
     var onFirstFrameReady: (() -> Void)?
+    var onPlaybackFailed: (() -> Void)?
 
     var url: URL? {
         didSet {
@@ -264,7 +265,17 @@ final class LevixelVideoPlayerView: UIView {
             }
         }
 
-        itemStatusObservation = item.observe(\.status, options: [.new, .initial]) { _, _ in
+        itemStatusObservation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
+            guard let self = self, self.playbackGeneration == generation else { return }
+            if item.status == .failed {
+                self.isPrimingFirstFrame = false
+                self.player?.pause()
+                DispatchQueue.main.async {
+                    guard self.playbackGeneration == generation else { return }
+                    self.onPlaybackFailed?()
+                }
+                return
+            }
             notifyFirstFrameReadyIfPossible()
         }
         likelyToKeepUpObservation = item.observe(\.isPlaybackLikelyToKeepUp, options: [.new, .initial]) { _, _ in

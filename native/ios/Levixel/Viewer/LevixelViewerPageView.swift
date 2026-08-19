@@ -4,6 +4,8 @@ protocol LevixelViewerPageViewDelegate: AnyObject {
     func levixelViewerPageViewDidRequestDismiss(_ pageView: LevixelViewerPageView)
     func levixelViewerPageViewDidToggleVideoChrome(_ pageView: LevixelViewerPageView)
     func levixelViewerPageView(_ pageView: LevixelViewerPageView, setHorizontalPagingEnabled enabled: Bool)
+    func levixelViewerPageViewDidBeginVideoControlsInteraction(_ pageView: LevixelViewerPageView)
+    func levixelViewerPageViewDidEndVideoControlsInteraction(_ pageView: LevixelViewerPageView)
     func levixelViewerPageViewDidBeginMultiTouch(_ pageView: LevixelViewerPageView)
     func levixelViewerPageViewDidEndMultiTouch(_ pageView: LevixelViewerPageView)
 }
@@ -28,6 +30,9 @@ final class LevixelViewerPageView: UIView {
     private var imageLoader: LevixelImageLoading?
     private var mediaContentMode: UIView.ContentMode = .scaleAspectFit
     private var loadGeneration = 0
+    private var fullImageReady = false
+    private var fullImageHandoffPending = false
+    private var delayedImageLoadingWorkItem: DispatchWorkItem?
 
     private var active = false
     private var videoRevealAllowed = false
@@ -35,6 +40,7 @@ final class LevixelViewerPageView: UIView {
     private var pinchInProgress = false
     private var videoControlsVisible = false
     private var videoControlsVisibleBeforeDismissDrag = false
+    private(set) var videoControlsInteractionActive = false
 
     private lazy var imageSingleTapGesture = UITapGestureRecognizer(
         target: self,
@@ -61,7 +67,7 @@ final class LevixelViewerPageView: UIView {
     }
 
     var canPageHorizontally: Bool {
-        guard !isVideoPage else { return true }
+        guard !isVideoPage else { return !videoControlsInteractionActive }
         return imageScrollView.zoomScale <= imageScrollView.minimumZoomScale + 0.01
     }
 
@@ -72,6 +78,9 @@ final class LevixelViewerPageView: UIView {
     var sharedElementView: UIImageView? {
         if isVideoPage {
             return posterImageView.image == nil ? nil : posterImageView
+        }
+        if !sourcePreviewImageView.isHidden, sourcePreviewImageView.image != nil {
+            return sourcePreviewImageView
         }
         return imageView.image == nil ? nil : imageView
     }
@@ -99,7 +108,11 @@ final class LevixelViewerPageView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        layoutImageIfNeeded(resetZoom: false)
+        let shouldResetZoom = fullImageHandoffPending
+        let didLayoutImage = layoutImageIfNeeded(resetZoom: shouldResetZoom)
+        if shouldResetZoom && didLayoutImage {
+            finishFullImageHandoff()
+        }
     }
 
     func configure(
@@ -114,6 +127,9 @@ final class LevixelViewerPageView: UIView {
         self.imageLoader = imageLoader
         self.mediaContentMode = normalizedContentMode(from: mediaContentMode)
         loadGeneration += 1
+        fullImageReady = false
+        fullImageHandoffPending = false
+        cancelDelayedImageLoading()
 
         activityIndicator.stopAnimating()
         activityIndicator.isHidden = true
@@ -132,6 +148,7 @@ final class LevixelViewerPageView: UIView {
         videoFirstFrameReady = false
         videoControlsVisible = false
         videoControlsVisibleBeforeDismissDrag = false
+        videoControlsInteractionActive = false
 
         imageScrollView.isHidden = true
         videoContainer.isHidden = true
@@ -151,26 +168,33 @@ final class LevixelViewerPageView: UIView {
 
         switch item {
         case .image(let image):
+            fullImageReady = image != nil
             configureImagePage(image: image)
-        case .imageURL(let url, let placeholder):
+        case .imageURL(let url, let thumbnailURL, let placeholder):
             configureImagePage(image: placeholder)
-            if placeholder == nil {
+            if let sourcePreviewImage = sourcePreviewImage {
                 showSourcePreview(image: sourcePreviewImage)
+            } else if let thumbnailURL = thumbnailURL {
+                loadSourcePreview(from: thumbnailURL)
             }
-            loadImage(from: url, placeholder: placeholder, into: imageView)
+            loadFullImage(from: url, placeholder: placeholder)
         case .video(let url, let poster):
-            configureVideoPage(url: url, poster: poster)
+            configureVideoPage(url: url, poster: poster, sourcePreviewImage: sourcePreviewImage)
         }
     }
 
     func prepareForReuse() {
         loadGeneration += 1
+        cancelDelayedImageLoading()
         active = false
         videoRevealAllowed = false
         videoFirstFrameReady = false
         pinchInProgress = false
         videoControlsVisible = false
         videoControlsVisibleBeforeDismissDrag = false
+        videoControlsInteractionActive = false
+        fullImageReady = false
+        fullImageHandoffPending = false
 
         imageScrollView.zoomScale = 1
         imageScrollView.minimumZoomScale = 1
@@ -226,11 +250,17 @@ final class LevixelViewerPageView: UIView {
         if isVideoPage {
             return posterImageView.levixelSharedElementState()
         }
+        if !sourcePreviewImageView.isHidden, sourcePreviewImageView.image != nil {
+            return sourcePreviewImageView.levixelSharedElementState(
+                clippingFrameInWindow: mediaContainer.frameInWindow()
+            )
+        }
         return imageView.levixelSharedElementState(clippingFrameInWindow: imageScrollView.frameInWindow())
     }
 
     func defaultTransitionGeometry(in windowBounds: CGRect) -> LevixelSharedElementGeometry {
         let imageSize = sharedElementView?.image?.size
+            ?? sourcePreviewImageView.image?.size
             ?? imageView.image?.size
             ?? posterImageView.image?.size
             ?? CGSize(width: max(windowBounds.width * 0.72, 1), height: max(windowBounds.height * 0.42, 1))
@@ -245,6 +275,7 @@ final class LevixelViewerPageView: UIView {
     func canBeginVerticalDismiss(at windowLocation: CGPoint, velocity: CGPoint) -> Bool {
         guard abs(velocity.y) > abs(velocity.x) * 1.02 else { return false }
         if isVideoPage {
+            guard !videoControlsInteractionActive else { return false }
             return !videoPlayerView.isTouchOnInteractiveControls(atWindowPoint: windowLocation)
         }
         return canPageHorizontally
@@ -335,13 +366,20 @@ final class LevixelViewerPageView: UIView {
         videoPlayerView.onFirstFrameReady = { [weak self] in
             self?.handleVideoFirstFrameReady()
         }
+        videoPlayerView.onPlaybackFailed = { [weak self] in
+            self?.hideLoading()
+        }
         videoPlayerView.onControlsInteractStart = { [weak self] in
             guard let self = self else { return }
-            self.delegate?.levixelViewerPageView(self, setHorizontalPagingEnabled: false)
+            guard self.videoControlsInteractionActive == false else { return }
+            self.videoControlsInteractionActive = true
+            self.delegate?.levixelViewerPageViewDidBeginVideoControlsInteraction(self)
         }
         videoPlayerView.onControlsInteractEnd = { [weak self] in
             guard let self = self else { return }
-            self.delegate?.levixelViewerPageView(self, setHorizontalPagingEnabled: self.canPageHorizontally)
+            guard self.videoControlsInteractionActive else { return }
+            self.videoControlsInteractionActive = false
+            self.delegate?.levixelViewerPageViewDidEndVideoControlsInteraction(self)
         }
 
         posterImageView.backgroundColor = .clear
@@ -370,28 +408,35 @@ final class LevixelViewerPageView: UIView {
         imageView.image = image
         if image != nil {
             layoutImageIfNeeded(resetZoom: true)
+            hideLoading()
         } else {
-            showLoading()
+            hideLoading()
         }
         delegate?.levixelViewerPageView(self, setHorizontalPagingEnabled: canPageHorizontally)
     }
 
-    private func configureVideoPage(url: URL, poster: URL?) {
+    private func configureVideoPage(url: URL, poster: URL?, sourcePreviewImage: UIImage?) {
         imageScrollView.isHidden = true
         videoContainer.isHidden = false
 
         posterImageView.layer.removeAllAnimations()
+        posterImageView.contentMode = mediaContentMode
+        posterImageView.image = sourcePreviewImage
         posterImageView.alpha = 1
         videoPlayerView.setPlayerVisible(false)
         videoPlayerView.setControlsVisible(false, animated: false)
         videoControlsVisible = false
         videoControlsVisibleBeforeDismissDrag = false
         videoPlayerView.url = url
+        showLoading()
 
         if let poster = poster {
-            showLoading()
-            loadImage(from: poster, placeholder: nil, into: posterImageView)
-        } else {
+            requestImage(
+                from: poster,
+                placeholder: sourcePreviewImage,
+                into: posterImageView
+            ) { _ in }
+        } else if sourcePreviewImage == nil {
             posterImageView.image = nil
         }
 
@@ -399,22 +444,89 @@ final class LevixelViewerPageView: UIView {
         updateVideoPlaybackIfNeeded()
     }
 
-    private func loadImage(from url: URL, placeholder: UIImage?, into imageView: UIImageView) {
+    private func loadFullImage(from url: URL, placeholder: UIImage?) {
+        if let cachedImage = LevixelDecodedImageCache.image(for: url) {
+            imageView.image = cachedImage
+            completeFullImageHandoff()
+            return
+        }
+
+        scheduleImageLoading()
+        requestImage(from: url, placeholder: placeholder, into: imageView) { [weak self] loadedImage in
+            guard let self = self else { return }
+            guard loadedImage != nil else {
+                self.hideLoading()
+                return
+            }
+            self.completeFullImageHandoff()
+        }
+    }
+
+    private func completeFullImageHandoff() {
+        fullImageReady = true
+        fullImageHandoffPending = true
+        setNeedsLayout()
+        layoutIfNeeded()
+    }
+
+    private func finishFullImageHandoff() {
+        guard fullImageHandoffPending else { return }
+        fullImageHandoffPending = false
+        let handoffGeneration = loadGeneration
+        DispatchQueue.main.async {
+            guard self.loadGeneration == handoffGeneration, self.fullImageReady else { return }
+            self.hideSourcePreview()
+            self.hideLoading()
+            self.delegate?.levixelViewerPageView(
+                self,
+                setHorizontalPagingEnabled: self.canPageHorizontally
+            )
+        }
+    }
+
+    private func loadSourcePreview(from url: URL) {
+        sourcePreviewImageView.contentMode = mediaContentMode
+        sourcePreviewImageView.isHidden = false
+        requestImage(from: url, placeholder: nil, into: sourcePreviewImageView) { [weak self] loadedImage in
+            guard let self = self else { return }
+            if self.fullImageReady || loadedImage == nil {
+                self.hideSourcePreview()
+            }
+        }
+    }
+
+    private func requestImage(
+        from url: URL,
+        placeholder: UIImage?,
+        into targetImageView: UIImageView,
+        completion: @escaping (UIImage?) -> Void
+    ) {
         let generation = loadGeneration
-        showLoading()
-        imageLoader?.loadImage(url, placeholder: placeholder, imageView: imageView) { [weak self] loadedImage in
+        if let placeholder = placeholder {
+            targetImageView.image = placeholder
+        }
+        if let cachedImage = LevixelDecodedImageCache.image(for: url) {
+            targetImageView.image = cachedImage
+            completion(cachedImage)
+            return
+        }
+        guard let imageLoader = imageLoader else {
+            completion(nil)
+            return
+        }
+
+        let loadingImageView = UIImageView()
+        imageLoader.loadImage(url, placeholder: placeholder, imageView: loadingImageView) { [weak self] loadedImage in
             guard let self = self else { return }
             guard self.loadGeneration == generation else { return }
             DispatchQueue.main.async {
                 guard self.loadGeneration == generation else { return }
-                self.hideLoading()
-                if imageView === self.imageView {
-                    if loadedImage != nil {
-                        self.hideSourcePreview()
-                    }
-                    self.layoutImageIfNeeded(resetZoom: true)
-                    self.delegate?.levixelViewerPageView(self, setHorizontalPagingEnabled: self.canPageHorizontally)
+                let resolvedImage = loadedImage ?? loadingImageView.image
+                if let resolvedImage = resolvedImage {
+                    LevixelDecodedImageCache.store(resolvedImage, for: url)
+                    targetImageView.image = resolvedImage
                 }
+                completion(resolvedImage)
             }
         }
     }
@@ -437,8 +549,26 @@ final class LevixelViewerPageView: UIView {
     }
 
     private func hideLoading() {
+        cancelDelayedImageLoading()
         activityIndicator.stopAnimating()
         activityIndicator.isHidden = true
+    }
+
+    private func scheduleImageLoading() {
+        cancelDelayedImageLoading()
+        let generation = loadGeneration
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard self.loadGeneration == generation, !self.fullImageReady else { return }
+            self.showLoading()
+        }
+        delayedImageLoadingWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
+    }
+
+    private func cancelDelayedImageLoading() {
+        delayedImageLoadingWorkItem?.cancel()
+        delayedImageLoadingWorkItem = nil
     }
 
     private func updateVideoPlaybackIfNeeded() {
@@ -499,15 +629,16 @@ final class LevixelViewerPageView: UIView {
         }
     }
 
-    private func layoutImageIfNeeded(resetZoom: Bool) {
-        guard !isVideoPage else { return }
-        guard bounds.width > 0, bounds.height > 0 else { return }
-        guard let image = imageView.image else { return }
+    @discardableResult
+    private func layoutImageIfNeeded(resetZoom: Bool) -> Bool {
+        guard !isVideoPage else { return false }
+        guard bounds.width > 0, bounds.height > 0 else { return false }
+        guard let image = imageView.image else { return false }
 
         let scrollBounds = imageScrollView.bounds.size
-        guard scrollBounds.width > 0, scrollBounds.height > 0 else { return }
+        guard scrollBounds.width > 0, scrollBounds.height > 0 else { return false }
 
-        guard image.size.width > 0, image.size.height > 0 else { return }
+        guard image.size.width > 0, image.size.height > 0 else { return false }
 
         let widthRatio = scrollBounds.width / image.size.width
         let heightRatio = scrollBounds.height / image.size.height
@@ -542,7 +673,7 @@ final class LevixelViewerPageView: UIView {
             width: scaledSize.width,
             height: scaledSize.height
         )
-        hideLoading()
+        return true
     }
 
     private func zoomRect(for scale: CGFloat, centeredAt point: CGPoint) -> CGRect {

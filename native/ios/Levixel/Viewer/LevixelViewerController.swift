@@ -29,6 +29,7 @@ final class LevixelViewerController: UIViewController {
 
     private var verticalDismissLocked = false
     private var verticalDismissNeedsReanchor = false
+    private var videoControlsInteractionActive = false
     private var isRestoringDismissDrag = false
     private var isDraggingToDismiss = false
     private var dragStartPoint = CGPoint.zero
@@ -250,6 +251,7 @@ final class LevixelViewerController: UIViewController {
     private func performDismissTransition(anchorOverride: UIImageView? = nil) {
         guard pendingDismissal == false else { return }
         pendingDismissal = true
+        videoControlsInteractionActive = false
 
         let pageView = currentPageView
         pageView?.prepareForReturnAnimation()
@@ -332,6 +334,7 @@ final class LevixelViewerController: UIViewController {
             return
         }
 
+        videoControlsInteractionActive = false
         currentIndex = safeIndex
         updateVisiblePageStates()
         hideActiveSourceViewForCurrentIndex()
@@ -408,6 +411,7 @@ final class LevixelViewerController: UIViewController {
             && !isRestoringDismissDrag
             && !verticalDismissLocked
             && !verticalDismissNeedsReanchor
+            && !videoControlsInteractionActive
     }
 
     private func refreshNavigationItems() {
@@ -554,6 +558,7 @@ final class LevixelViewerController: UIViewController {
         case .changed:
             guard isRestoringDismissDrag == false else { return }
             guard verticalDismissLocked == false else { return }
+            guard videoControlsInteractionActive == false else { return }
             guard let pageView = currentPageView else { return }
 
             if isDraggingToDismiss == false {
@@ -660,7 +665,10 @@ extension LevixelViewerController: UIGestureRecognizerDelegate {
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer === panGestureRecognizer {
             recalculateHorizontalPagingEnabled()
-            if verticalDismissLocked || verticalDismissNeedsReanchor || isRestoringDismissDrag {
+            if verticalDismissLocked
+                || verticalDismissNeedsReanchor
+                || videoControlsInteractionActive
+                || isRestoringDismissDrag {
                 return false
             }
 
@@ -695,6 +703,25 @@ extension LevixelViewerController: LevixelViewerPageViewDelegate {
 
     func levixelViewerPageView(_ pageView: LevixelViewerPageView, setHorizontalPagingEnabled enabled: Bool) {
         guard pageView.index == currentIndex else { return }
+        if enabled == false {
+            horizontalPagingEnabled = false
+            return
+        }
+        recalculateHorizontalPagingEnabled()
+    }
+
+    func levixelViewerPageViewDidBeginVideoControlsInteraction(_ pageView: LevixelViewerPageView) {
+        guard pageView.index == currentIndex else { return }
+        videoControlsInteractionActive = true
+        if isDraggingToDismiss {
+            cancelVerticalDismissDrag()
+        }
+        recalculateHorizontalPagingEnabled()
+    }
+
+    func levixelViewerPageViewDidEndVideoControlsInteraction(_ pageView: LevixelViewerPageView) {
+        guard pageView.index == currentIndex else { return }
+        videoControlsInteractionActive = false
         recalculateHorizontalPagingEnabled()
     }
 

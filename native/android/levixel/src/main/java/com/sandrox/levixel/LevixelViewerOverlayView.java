@@ -47,6 +47,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     private boolean dragging;
     private boolean multiTouchLock;
     private boolean needReanchorAfterMultiTouch;
+    private boolean videoControlGestureActive;
     private float dragStartRawY;
     private float dragStartTranslationY;
     @Nullable
@@ -140,6 +141,17 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         }
 
         int action = event.getActionMasked();
+        if (videoControlGestureActive && action != MotionEvent.ACTION_DOWN) {
+            boolean terminal = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL;
+            super.dispatchTouchEvent(event);
+            if (terminal) {
+                videoControlGestureActive = false;
+                if (!closing) {
+                    syncPagerGesturePolicy();
+                }
+            }
+            return true;
+        }
         if (action == MotionEvent.ACTION_POINTER_DOWN) {
             enterMultiTouchLock();
             super.dispatchTouchEvent(event);
@@ -166,6 +178,19 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             case MotionEvent.ACTION_DOWN:
                 if (needReanchorAfterMultiTouch) {
                     needReanchorAfterMultiTouch = false;
+                }
+                LevixelViewerPageView touchedPageView = resolveCurrentPageView();
+                videoControlGestureActive = touchedPageView != null
+                        && touchedPageView.isTouchOnInteractiveVideoControls(event.getRawX(), event.getRawY());
+                if (videoControlGestureActive) {
+                    dragging = false;
+                    dragTarget = null;
+                    dragPageView = null;
+                    releaseVelocityTracker();
+                    viewPager.setUserInputEnabled(false);
+                    viewPager.requestDisallowInterceptTouchEvent(true);
+                    super.dispatchTouchEvent(event);
+                    return true;
                 }
                 syncPagerGesturePolicy();
                 downX = event.getRawX();
@@ -361,6 +386,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         syncCurrentIndexFromPager();
         closing = true;
         dragging = false;
+        videoControlGestureActive = false;
         viewPager.setUserInputEnabled(false);
         viewPager.requestDisallowInterceptTouchEvent(false);
         releaseVelocityTracker();
@@ -494,7 +520,10 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
 
     private void syncPagerGesturePolicy() {
         LevixelViewerPageView pageView = resolveCurrentPageView();
-        boolean canPage = items.size() > 1 && pageView != null && pageView.canPageHorizontally();
+        boolean canPage = items.size() > 1
+                && !videoControlGestureActive
+                && pageView != null
+                && pageView.canPageHorizontally();
         viewPager.setUserInputEnabled(canPage);
         viewPager.requestDisallowInterceptTouchEvent(!canPage);
         if (pageView != null) {
@@ -561,7 +590,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             return;
         }
         Drawable sourceDrawable = LevixelLayoutSupport.transitionDrawableForImageView(sourceView);
-        pageView.setImagePlaceholderIfEmpty(sourceDrawable);
+        pageView.setSourcePlaceholderIfNeeded(sourceDrawable);
     }
 
     private void hideActiveSourceViewForCurrentIndex() {
@@ -626,6 +655,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     }
 
     private void cleanup() {
+        videoControlGestureActive = false;
         restoreHiddenActiveSourceView();
         removeCallbacks(openTransitionReadyWatcher);
         if (pagerAdapter != null) {

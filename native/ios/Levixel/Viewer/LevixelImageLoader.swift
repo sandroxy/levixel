@@ -4,6 +4,31 @@ import UIKit
 import SDWebImage
 #endif
 
+enum LevixelDecodedImageCache {
+    private static let cache: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.totalCostLimit = 96 * 1024 * 1024
+        cache.countLimit = 80
+        return cache
+    }()
+
+    static func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    static func store(_ image: UIImage, for url: URL) {
+        let pixelCost: Int
+        if let cgImage = image.cgImage {
+            pixelCost = cgImage.bytesPerRow * cgImage.height
+        } else {
+            let pixelWidth = max(Int(image.size.width * image.scale), 1)
+            let pixelHeight = max(Int(image.size.height * image.scale), 1)
+            pixelCost = pixelWidth * pixelHeight * 4
+        }
+        cache.setObject(image, forKey: url as NSURL, cost: pixelCost)
+    }
+}
+
 public protocol LevixelImageLoading {
     func loadImage(
         _ url: URL,

@@ -6,6 +6,8 @@ import {
   LevixelMediaType,
   RectMetrics
 } from '../model/LevixelModels';
+import { LevixelImageViewer } from './LevixelImageViewer';
+import { LevixelVideoPlayer } from './LevixelVideoPlayer';
 
 const OPEN_SNAPSHOT_DURATION_MS: number = 300;
 const OPEN_CONTENT_FADE_DURATION_MS: number = 140;
@@ -48,11 +50,18 @@ export struct LevixelGallery {
   @Prop navigationTopInset: number = 0;
   onNavigateBack: () => void = (): void => {};
   private readonly tileRectsInWindow: Map<string, RectMetrics> = new Map<string, RectMetrics>();
+  private readonly visibleSourceIds: Set<string> = new Set<string>();
   private readonly imageResourceCache: Map<string, TransitionImageResource> = new Map<string, TransitionImageResource>();
   private readonly imageResourceRequests: Map<string, Promise<TransitionImageResource | null>> =
     new Map<string, Promise<TransitionImageResource | null>>();
   private transitionToken: number = 0;
   private snapshotPixelMap: image.PixelMap | null = null;
+  private viewerPreviewItemId: string = '';
+  private viewerPreviewPixelMap: image.PixelMap | null = null;
+  private openingItemId: string = '';
+  private openingIndex: number = -1;
+  private openingTransitionToken: number = 0;
+  private openingHandoffStarted: boolean = false;
 
   @State rootWidth: number = 360;
   @State rootHeight: number = 720;
@@ -70,8 +79,12 @@ export struct LevixelGallery {
   @State snapshotRect: RectMetrics = { left: 0, top: 0, width: 1, height: 1 };
   @State snapshotContentRect: RectMetrics = { left: 0, top: 0, width: 1, height: 1 };
   @State snapshotRadius: number = 0;
+  @State snapshotOpacity: number = 1;
   @State dragOffsetY: number = 0;
   @State dragScale: number = 1;
+  @State videoControlGestureActive: boolean = false;
+  @State openingPreviewReady: boolean = false;
+  @State openingSnapshotAtTarget: boolean = false;
 
   aboutToAppear(): void {
     this.preloadTransitionResources();
@@ -87,6 +100,14 @@ export struct LevixelGallery {
 
       if (this.snapshotVisible && this.snapshotPixelMap !== null) {
         this.TransitionSnapshot()
+      }
+
+      if (this.shouldShowOpeningLoading()) {
+        LoadingProgress()
+          .width(32)
+          .height(32)
+          .color(Color.White)
+          .align(Alignment.Center)
       }
     }
     .width('100%')
@@ -107,45 +128,37 @@ export struct LevixelGallery {
         this.NavigationHeader()
       }
 
-      Scroll() {
-        Column() {
-          if (!this.showsNavigationHeader) {
-            Row() {
-              Column() {
-                Text('Levixel')
-                  .fontSize(28)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#101828')
-                  .width('100%')
-                Text('Shared transition gallery')
-                  .fontSize(13)
-                  .fontColor('#667085')
-                  .margin({ top: 4 })
-                  .width('100%')
-              }
-              .layoutWeight(1)
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 18, bottom: 14 })
+      if (!this.showsNavigationHeader) {
+        Row() {
+          Column() {
+            Text('Levixel')
+              .fontSize(28)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#101828')
+              .width('100%')
+            Text('Shared transition gallery')
+              .fontSize(13)
+              .fontColor('#667085')
+              .margin({ top: 4 })
+              .width('100%')
           }
-
-          Grid() {
-            ForEach(this.items, (item: LevixelMediaItem, index: number) => {
-              GridItem() {
-                this.ThumbnailTile(item, index)
-              }
-            }, (item: LevixelMediaItem) => item.id)
-          }
-          .columnsTemplate('1fr 1fr')
-          .columnsGap(12)
-          .rowsGap(12)
-          .padding({ left: 12, right: 12, top: 12, bottom: 28 })
-          .width('100%')
+          .layoutWeight(1)
         }
         .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Start)
+        .padding({ left: 16, right: 16, top: 18, bottom: 14 })
       }
+
+      Grid() {
+        ForEach(this.items, (item: LevixelMediaItem, index: number) => {
+          GridItem() {
+            this.ThumbnailTile(item, index)
+          }
+        }, (item: LevixelMediaItem) => item.id)
+      }
+      .columnsTemplate('1fr 1fr')
+      .columnsGap(12)
+      .rowsGap(12)
+      .padding({ left: 12, right: 12, top: 12, bottom: 28 })
       .layoutWeight(1)
       .width('100%')
     }
@@ -222,6 +235,13 @@ export struct LevixelGallery {
         height: this.asPositiveNumber(newArea.height, 1)
       });
     })
+    .onVisibleAreaChange([0.0, 0.01], (isVisible: boolean, currentRatio: number) => {
+      if (isVisible && currentRatio > 0) {
+        this.visibleSourceIds.add(item.id);
+      } else {
+        this.visibleSourceIds.delete(item.id);
+      }
+    })
   }
 
   @Builder
@@ -262,7 +282,9 @@ export struct LevixelGallery {
           .index(this.currentIndex)
           .loop(false)
           .indicator(false)
+          .disableSwipe(this.videoControlGestureActive)
           .onChange((index: number) => {
+            this.videoControlGestureActive = false;
             this.currentIndex = index;
             this.syncHiddenSourceToCurrentItem();
             this.resetDragState(false);
@@ -278,12 +300,23 @@ export struct LevixelGallery {
         .gesture(
           PanGesture({ direction: PanDirection.Vertical, distance: 8 })
             .onActionUpdate((event) => {
+              if (this.videoControlGestureActive) {
+                return;
+              }
               this.updateVerticalDrag(event.offsetY);
             })
             .onActionEnd((event) => {
+              if (this.videoControlGestureActive) {
+                this.resetDragState(true);
+                return;
+              }
               this.finishVerticalDrag(event.velocityY);
             })
             .onActionCancel(() => {
+              if (this.videoControlGestureActive) {
+                this.resetDragState(true);
+                return;
+              }
               this.animateDragBack();
             })
         )
@@ -301,7 +334,7 @@ export struct LevixelGallery {
     .width('100%')
     .height('100%')
     .onClick(() => {
-      if (!this.transitionActive) {
+      if (item.mediaType === LevixelMediaType.IMAGE && !this.transitionActive) {
         this.closeViewer();
       }
     })
@@ -310,24 +343,35 @@ export struct LevixelGallery {
   @Builder
   private ViewerMedia(item: LevixelMediaItem) {
     Stack({ alignContent: Alignment.Center }) {
-      Image(this.displayUrl(item))
+      Image(this.previewSourceFor(item))
         .width('100%')
         .height('100%')
         .objectFit(ImageFit.Fill)
+        .syncLoad(this.previewUsesPixelMap(item))
+        .onComplete(() => {
+          this.handleViewerPreviewReady(item.id);
+        })
 
-      if (item.mediaType === LevixelMediaType.VIDEO) {
-        Column() {
-          Text('▶')
-            .fontSize(42)
-            .fontColor(Color.White)
-          Text('Video item shares the same transition path')
-            .fontSize(13)
-            .fontColor('#D0D5DD')
-            .margin({ top: 8 })
-        }
-        .padding(16)
-        .backgroundColor('#80000000')
-        .borderRadius(8)
+      if (item.mediaType === LevixelMediaType.IMAGE) {
+        LevixelImageViewer({
+          sourceUrl: item.sourceUrl
+        })
+      } else {
+        LevixelVideoPlayer({
+          itemId: item.id,
+          sourceUrl: item.sourceUrl,
+          active: this.isActiveVideoItem(item),
+          showPosterForDismiss: this.dragOffsetY !== 0,
+          onCloseRequested: (): void => {
+            this.closeViewer();
+          },
+          onControlInteractionChange: (active: boolean): void => {
+            this.videoControlGestureActive = active;
+            if (active) {
+              this.resetDragState(true);
+            }
+          }
+        })
       }
     }
     .width(this.targetRectFor(item).width)
@@ -350,6 +394,7 @@ export struct LevixelGallery {
     .position({ x: this.snapshotRect.left, y: this.snapshotRect.top })
     .borderRadius(this.snapshotRadius)
     .clip(true)
+    .opacity(this.snapshotOpacity)
   }
 
   private async openViewer(index: number): Promise<void> {
@@ -363,6 +408,10 @@ export struct LevixelGallery {
     if (!this.isActiveTransition(token)) {
       return;
     }
+
+    this.viewerPreviewItemId = sourceState !== null ? item.id : '';
+    this.viewerPreviewPixelMap = sourceState !== null ? sourceState.pixelMap : null;
+    this.prepareOpeningTransition(token, item.id, index, sourceState !== null);
 
     this.currentIndex = index;
     this.viewerOpen = true;
@@ -396,15 +445,8 @@ export struct LevixelGallery {
         if (!this.isActiveTransition(token)) {
           return;
         }
-        this.hiddenViewerMediaId = '';
-        this.getUIContext().animateTo({ duration: OPEN_CONTENT_FADE_DURATION_MS, curve: Curve.EaseOut }, () => {
-          this.contentOpacity = 1;
-        });
-        setTimeout(() => {
-          if (this.isActiveTransition(token)) {
-            this.finishOpenTransition(index);
-          }
-        }, OPEN_CONTENT_FADE_DURATION_MS + 20);
+        this.openingSnapshotAtTarget = true;
+        this.beginOpenPreviewHandoffIfReady();
       }, OPEN_SNAPSHOT_DURATION_MS);
     }, 0);
   }
@@ -431,6 +473,7 @@ export struct LevixelGallery {
     this.snapshotVisible = false;
     this.snapshotPixelMap = null;
     this.transitionActive = false;
+    this.resetOpeningTransitionState();
     this.resetDragState(false);
   }
 
@@ -499,17 +542,23 @@ export struct LevixelGallery {
     this.contentOpacity = 0;
     this.snapshotVisible = false;
     this.snapshotPixelMap = null;
+    this.viewerPreviewItemId = '';
+    this.viewerPreviewPixelMap = null;
     this.transitionActive = false;
     this.hiddenSourceId = '';
     this.hiddenViewerMediaId = '';
     this.backgroundOpacity = 0;
     this.snapshotRadius = 0;
+    this.snapshotOpacity = 1;
+    this.videoControlGestureActive = false;
+    this.resetOpeningTransitionState();
     this.resetDragState(false);
   }
 
   private beginTransition(): number {
     this.transitionToken += 1;
     this.transitionActive = true;
+    this.videoControlGestureActive = false;
     return this.transitionToken;
   }
 
@@ -519,26 +568,37 @@ export struct LevixelGallery {
 
   private async captureSourceState(item: LevixelMediaItem, index: number): Promise<SharedElementState | null> {
     const sourceRect: RectMetrics = this.sourceRectFor(item, index);
-    const resource: TransitionImageResource | null = await this.loadImageResource(item.thumbnailUrl);
-    if (resource !== null) {
-      return this.createImageResourceState(resource, sourceRect, TransitionImageFit.COVER, THUMBNAIL_RADIUS);
+    const cachedResource: TransitionImageResource | undefined = this.imageResourceCache.get(item.thumbnailUrl);
+    if (cachedResource !== undefined) {
+      return this.createImageResourceState(cachedResource, sourceRect, TransitionImageFit.COVER, THUMBNAIL_RADIUS);
     }
 
     const pixelMap: image.PixelMap | null = await this.capturePixelMap(this.sourceSnapshotId(item));
-    if (pixelMap === null) {
-      return null;
+    if (pixelMap !== null) {
+      return {
+        pixelMap: pixelMap,
+        geometry: this.defaultGeometryFor(sourceRect),
+        radius: THUMBNAIL_RADIUS
+      };
     }
-    return {
-      pixelMap: pixelMap,
-      geometry: this.defaultGeometryFor(sourceRect),
-      radius: THUMBNAIL_RADIUS
-    };
+
+    const resource: TransitionImageResource | null = await this.loadImageResource(item.thumbnailUrl);
+    return resource !== null
+      ? this.createImageResourceState(resource, sourceRect, TransitionImageFit.COVER, THUMBNAIL_RADIUS)
+      : null;
   }
 
   private async captureViewerState(item: LevixelMediaItem): Promise<SharedElementState | null> {
-    const resource: TransitionImageResource | null = await this.loadImageResource(this.displayUrl(item));
-    if (resource !== null) {
-      return this.createImageResourceState(resource, this.currentViewerRectFor(item), TransitionImageFit.FILL, 0);
+    const fullResource: TransitionImageResource | undefined = this.imageResourceCache.get(this.displayUrl(item));
+    const previewResource: TransitionImageResource | undefined = this.imageResourceCache.get(item.thumbnailUrl);
+    const transitionResource: TransitionImageResource | undefined = fullResource ?? previewResource;
+    if (transitionResource !== undefined) {
+      return this.createImageResourceState(
+        transitionResource,
+        this.currentViewerRectFor(item),
+        TransitionImageFit.FILL,
+        0
+      );
     }
 
     const pixelMap: image.PixelMap | null = await this.capturePixelMap(this.viewerSnapshotId(item));
@@ -601,6 +661,7 @@ export struct LevixelGallery {
   private applySnapshotState(state: SharedElementState): void {
     this.snapshotPixelMap = state.pixelMap;
     this.snapshotRadius = state.radius;
+    this.snapshotOpacity = 1;
     this.applySnapshotGeometry(state.geometry);
   }
 
@@ -640,7 +701,6 @@ export struct LevixelGallery {
   private preloadTransitionResources(): void {
     this.items.forEach((item: LevixelMediaItem) => {
       this.loadImageResource(item.thumbnailUrl);
-      this.loadImageResource(this.displayUrl(item));
     });
   }
 
@@ -767,7 +827,7 @@ export struct LevixelGallery {
   }
 
   private updateVerticalDrag(offsetY: number): void {
-    if (this.transitionActive) {
+    if (this.transitionActive || this.videoControlGestureActive) {
       return;
     }
     this.dragOffsetY = offsetY;
@@ -777,6 +837,10 @@ export struct LevixelGallery {
   }
 
   private finishVerticalDrag(velocityY: number): void {
+    if (this.videoControlGestureActive) {
+      this.resetDragState(true);
+      return;
+    }
     const distanceThreshold: number = this.rootHeight * 0.16;
     const quickFlingDistance: number = this.rootHeight * 0.06;
     const velocityThreshold: number = 1300;
@@ -832,6 +896,9 @@ export struct LevixelGallery {
   }
 
   private closeTargetRectFor(item: LevixelMediaItem): RectMetrics | null {
+    if (!this.visibleSourceIds.has(item.id)) {
+      return null;
+    }
     const measured: RectMetrics | null = this.measuredSourceRectFor(item);
     if (measured === null || !this.isRectVisible(measured)) {
       return null;
@@ -902,6 +969,92 @@ export struct LevixelGallery {
 
   private displayUrl(item: LevixelMediaItem): string {
     return item.mediaType === LevixelMediaType.VIDEO ? item.thumbnailUrl : item.sourceUrl;
+  }
+
+  private previewSourceFor(item: LevixelMediaItem): string | image.PixelMap {
+    if (this.viewerPreviewItemId === item.id && this.viewerPreviewPixelMap !== null) {
+      return this.viewerPreviewPixelMap;
+    }
+    const cached: TransitionImageResource | undefined = this.imageResourceCache.get(item.thumbnailUrl);
+    return cached !== undefined ? cached.pixelMap : item.thumbnailUrl;
+  }
+
+  private previewUsesPixelMap(item: LevixelMediaItem): boolean {
+    if (this.viewerPreviewItemId === item.id && this.viewerPreviewPixelMap !== null) {
+      return true;
+    }
+    return this.imageResourceCache.has(item.thumbnailUrl);
+  }
+
+  private prepareOpeningTransition(token: number, itemId: string, index: number, hasSnapshot: boolean): void {
+    this.openingItemId = hasSnapshot ? itemId : '';
+    this.openingIndex = hasSnapshot ? index : -1;
+    this.openingTransitionToken = hasSnapshot ? token : 0;
+    this.openingHandoffStarted = false;
+    this.openingPreviewReady = false;
+    this.openingSnapshotAtTarget = false;
+    this.snapshotOpacity = 1;
+  }
+
+  private handleViewerPreviewReady(itemId: string): void {
+    if (!this.isActiveTransition(this.openingTransitionToken) || this.openingItemId !== itemId) {
+      return;
+    }
+    this.openingPreviewReady = true;
+    this.beginOpenPreviewHandoffIfReady();
+  }
+
+  private beginOpenPreviewHandoffIfReady(): void {
+    if (this.openingHandoffStarted || !this.openingPreviewReady || !this.openingSnapshotAtTarget) {
+      return;
+    }
+    const token: number = this.openingTransitionToken;
+    const index: number = this.openingIndex;
+    if (!this.isActiveTransition(token) || index < 0 || index >= this.items.length) {
+      return;
+    }
+
+    this.openingHandoffStarted = true;
+    this.hiddenViewerMediaId = '';
+    this.contentOpacity = 1;
+    setTimeout(() => {
+      if (!this.isActiveTransition(token)) {
+        return;
+      }
+      this.getUIContext().animateTo({ duration: OPEN_CONTENT_FADE_DURATION_MS, curve: Curve.EaseOut }, () => {
+        this.snapshotOpacity = 0;
+      });
+      setTimeout(() => {
+        if (this.isActiveTransition(token)) {
+          this.finishOpenTransition(index);
+        }
+      }, OPEN_CONTENT_FADE_DURATION_MS + 20);
+    }, 0);
+  }
+
+  private shouldShowOpeningLoading(): boolean {
+    return this.transitionActive && this.snapshotVisible && this.openingSnapshotAtTarget &&
+      !this.openingPreviewReady && this.openingItemId.length > 0;
+  }
+
+  private resetOpeningTransitionState(): void {
+    this.openingItemId = '';
+    this.openingIndex = -1;
+    this.openingTransitionToken = 0;
+    this.openingHandoffStarted = false;
+    this.openingPreviewReady = false;
+    this.openingSnapshotAtTarget = false;
+    this.snapshotOpacity = 1;
+  }
+
+  private isActiveVideoItem(item: LevixelMediaItem): boolean {
+    if (item.mediaType !== LevixelMediaType.VIDEO || this.transitionActive || !this.viewerOpen) {
+      return false;
+    }
+    if (this.currentIndex < 0 || this.currentIndex >= this.items.length) {
+      return false;
+    }
+    return this.items[this.currentIndex].id === item.id;
   }
 
   private asPositionNumber(value: Length | undefined, fallback: number): number {

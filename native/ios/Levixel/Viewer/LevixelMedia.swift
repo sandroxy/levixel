@@ -2,7 +2,7 @@ import UIKit
 
 public enum LevixelMediaItem {
     case image(UIImage?)
-    case imageURL(URL, placeholder: UIImage?)
+    case imageURL(URL, thumbnailURL: URL? = nil, placeholder: UIImage?)
     case video(url: URL, poster: URL?)
 }
 

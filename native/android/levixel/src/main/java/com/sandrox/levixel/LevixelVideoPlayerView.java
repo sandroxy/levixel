@@ -20,14 +20,12 @@ import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.AppCompatImageButton;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerControlView;
 import androidx.media3.ui.PlayerView;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.GlideException;
-import com.bumptech.glide.request.RequestListener;
-import com.bumptech.glide.request.target.Target;
 
 public final class LevixelVideoPlayerView extends FrameLayout {
     public interface Listener {
@@ -54,9 +52,16 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         @Override
         public void onRenderedFirstFrame() {
             firstFrameReady = true;
+            notifyContentReady();
             if (active) {
                 revealPlayer();
             }
+        }
+
+        @Override
+        public void onPlayerError(@NonNull PlaybackException error) {
+            firstFrameReady = false;
+            notifyContentReady();
         }
     };
 
@@ -149,19 +154,6 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         Glide.with(posterImageView)
                 .load(item.getThumbnailUrl())
                 .dontAnimate()
-                .listener(new RequestListener<Drawable>() {
-                    @Override
-                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                        notifyContentReady();
-                        return false;
-                    }
-
-                    @Override
-                    public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
-                        notifyContentReady();
-                        return false;
-                    }
-                })
                 .into(posterImageView);
         if (active) {
             ensurePlayerPrepared(item.getSourceUrl());
@@ -225,8 +217,19 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     }
 
     public boolean isTouchOnInteractiveControls(float rawX, float rawY) {
-        return isTouchInsideView(playerView.findViewById(androidx.media3.ui.R.id.exo_progress), rawX, rawY, dp(24))
+        return isTouchInsideView(playerView.findViewById(androidx.media3.ui.R.id.exo_bottom_bar), rawX, rawY, dp(16))
+                || isTouchInsideView(playerView.findViewById(androidx.media3.ui.R.id.exo_progress), rawX, rawY, dp(24))
                 || isTouchInsideView(closeButton, rawX, rawY, dp(12));
+    }
+
+    public void setPosterPlaceholder(@NonNull Drawable drawable) {
+        if (firstFrameReady) {
+            return;
+        }
+        Glide.with(posterImageView).clear(posterImageView);
+        posterImageView.setImageDrawable(drawable);
+        posterImageView.setAlpha(1f);
+        posterImageView.setVisibility(VISIBLE);
     }
 
     public void release() {
