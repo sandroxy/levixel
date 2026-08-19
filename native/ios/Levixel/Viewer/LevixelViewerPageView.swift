@@ -108,6 +108,10 @@ final class LevixelViewerPageView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        refreshLayoutForCurrentBounds()
+    }
+
+    func refreshLayoutForCurrentBounds() {
         let shouldResetZoom = fullImageHandoffPending
         let didLayoutImage = layoutImageIfNeeded(resetZoom: shouldResetZoom)
         if shouldResetZoom && didLayoutImage {

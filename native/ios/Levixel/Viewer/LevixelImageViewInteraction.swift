@@ -125,7 +125,7 @@ extension UIImageView {
         )
     }
 
-    func removeLevixelViewerInteraction() {
+    public func removeLevixelViewerInteraction() {
         if let recognizer = levixelTapGestureRecognizer {
             removeGestureRecognizer(recognizer)
         }

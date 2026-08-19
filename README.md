@@ -47,3 +47,18 @@ Verify the packaged HAR in the shared HarmonyOS test host:
 ```
 
 Set `DEVECO_SDK_HOME`; also set `HVIGORW` and `OHPM` when those tools are not available on `PATH`.
+
+## React Native
+
+Build the self-contained npm tarball with the Android AAR and iOS XCFramework:
+
+```sh
+./scripts/package-react-native.sh
+```
+
+Verify the exact tarball in the shared Expo test host:
+
+```sh
+./scripts/verify-react-native.sh android
+./scripts/verify-react-native.sh ios
+```

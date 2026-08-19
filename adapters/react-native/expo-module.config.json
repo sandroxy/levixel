@@ -1,0 +1,16 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LevixelModule"],
+    "podspecPath": "./SandroxLevixel.podspec"
+  },
+  "android": {
+    "modules": ["com.sandrox.levixel.reactnative.LevixelModule"],
+    "gradleAarProjects": [
+      {
+        "name": "levixel-core",
+        "aarFilePath": "android/libs/levixel-core.aar"
+      }
+    ]
+  }
+}

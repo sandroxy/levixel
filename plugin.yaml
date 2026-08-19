@@ -100,3 +100,36 @@ targets:
     constraints:
       - name: minimum-api
         value: 23
+  - id: react-native
+    kind: adapter
+    runtime: react-native
+    platforms:
+      - android
+      - ios
+    sourceRoot: adapters/react-native
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-react-native.sh
+    verify:
+      commands:
+        - ./scripts/verify-react-native.sh android
+        - ./scripts/verify-react-native.sh ios
+    artifacts:
+      - id: npm-package
+        format: npm-tarball
+        output: dist/react-native/sandrox-levixel-0.1.0.tgz
+        distribution:
+          channel: npm
+          packageId: '@sandrox/levixel'
+    constraints:
+      - name: minimum-expo
+        value: 54
+      - name: minimum-react-native
+        value: '0.81'

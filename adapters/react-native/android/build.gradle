@@ -1,0 +1,38 @@
+import groovy.json.JsonSlurper
+
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+def packageJson = new JsonSlurper().parseText(file('../package.json').text)
+def levixelVersion = packageJson.version
+
+group = 'com.sandrox.levixel'
+version = levixelVersion
+
+android {
+  namespace 'com.sandrox.levixel.reactnative'
+
+  defaultConfig {
+    versionCode 1
+    versionName levixelVersion
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
+
+dependencies {
+  implementation project(":${project.name}\$levixel-core")
+  implementation 'androidx.activity:activity:1.11.0'
+  implementation 'androidx.appcompat:appcompat:1.7.1'
+  implementation 'androidx.recyclerview:recyclerview:1.4.0'
+  implementation 'androidx.viewpager2:viewpager2:1.1.0'
+  implementation 'androidx.media3:media3-exoplayer:1.5.1'
+  implementation 'androidx.media3:media3-ui:1.5.1'
+  implementation 'com.github.bumptech.glide:glide:4.16.0'
+  implementation 'com.github.chrisbanes:PhotoView:2.3.0'
+}

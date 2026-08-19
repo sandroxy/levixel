@@ -116,8 +116,10 @@ final class LevixelViewerController: UIViewController {
         super.viewDidLayoutSubviews()
 
         guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
-        if layout.itemSize != collectionView.bounds.size {
-            layout.itemSize = collectionView.bounds.size
+        let itemSize = collectionView.bounds.size
+        guard itemSize.width > 0, itemSize.height > 0 else { return }
+        if layout.itemSize != itemSize {
+            layout.itemSize = itemSize
             layout.invalidateLayout()
             scrollToIndex(currentIndex, animated: false)
         } else if pendingInitialScroll {
@@ -756,6 +758,12 @@ private final class LevixelViewerPageCell: UICollectionViewCell {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        contentView.layoutIfNeeded()
+        pageView.refreshLayoutForCurrentBounds()
     }
 
     override func prepareForReuse() {
