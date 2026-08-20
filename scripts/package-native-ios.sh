@@ -16,7 +16,7 @@ swift_package_name="levixel-${version}-swift-package.zip"
 swift_package_path="${artifact_dir}/${swift_package_name}"
 swift_package_dir="${artifact_dir}/swift-package"
 swift_package_template="${plugin_dir}/packaging/swift-package/Package.swift.template"
-binary_url="${LEVIXEL_IOS_BINARY_URL:-https://gitee.com/chrisJxc/integrated-plugins/releases/download/levixel-v${version}/${artifact_name}}"
+binary_url="${LEVIXEL_IOS_BINARY_URL:-https://gitee.com/sandrox/levixel/releases/download/${version}/${artifact_name}}"
 
 rm -rf "${build_dir}"
 mkdir -p "${build_dir}"

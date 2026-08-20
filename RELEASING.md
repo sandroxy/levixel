@@ -81,13 +81,15 @@ folded into release packaging work.
 
 ## iOS / Swift Package Manager
 
-1. Create the Gitee release tag `levixel-v1.0.0` for the canonical release
-   commit.
-2. Attach `dist/native-ios/levixel-1.0.0.xcframework.zip` without rebuilding.
-3. Push the contents of `dist/native-ios/swift-package` to the dedicated public
-   Swift Package repository.
-4. Tag that package repository `1.0.0`.
-5. Resolve the public package in a clean iOS consumer and run one final smoke
+1. Create the source tag `levixel-v1.0.0` on the canonical release commit.
+2. Push the generated Swift Package contents to the public product repository
+   at `https://gitee.com/sandrox/levixel`.
+3. Tag the public product repository `1.0.0`.
+4. Create the matching public Gitee release and attach
+   `dist/native-ios/levixel-1.0.0.xcframework.zip` without rebuilding.
+5. Confirm the release asset is anonymously downloadable and matches the
+   checksum pinned in `Package.swift`.
+6. Resolve the public package in a clean iOS consumer and run one final smoke
    test.
 
 The generated package manifest points to the canonical Gitee release URL and

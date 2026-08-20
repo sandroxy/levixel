@@ -61,6 +61,8 @@ the iOS consumer host:
 The generated Swift Package repository contents are in
 `dist/native-ios/swift-package`.
 
+Public package repository: `https://gitee.com/sandrox/levixel`.
+
 ## HarmonyOS
 
 Build and verify the OHPM-ready HAR:
