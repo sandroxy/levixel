@@ -10,8 +10,16 @@ host_dir="${repo_root}/ios-plugins-test"
 staging_dir="${host_dir}/.artifacts"
 xcframework_path="${staging_dir}/Levixel.xcframework"
 derived_data="${host_dir}/DerivedData"
+swift_package_dir="${plugin_dir}/dist/native-ios/swift-package"
 
-"${script_dir}/package-native-ios.sh"
+if [[ "${LEVIXEL_SKIP_PACKAGE:-0}" != "1" ]]; then
+  "${script_dir}/package-native-ios.sh"
+fi
+
+if [[ ! -f "${artifact_path}" || ! -f "${swift_package_dir}/Package.swift" ]]; then
+  echo "Packaged iOS artifacts are missing." >&2
+  exit 1
+fi
 
 rm -rf "${staging_dir}"
 mkdir -p "${staging_dir}"
@@ -24,8 +32,31 @@ fi
 
 plutil -lint "${xcframework_path}/Info.plist"
 
-if rg -n 'Galeria|galeria|com\.chris' "${xcframework_path}"; then
-  echo "Legacy Galeria identifiers found in packaged iOS artifact" >&2
+while IFS= read -r framework_path; do
+  for legal_file in LICENSE THIRD_PARTY_NOTICES.md PrivacyInfo.xcprivacy; do
+    if [[ ! -f "${framework_path}/${legal_file}" ]]; then
+      echo "${legal_file} is missing from ${framework_path}" >&2
+      exit 1
+    fi
+  done
+  plutil -lint "${framework_path}/PrivacyInfo.xcprivacy"
+done < <(find "${xcframework_path}" -type d -name 'Levixel.framework' -print)
+
+while IFS= read -r -d '' packaged_file; do
+  if rg -a -n 'Galeria|galeria|com\.chris' "${packaged_file}"; then
+    echo "Legacy Galeria identifiers found in packaged iOS runtime content" >&2
+    exit 1
+  fi
+done < <(find "${xcframework_path}" -type f \
+  ! -name 'LICENSE' \
+  ! -name 'THIRD_PARTY_NOTICES.md' \
+  -print0)
+
+swift package dump-package --package-path "${swift_package_dir}" >/dev/null
+declared_checksum="$(sed -n 's/.*checksum: "\([0-9a-f]*\)".*/\1/p' "${swift_package_dir}/Package.swift")"
+actual_checksum="$(swift package compute-checksum "${artifact_path}")"
+if [[ "${declared_checksum}" != "${actual_checksum}" ]]; then
+  echo "Swift package checksum does not match ${artifact_path}" >&2
   exit 1
 fi
 

@@ -3,8 +3,8 @@
 schemaVersion: 1
 id: levixel
 displayName: Levixel
-version: 0.1.0
-summary: Shared-transition image and video viewer for native, React Native, UniApp, and web applications.
+version: 1.0.0
+summary: Shared-transition image and video viewer for native and React Native applications.
 
 contract:
   version: 1
@@ -39,12 +39,15 @@ targets:
       commands:
         - ./scripts/verify-native-android.sh
     artifacts:
+      - id: maven-repository
+        format: maven-repository-zip
+        output: dist/native-android/levixel-1.0.0-maven.zip
+        distribution:
+          channel: maven-central
+          packageId: com.sandrox:levixel
       - id: aar
         format: aar
-        output: dist/native-android/levixel-0.1.0.aar
-        distribution:
-          channel: github-release
-          packageId: com.sandrox.levixel:levixel
+        output: dist/native-android/levixel-1.0.0.aar
     constraints:
       - name: minimum-sdk
         value: 21
@@ -68,10 +71,13 @@ targets:
     artifacts:
       - id: xcframework
         format: xcframework-zip
-        output: dist/native-ios/levixel-0.1.0.xcframework.zip
+        output: dist/native-ios/levixel-1.0.0.xcframework.zip
         distribution:
-          channel: github-release
-          packageId: com.sandrox.levixel
+          channel: swift-package
+          packageId: Levixel
+      - id: swift-package
+        format: swift-package-zip
+        output: dist/native-ios/levixel-1.0.0-swift-package.zip
     constraints:
       - name: minimum-ios
         value: '13.0'
@@ -93,7 +99,7 @@ targets:
     artifacts:
       - id: har
         format: har
-        output: dist/native-harmonyos/levixel-0.1.0.har
+        output: dist/native-harmonyos/levixel-1.0.0.har
         distribution:
           channel: ohpm
           packageId: '@sandrox/levixel'
@@ -119,12 +125,11 @@ targets:
       command: ./scripts/package-react-native.sh
     verify:
       commands:
-        - ./scripts/verify-react-native.sh android
-        - ./scripts/verify-react-native.sh ios
+        - ./scripts/verify-react-native.sh all
     artifacts:
       - id: npm-package
         format: npm-tarball
-        output: dist/react-native/sandrox-levixel-0.1.0.tgz
+        output: dist/react-native/sandrox-levixel-1.0.0.tgz
         distribution:
           channel: npm
           packageId: '@sandrox/levixel'

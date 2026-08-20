@@ -16,8 +16,17 @@ if [[ "${package_version}" != "${version}" ]]; then
   exit 1
 fi
 
-"${script_dir}/package-native-android.sh"
-"${script_dir}/package-native-ios.sh"
+"${script_dir}/verify-release-metadata.sh"
+
+android_artifact="${plugin_dir}/dist/native-android/levixel-${version}.aar"
+ios_artifact="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
+for native_artifact in "${android_artifact}" "${ios_artifact}"; do
+  if [[ ! -f "${native_artifact}" ]]; then
+    echo "Native artifact is missing: ${native_artifact}" >&2
+    echo "Package and verify the native cores before packaging React Native." >&2
+    exit 1
+  fi
+done
 
 rm -rf "${staging_dir}"
 mkdir -p "${staging_dir}"
@@ -35,10 +44,8 @@ mkdir -p \
   "${staging_dir}/android/libs" \
   "${staging_dir}/ios/Frameworks"
 
-android_artifact="${plugin_dir}/dist/native-android/levixel-${version}.aar"
 cp "${android_artifact}" "${staging_dir}/android/libs/levixel-core.aar"
 
-ios_artifact="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
 unzip -q "${ios_artifact}" 'Levixel.xcframework/*' -d "${staging_dir}/ios/Frameworks"
 
 rm -f "${artifact_path}" "${artifact_path}.sha256"
