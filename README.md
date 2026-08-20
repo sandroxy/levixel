@@ -89,6 +89,16 @@ packaged Android and iOS cores:
 ./scripts/verify-react-native.sh ios
 ```
 
+Inspect the immutable npm tarball without rebuilding it:
+
+```sh
+./scripts/verify-react-native-package.sh
+```
+
+After the exact tarball passes Android and iOS hand verification, follow the
+tagged publication procedure in [RELEASING.md](RELEASING.md). Do not rebuild
+between hand verification and npm publication.
+
 ## License And Provenance
 
 Levixel is independently maintained and substantially rewritten, but the

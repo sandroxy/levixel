@@ -4,12 +4,22 @@
   "description": "Shared-transition image and video viewer for React Native and Expo.",
   "license": "MIT",
   "author": "sandrox",
-  "homepage": "https://gitee.com/chrisJxc/integrated-plugins",
+  "homepage": "https://gitee.com/sandrox/levixel",
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/chrisJxc/integrated-plugins.git",
-    "directory": "plugins/levixel/adapters/react-native"
+    "url": "https://gitee.com/sandrox/levixel.git"
   },
+  "bugs": {
+    "url": "https://gitee.com/sandrox/levixel/issues"
+  },
+  "keywords": [
+    "expo",
+    "gallery",
+    "image-viewer",
+    "react-native",
+    "shared-transition",
+    "video-viewer"
+  ],
   "main": "src/index.ts",
   "react-native": "src/index.ts",
   "types": "src/index.ts",
@@ -19,7 +29,9 @@
     "src",
     "SandroxLevixel.podspec",
     "expo-module.config.json",
+    "CHANGELOG.md",
     "LICENSE",
+    "PROVENANCE.md",
     "README.md",
     "THIRD_PARTY_NOTICES.md"
   ],
@@ -29,7 +41,8 @@
     "react-native": ">=0.81.0"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "sideEffects": false
 }

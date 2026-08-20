@@ -15,9 +15,9 @@ case "${target}" in
     ;;
 esac
 
-"${script_dir}/package-react-native.sh"
+"${script_dir}/verify-react-native-package.sh"
 
-corepack pnpm@9.12.3 --dir "${host_dir}" install --force
+corepack pnpm@9.12.3 --dir "${host_dir}" install --force --frozen-lockfile
 corepack pnpm@9.12.3 --dir "${host_dir}" typecheck
 
 if [[ "${target}" == "android" || "${target}" == "all" ]]; then

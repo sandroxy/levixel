@@ -1,15 +1,15 @@
-# Native Release Process
+# Release Process
 
 ## Artifact Graph
 
-The native release has one canonical version and three ecosystem-specific
-products:
+Levixel has one canonical version and ecosystem-specific products:
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
 | Android | `io.gitee.sandrox:levixel:1.0.0` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
 | iOS | `Levixel` | Checksum-pinned Swift Package that downloads the XCFramework ZIP |
 | HarmonyOS | `@sandrox/levixel@1.0.0` | OHPM HAR |
+| React Native | `@sandrox/levixel@1.0.0` | npm tarball containing thin Expo Modules bridges and the verified Android/iOS native artifacts |
 
 The raw Android AAR remains an internal adapter input. It is not the preferred
 public Android installation format because an AAR alone cannot declare its
@@ -109,6 +109,54 @@ LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-1.0.0.xcframework.zip \
 3. Publish `dist/native-harmonyos/levixel-1.0.0.har` without rebuilding.
 4. Install `@sandrox/levixel@1.0.0` into a clean HarmonyOS consumer and run a
    final smoke test.
+
+## React Native / npm
+
+The npm product embeds the exact Android AAR and iOS XCFramework recorded in
+`dist/native-release/levixel-native-1.0.0.json`. It must not compile copied
+native viewer source or resolve an unpinned native core during consumer install.
+
+1. Package the npm candidate once:
+
+   ```sh
+   ./scripts/package-react-native.sh
+   ```
+
+2. Update the shared host lockfile to the candidate tarball, then verify
+   Android and iOS transition, paging, zoom, pan, video, loading, and return
+   behavior:
+
+   ```sh
+   ./scripts/verify-react-native.sh android
+   ./scripts/verify-react-native.sh ios
+   ```
+
+   The verification script uses a frozen lockfile and never rebuilds the
+   tarball.
+3. Commit the source and host lockfile that produced the accepted candidate,
+   then create the canonical tag on that commit:
+
+   ```sh
+   git tag -a levixel-react-native-v1.0.0 -m "Levixel React Native 1.0.0"
+   ```
+
+4. Check the exact accepted archive and npm publication metadata:
+
+   ```sh
+   ./scripts/publish-react-native.sh --dry-run
+   ```
+
+5. Authenticate with the public npm registry and publish the same archive
+   bytes, without rerunning `package-react-native.sh`:
+
+   ```sh
+   npm login --scope=@sandrox --registry=https://registry.npmjs.org/
+   ./scripts/publish-react-native.sh --publish
+   ```
+
+6. Install `@sandrox/levixel@1.0.0` from npm in a clean consumer and run the
+   final Android/iOS smoke test. Public npm versions are immutable; never reuse
+   `1.0.0` for different bytes.
 
 ## Provenance
 

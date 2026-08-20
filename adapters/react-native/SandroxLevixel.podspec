@@ -10,7 +10,9 @@ Pod::Spec.new do |s|
   s.license = package['license']
   s.author = package['author']
   s.homepage = package['homepage']
-  s.source = { git: package['repository']['url'], tag: s.version.to_s }
+  s.source = {
+    http: "https://registry.npmjs.org/@sandrox/levixel/-/levixel-#{s.version}.tgz"
+  }
   s.platform = :ios, '15.1'
   s.swift_version = '5.9'
   s.static_framework = true
