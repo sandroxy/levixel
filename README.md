@@ -37,7 +37,7 @@ Verify the Maven coordinate and its transitive metadata in the Android host:
 ./scripts/verify-native-android.sh
 ```
 
-Public coordinate: `com.sandrox:levixel:1.0.0`.
+Public coordinate: `io.gitee.sandrox:levixel:1.0.0`.
 
 The current Android core intentionally retains the already validated
 `PhotoView 2.3.0` implementation. Consumers must make JitPack available until

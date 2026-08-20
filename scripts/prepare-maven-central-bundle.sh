@@ -8,9 +8,15 @@ repository_path="${plugin_dir}/dist/native-android/levixel-${version}-maven.zip"
 artifact_dir="${plugin_dir}/dist/native-android"
 bundle_name="levixel-${version}-maven-central.zip"
 bundle_path="${artifact_dir}/${bundle_name}"
+expected_signing_fingerprint="B7D159C354B9EF7318D3544200BE5C219A0DD690"
 
 if [[ ! -f "${repository_path}" ]]; then
   echo "Build and verify the native release candidate before preparing Maven Central." >&2
+  exit 1
+fi
+
+if ! command -v gpg >/dev/null 2>&1; then
+  echo "GnuPG is required to verify the Maven Central signatures." >&2
   exit 1
 fi
 
@@ -18,7 +24,7 @@ temporary_dir="$(mktemp -d)"
 trap 'rm -rf "${temporary_dir}"' EXIT
 unzip -q "${repository_path}" -d "${temporary_dir}/repository"
 
-version_dir="${temporary_dir}/repository/com/sandrox/levixel/${version}"
+version_dir="${temporary_dir}/repository/io/gitee/sandrox/levixel/${version}"
 if [[ ! -d "${version_dir}" ]]; then
   echo "Maven repository does not contain Levixel ${version}." >&2
   exit 1
@@ -41,9 +47,23 @@ for artifact in "${artifacts[@]}"; do
     echo "Rebuild the release candidate with LEVIXEL_SIGNING_KEY and LEVIXEL_SIGNING_PASSWORD." >&2
     exit 1
   fi
+
+  signature_status="$(gpg --batch --status-fd 1 --verify "${artifact}.asc" "${artifact}" 2>/dev/null || true)"
+  signature_fingerprint="$(awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print $3; exit }' <<<"${signature_status}")"
+  if [[ "${signature_fingerprint}" != "${expected_signing_fingerprint}" ]]; then
+    echo "Unexpected Maven signature for $(basename "${artifact}"): ${signature_fingerprint:-invalid}" >&2
+    exit 1
+  fi
+
+  for checksum in md5 sha1 sha256 sha512; do
+    if [[ ! -f "${artifact}.${checksum}" || ! -f "${artifact}.asc.${checksum}" ]]; then
+      echo "Maven checksum is missing for $(basename "${artifact}") (${checksum})." >&2
+      exit 1
+    fi
+  done
 done
 
-bundle_root="${temporary_dir}/bundle/com/sandrox/levixel"
+bundle_root="${temporary_dir}/bundle/io/gitee/sandrox/levixel"
 mkdir -p "${bundle_root}"
 cp -R "${version_dir}" "${bundle_root}/${version}"
 

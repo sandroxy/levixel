@@ -4,7 +4,7 @@ plugins {
     id "signing"
 }
 
-group = "com.sandrox"
+group = "io.gitee.sandrox"
 version = rootProject.ext.levixelVersion
 
 def pluginRoot = file("../../..")
@@ -128,6 +128,7 @@ afterEvaluate {
                         developer {
                             id = "sandrox"
                             name = "SandroX"
+                            email = "wangyifengjxc@gmail.com"
                         }
                     }
 

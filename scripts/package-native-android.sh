@@ -11,7 +11,7 @@ artifact_dir="${plugin_dir}/dist/native-android"
 artifact_path="${artifact_dir}/${artifact_name}"
 repository_path="${artifact_dir}/${repository_name}"
 repository_dir="${android_dir}/levixel/build/maven-repository"
-maven_artifact="${repository_dir}/com/sandrox/levixel/${version}/${artifact_name}"
+maven_artifact="${repository_dir}/io/gitee/sandrox/levixel/${version}/${artifact_name}"
 
 "${android_dir}/gradlew" -p "${android_dir}" \
   :levixel:clean \

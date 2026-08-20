@@ -40,13 +40,13 @@ rm -rf "${artifact_stage}"
 mkdir -p "${artifact_stage}/maven"
 unzip -q "${repository_path}" -d "${artifact_stage}/maven"
 
-version_dir="${artifact_stage}/maven/com/sandrox/levixel/${version}"
+version_dir="${artifact_stage}/maven/io/gitee/sandrox/levixel/${version}"
 pom_path="${version_dir}/levixel-${version}.pom"
 if [[ ! -f "${pom_path}" ]]; then
     printf '%s\n' "Levixel Maven POM is missing from ${repository_path}" >&2
     exit 1
 fi
-if ! rg -q '<groupId>com\.sandrox</groupId>' "${pom_path}" \
+if ! rg -q '<groupId>io\.gitee\.sandrox</groupId>' "${pom_path}" \
     || ! rg -q '<artifactId>levixel</artifactId>' "${pom_path}"; then
     printf '%s\n' "Levixel Maven POM has unexpected coordinates" >&2
     exit 1

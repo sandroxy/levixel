@@ -44,7 +44,7 @@ targets:
         output: dist/native-android/levixel-1.0.0-maven.zip
         distribution:
           channel: maven-central
-          packageId: com.sandrox:levixel
+          packageId: io.gitee.sandrox:levixel
       - id: aar
         format: aar
         output: dist/native-android/levixel-1.0.0.aar

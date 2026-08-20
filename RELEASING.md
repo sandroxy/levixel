@@ -7,7 +7,7 @@ products:
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
-| Android | `com.sandrox:levixel:1.0.0` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
+| Android | `io.gitee.sandrox:levixel:1.0.0` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
 | iOS | `Levixel` | Checksum-pinned Swift Package that downloads the XCFramework ZIP |
 | HarmonyOS | `@sandrox/levixel@1.0.0` | OHPM HAR |
 
@@ -50,9 +50,19 @@ identity, version, or transitive dependencies.
 External prerequisites:
 
 - A Central Publisher Portal account.
-- A verified namespace that permits `com.sandrox`.
+- A verified namespace that permits `io.gitee.sandrox`.
 - A public signing key and the matching private key supplied through the two
   environment variables above.
+
+The canonical release-signing key is published through the key servers
+supported by Maven Central. Its full fingerprint is:
+
+```text
+B7D159C354B9EF7318D3544200BE5C219A0DD690
+```
+
+`prepare-maven-central-bundle.sh` rejects missing signatures, signatures made
+by any other key, and incomplete checksum sets before producing an upload.
 
 After the signed native candidate has passed the Android host, create the
 Central Portal upload without rebuilding:
