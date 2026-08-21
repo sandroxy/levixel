@@ -53,6 +53,12 @@ done < <(find "${xcframework_path}" -type f \
   -print0)
 
 swift package dump-package --package-path "${swift_package_dir}" >/dev/null
+declared_url="$(sed -n 's/.*url: "\([^"]*\)".*/\1/p' "${swift_package_dir}/Package.swift")"
+expected_url="https://github.com/sandroxy/levixel/releases/download/${version}/levixel-${version}.xcframework.zip"
+if [[ "${declared_url}" != "${expected_url}" ]]; then
+  echo "Swift package binary URL is not canonical: ${declared_url}" >&2
+  exit 1
+fi
 declared_checksum="$(sed -n 's/.*checksum: "\([0-9a-f]*\)".*/\1/p' "${swift_package_dir}/Package.swift")"
 actual_checksum="$(swift package compute-checksum "${artifact_path}")"
 if [[ "${declared_checksum}" != "${actual_checksum}" ]]; then

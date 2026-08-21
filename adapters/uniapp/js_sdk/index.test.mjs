@@ -94,7 +94,7 @@ function completePreviewDownload(request) {
 
 globalThis.uni = {
   requireNativePlugin(name) {
-    assert.equal(name, 'Levixel')
+    assert.equal(name, 'Sandrox-Levixel')
     return nativePlugin
   },
   getImageInfo({ src, success }) {

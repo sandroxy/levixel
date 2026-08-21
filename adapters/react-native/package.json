@@ -4,13 +4,14 @@
   "description": "Shared-transition image and video viewer for React Native and Expo.",
   "license": "MIT",
   "author": "sandrox",
-  "homepage": "https://gitee.com/sandrox/levixel",
+  "homepage": "https://github.com/sandroxy/levixel",
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/sandrox/levixel.git"
+    "url": "https://github.com/sandroxy/integrated-plugins.git",
+    "directory": "plugins/levixel/adapters/react-native"
   },
   "bugs": {
-    "url": "https://gitee.com/sandrox/levixel/issues"
+    "url": "https://github.com/sandroxy/integrated-plugins/issues"
   },
   "keywords": [
     "expo",

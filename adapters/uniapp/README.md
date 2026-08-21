@@ -5,7 +5,7 @@ Levixel native artifacts. It does not copy either native viewer core.
 
 ## Public SDK
 
-Install the generated `SandroxUniPlugin-Levixel` directory under the consumer
+Install the generated `Sandrox-Levixel` directory under the consumer
 project's `nativeplugins/` directory, enable it in `manifest.json`, and import
 its JavaScript SDK:
 
@@ -14,7 +14,7 @@ import {
   openLevixelFromSelector,
   prepareLevixelItem,
   warmupLevixelItem,
-} from '@/nativeplugins/SandroxUniPlugin-Levixel/js_sdk/index.js'
+} from '@/nativeplugins/Sandrox-Levixel/js_sdk/index.js'
 ```
 
 Each rendered source element must use the same selector and order as `items`.

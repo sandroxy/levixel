@@ -118,7 +118,7 @@ afterEvaluate {
                 pom {
                     name = "Levixel"
                     description = "Shared-transition image and video viewer for Android."
-                    url = "https://gitee.com/chrisJxc/integrated-plugins"
+                    url = "https://github.com/sandroxy/levixel"
                     inceptionYear = "2026"
 
                     licenses {
@@ -138,9 +138,9 @@ afterEvaluate {
                     }
 
                     scm {
-                        connection = "scm:git:https://gitee.com/chrisJxc/integrated-plugins.git"
-                        developerConnection = "scm:git:ssh://git@gitee.com/chrisJxc/integrated-plugins.git"
-                        url = "https://gitee.com/chrisJxc/integrated-plugins"
+                        connection = "scm:git:https://github.com/sandroxy/integrated-plugins.git"
+                        developerConnection = "scm:git:ssh://git@github.com/sandroxy/integrated-plugins.git"
+                        url = "https://github.com/sandroxy/integrated-plugins"
                     }
                 }
             }

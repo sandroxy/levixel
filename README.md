@@ -61,7 +61,7 @@ the iOS consumer host:
 The generated Swift Package repository contents are in
 `dist/native-ios/swift-package`.
 
-Public package repository: `https://gitee.com/sandrox/levixel`.
+Public package repository: `https://github.com/sandroxy/levixel`.
 
 ## HarmonyOS
 

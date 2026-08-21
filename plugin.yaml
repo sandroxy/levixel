@@ -164,7 +164,7 @@ targets:
         output: dist/uniapp/sandrox-levixel-uniapp-1.1.0.zip
         distribution:
           channel: uniapp-marketplace
-          packageId: SandroxUniPlugin-Levixel
+          packageId: Sandrox-Levixel
     constraints:
       - name: minimum-android-sdk
         value: 21

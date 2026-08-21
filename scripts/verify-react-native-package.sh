@@ -87,7 +87,7 @@ ruby -rjson -e '
     "name" => "@sandrox/levixel",
     "version" => ARGV.fetch(1),
     "license" => "MIT",
-    "homepage" => "https://gitee.com/sandrox/levixel",
+    "homepage" => "https://github.com/sandroxy/levixel",
     "main" => "src/index.ts",
     "react-native" => "src/index.ts",
     "types" => "src/index.ts"
@@ -97,9 +97,10 @@ ruby -rjson -e '
   repository = package.fetch("repository")
   abort("Unexpected npm repository") unless repository == {
     "type" => "git",
-    "url" => "https://gitee.com/sandrox/levixel.git"
+    "url" => "https://github.com/sandroxy/integrated-plugins.git",
+    "directory" => "plugins/levixel/adapters/react-native"
   }
-  abort("Unexpected npm bugs URL") unless package.dig("bugs", "url") == "https://gitee.com/sandrox/levixel/issues"
+  abort("Unexpected npm bugs URL") unless package.dig("bugs", "url") == "https://github.com/sandroxy/integrated-plugins/issues"
   abort("Package must publish publicly") unless package.dig("publishConfig", "access") == "public"
   abort("Package must use the public npm registry") unless package.dig("publishConfig", "registry") == "https://registry.npmjs.org/"
   lifecycle = package.fetch("scripts", {}).keys.grep(/^(preinstall|install|postinstall|prepublish|prepare)$/)

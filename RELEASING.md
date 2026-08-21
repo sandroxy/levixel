@@ -10,7 +10,7 @@ Levixel has one canonical version and ecosystem-specific products:
 | iOS | `Levixel` | Checksum-pinned Swift Package that downloads the XCFramework ZIP |
 | HarmonyOS | `@sandrox/levixel@1.1.0` | OHPM HAR |
 | React Native | `@sandrox/levixel@1.1.0` | npm tarball containing thin Expo Modules bridges and the verified Android/iOS native artifacts |
-| UniApp | `SandroxUniPlugin-Levixel@1.1.0` | DCloud native-plugin ZIP containing thin Android/iOS bridges, the verified native artifacts, and the JavaScript SDK |
+| UniApp | `Sandrox-Levixel@1.1.0` | DCloud native-plugin ZIP containing thin Android/iOS bridges, the verified native artifacts, and the JavaScript SDK |
 
 The raw Android AAR remains an internal adapter input. It is not the preferred
 public Android installation format because an AAR alone cannot declare its
@@ -84,16 +84,16 @@ folded into release packaging work.
 
 1. Create the source tag `levixel-v1.1.0` on the canonical release commit.
 2. Push the generated Swift Package contents to the public product repository
-   at `https://gitee.com/sandrox/levixel`.
+   at `https://github.com/sandroxy/levixel`.
 3. Tag the public product repository `1.1.0`.
-4. Create the matching public Gitee release and attach
+4. Create the matching public GitHub release and attach
    `dist/native-ios/levixel-1.1.0.xcframework.zip` without rebuilding.
 5. Confirm the release asset is anonymously downloadable and matches the
    checksum pinned in `Package.swift`.
 6. Resolve the public package in a clean iOS consumer and run one final smoke
    test.
 
-The generated package manifest points to the canonical Gitee release URL and
+The generated package manifest points to the canonical GitHub release URL and
 contains the checksum computed from the verified XCFramework ZIP. Override the
 URL before packaging only when the permanent binary host changes:
 

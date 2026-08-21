@@ -11,4 +11,5 @@ import Levixel
 
 The package manifest references the release XCFramework by HTTPS URL and pins
 its checksum. The binary archive is built and verified in the canonical
-Integrated Plugins repository before this package is tagged.
+[Integrated Plugins](https://github.com/sandroxy/integrated-plugins)
+repository before this package is tagged.

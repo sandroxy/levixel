@@ -51,6 +51,11 @@ if ! rg -q '<groupId>io\.gitee\.sandrox</groupId>' "${pom_path}" \
     printf '%s\n' "Levixel Maven POM has unexpected coordinates" >&2
     exit 1
 fi
+if ! rg -q '<url>https://github\.com/sandroxy/levixel</url>' "${pom_path}" \
+    || ! rg -q '<connection>scm:git:https://github\.com/sandroxy/integrated-plugins\.git</connection>' "${pom_path}"; then
+    printf '%s\n' "Levixel Maven POM does not reference the canonical GitHub repositories" >&2
+    exit 1
+fi
 if ! rg -q '<artifactId>PhotoView</artifactId>' "${pom_path}"; then
     printf '%s\n' "Levixel Maven POM is missing runtime dependency metadata" >&2
     exit 1

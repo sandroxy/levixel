@@ -25,4 +25,4 @@ geometry use the exported model types.
 See the canonical repository for the maintained test host and release
 verification workflow:
 
-https://gitee.com/chrisJxc/integrated-plugins
+https://github.com/sandroxy/integrated-plugins

@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 repo_root="$(cd "${plugin_dir}/../.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
-package_id="SandroxUniPlugin-Levixel"
+package_id="Sandrox-Levixel"
 archive_path="${1:-${plugin_dir}/dist/uniapp/sandrox-levixel-uniapp-${version}.zip}"
 checksum_path="${archive_path}.sha256"
 host_plugin_root="${repo_root}/uniapp-plugins-test/nativeplugins/${package_id}"
@@ -51,13 +51,13 @@ done
 ruby -rjson -e '
   package = JSON.parse(File.read(ARGV.fetch(0)))
   version = ARGV.fetch(1)
-  abort "unexpected package id" unless package.fetch("id") == "SandroxUniPlugin-Levixel"
+  abort "unexpected package id" unless package.fetch("id") == "Sandrox-Levixel"
   abort "unexpected package version" unless package.fetch("version") == version
   native = package.fetch("_dp_nativeplugin")
   android = native.fetch("android")
   ios = native.fetch("ios")
-  abort "unexpected Android module" unless android.fetch("plugins") == [{"type" => "module", "name" => "Levixel", "class" => "com.sandrox.levixel.uniapp.LevixelUniModule"}]
-  abort "unexpected iOS module" unless ios.fetch("plugins") == [{"type" => "module", "name" => "Levixel", "class" => "LevixelUniModule"}]
+  abort "unexpected Android module" unless android.fetch("plugins") == [{"type" => "module", "name" => "Sandrox-Levixel", "class" => "com.sandrox.levixel.uniapp.LevixelUniModule"}]
+  abort "unexpected iOS module" unless ios.fetch("plugins") == [{"type" => "module", "name" => "Sandrox-Levixel", "class" => "LevixelUniModule"}]
   abort "Levixel.framework must be embedded" unless ios.fetch("embedFrameworks") == ["Levixel.framework"]
 ' "${package_root}/package.json" "${version}"
 

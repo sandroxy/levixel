@@ -5,6 +5,8 @@
 - Adds the artifact-only UniApp adapter for Android and iOS with canonical
   source geometry, bounded selected-preview handoff, structured events, and
   strict contract validation.
+- Publishes the UniApp adapter under the DCloud-recommended
+  `Sandrox-Levixel` plugin and module identifier.
 - Exposes explicit iOS viewer sessions so framework adapters can close and
   clean up presentations without copying the native viewer core.
 - Preserves the validated native and React Native interaction model while

@@ -72,6 +72,8 @@ ruby -rjson -e '
   expected = {
     "name" => "@sandrox/levixel",
     "version" => ARGV.fetch(1),
+    "homepage" => "https://github.com/sandroxy/levixel",
+    "repository" => "https://github.com/sandroxy/integrated-plugins",
     "types" => "Index.d.ets",
     "artifactType" => "obfuscation",
     "compatibleSdkVersion" => 23,
