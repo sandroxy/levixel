@@ -81,7 +81,7 @@ export struct LevixelVideoPlayer {
 
   @Builder
   private VideoControls() {
-    Stack({ alignContent: Alignment.TopStart }) {
+    Column() {
       Stack({ alignContent: Alignment.Center }) {
         Text('×')
           .fontSize(30)
@@ -89,7 +89,7 @@ export struct LevixelVideoPlayer {
       }
       .width(48)
       .height(48)
-      .margin({ left: 12, top: 12 })
+      .alignSelf(ItemAlign.Start)
       .borderRadius(24)
       .backgroundColor('#66000000')
       .onTouch((event: TouchEvent) => {
@@ -98,6 +98,8 @@ export struct LevixelVideoPlayer {
       .onClick(() => {
         this.onCloseRequested();
       })
+
+      Blank()
 
       Row() {
         Stack({ alignContent: Alignment.Center }) {
@@ -131,18 +133,18 @@ export struct LevixelVideoPlayer {
           .fontColor(Color.White)
           .margin({ left: 8 })
       }
+      .width('100%')
       .height(56)
       .padding({ left: 6, right: 12 })
-      .margin({ left: 12, right: 12, bottom: 20 })
       .borderRadius(12)
       .backgroundColor('#99000000')
-      .align(Alignment.Bottom)
       .onTouch((event: TouchEvent) => {
         this.handleControlTouch(event);
       })
     }
     .width('100%')
     .height('100%')
+    .padding({ left: 12, right: 12, top: 12, bottom: 20 })
   }
 
   private preparePlayer(): void {
