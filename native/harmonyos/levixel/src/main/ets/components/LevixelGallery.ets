@@ -38,7 +38,6 @@ interface TransitionImageResource {
 
 enum TransitionImageFit {
   COVER,
-  CONTAIN,
   FILL
 }
 
@@ -683,10 +682,6 @@ export struct LevixelGallery {
   }
 
   private viewerGeometryFor(item: LevixelMediaItem): SharedElementGeometry {
-    const resource: TransitionImageResource | undefined = this.imageResourceCache.get(this.displayUrl(item));
-    if (resource !== undefined) {
-      return this.geometryForImageResource(resource, this.viewerContainerBounds(), TransitionImageFit.CONTAIN);
-    }
     return this.defaultGeometryFor(this.targetRectFor(item));
   }
 
@@ -928,12 +923,11 @@ export struct LevixelGallery {
   private targetRectFor(item: LevixelMediaItem): RectMetrics {
     const availableWidth: number = Math.max(1, this.rootWidth);
     const availableHeight: number = Math.max(1, this.rootHeight);
-    const resource: TransitionImageResource | undefined = this.imageResourceCache.get(this.displayUrl(item));
-    const aspectWidth: number = resource !== undefined ? resource.width : item.aspectWidth;
-    const aspectHeight: number = resource !== undefined ? resource.height : item.aspectHeight;
+    const aspectWidth: number = Math.max(1, item.aspectWidth);
+    const aspectHeight: number = Math.max(1, item.aspectHeight);
     const scale: number = Math.min(
-      availableWidth / Math.max(1, aspectWidth),
-      availableHeight / Math.max(1, aspectHeight)
+      availableWidth / aspectWidth,
+      availableHeight / aspectHeight
     );
     const width: number = aspectWidth * scale;
     const height: number = aspectHeight * scale;
@@ -942,15 +936,6 @@ export struct LevixelGallery {
       top: (this.rootHeight - height) * 0.5,
       width: width,
       height: height
-    };
-  }
-
-  private viewerContainerBounds(): RectMetrics {
-    return {
-      left: 0,
-      top: 0,
-      width: Math.max(1, this.rootWidth),
-      height: Math.max(1, this.rootHeight)
     };
   }
 

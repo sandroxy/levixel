@@ -12,7 +12,6 @@ export struct LevixelImageViewer {
         .height('100%')
         .objectFit(ImageFit.Fill)
         .opacity(this.fullImageVisible ? 1 : 0)
-        .animation({ duration: 120, curve: Curve.EaseOut })
         .onComplete(() => {
           this.loadFailed = false;
           this.fullImageVisible = true;
