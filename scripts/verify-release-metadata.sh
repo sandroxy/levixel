@@ -3,9 +3,16 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
+repo_root="$(cd "${plugin_dir}/../.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${plugin_dir}/adapters/react-native/package.json")"
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
+harmony_host_version="$(ruby -rjson -e '
+  packages = JSON.parse(File.read(ARGV.fetch(0))).fetch("packages").values
+  package = packages.find { |entry| entry["name"] == "@sandrox/levixel" }
+  abort("HarmonyOS test host does not lock @sandrox/levixel.") unless package
+  print package.fetch("version")
+' "${repo_root}/harmonyos-plugins-test/entry/oh-package-lock.json5")"
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid Levixel semantic version: ${version}" >&2
@@ -19,6 +26,11 @@ fi
 
 if [[ "${harmony_version}" != "${version}" ]]; then
   echo "HarmonyOS version ${harmony_version} does not match ${version}." >&2
+  exit 1
+fi
+
+if [[ "${harmony_host_version}" != "${version}" ]]; then
+  echo "HarmonyOS test host version ${harmony_host_version} does not match ${version}." >&2
   exit 1
 fi
 
