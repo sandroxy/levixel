@@ -1,6 +1,38 @@
 import ObjectiveC
 import UIKit
 
+public final class LevixelViewerSession {
+    private weak var viewerController: LevixelViewerController?
+    private let dataSource: LevixelDataSource
+    private let imageLoader: LevixelImageLoading
+
+    fileprivate init(
+        viewerController: LevixelViewerController,
+        dataSource: LevixelDataSource,
+        imageLoader: LevixelImageLoading
+    ) {
+        self.viewerController = viewerController
+        self.dataSource = dataSource
+        self.imageLoader = imageLoader
+    }
+
+    public func close(animated: Bool = true) {
+        let closeViewer: () -> Void = { [weak self] in
+            guard let viewerController = self?.viewerController else { return }
+            viewerController.requestDismissal(animated: animated)
+        }
+        if Thread.isMainThread {
+            closeViewer()
+        } else {
+            DispatchQueue.main.async(execute: closeViewer)
+        }
+    }
+
+    func invalidate() {
+        viewerController = nil
+    }
+}
+
 extension UIImageView {
     private struct LevixelAnchorRegistration {
         let galleryId: String
@@ -131,14 +163,61 @@ extension UIImageView {
         }
         levixelTapGestureRecognizer = nil
 
-        if let registration = levixelAnchorRegistration {
-            LevixelSourceViewRegistry.shared.unregister(
-                self,
-                galleryId: registration.galleryId,
-                index: registration.index
-            )
-        }
+        unregisterLevixelSource()
+    }
+
+    public func registerLevixelSource(galleryId: String, index: Int) {
+        updateLevixelAnchorRegistration(galleryId: galleryId, index: index)
+    }
+
+    public func unregisterLevixelSource() {
+        guard let registration = levixelAnchorRegistration else { return }
+        LevixelSourceViewRegistry.shared.unregister(
+            self,
+            galleryId: registration.galleryId,
+            index: registration.index
+        )
         levixelAnchorRegistration = nil
+    }
+
+    @discardableResult
+    public func presentLevixelViewer(
+        dataSource: LevixelDataSource,
+        initialIndex: Int = 0,
+        configuration: LevixelViewerConfiguration = LevixelViewerConfiguration(),
+        from viewController: UIViewController? = nil,
+        imageLoader: LevixelImageLoading? = nil,
+        galleryId: String? = nil,
+        completion: (() -> Void)? = nil
+    ) -> LevixelViewerSession? {
+        guard dataSource.numberOfItems() > 0 else { return nil }
+
+        let resolvedImageLoader = imageLoader ?? LevixelImageLoaderFactory.makeDefault()
+        let viewerController = LevixelViewerController(
+            sourceView: self,
+            dataSource: dataSource,
+            imageLoader: resolvedImageLoader,
+            configuration: configuration,
+            initialIndex: initialIndex,
+            galleryId: galleryId
+        )
+        let rootViewController = viewController ?? topMostHostViewController
+        guard let presenter = rootViewController.map(topMostPresentedController(from:)) else {
+            return nil
+        }
+
+        if let galleryId, galleryId.isEmpty == false {
+            updateLevixelAnchorRegistration(galleryId: galleryId, index: initialIndex)
+        }
+
+        let session = LevixelViewerSession(
+            viewerController: viewerController,
+            dataSource: dataSource,
+            imageLoader: resolvedImageLoader
+        )
+        viewerController.attachPresentationSession(session)
+        presenter.present(viewerController, animated: false, completion: completion)
+        return session
     }
 
     private func configureLevixelViewer(
@@ -205,19 +284,15 @@ extension UIImageView {
     @objc
     private func showLevixelViewer(_ recognizer: LevixelTapGestureRecognizer) {
         guard let sourceView = recognizer.view as? UIImageView else { return }
-        let resolvedImageLoader = recognizer.imageLoader ?? LevixelImageLoaderFactory.makeDefault()
-        let viewerController = LevixelViewerController(
-            sourceView: sourceView,
-            dataSource: recognizer.dataSource,
-            imageLoader: resolvedImageLoader,
-            configuration: recognizer.configuration,
+        guard let dataSource = recognizer.dataSource else { return }
+        sourceView.presentLevixelViewer(
+            dataSource: dataSource,
             initialIndex: recognizer.initialIndex,
+            configuration: recognizer.configuration,
+            from: recognizer.fromViewController,
+            imageLoader: recognizer.imageLoader,
             galleryId: recognizer.galleryId
         )
-
-        let rootViewController = recognizer.fromViewController ?? topMostHostViewController
-        let presenter = rootViewController.flatMap(topMostPresentedController(from:))
-        presenter?.present(viewerController, animated: false)
     }
 
     private func topMostPresentedController(from rootViewController: UIViewController) -> UIViewController {

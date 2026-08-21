@@ -6,10 +6,11 @@ Levixel has one canonical version and ecosystem-specific products:
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
-| Android | `io.gitee.sandrox:levixel:1.0.0` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
+| Android | `io.gitee.sandrox:levixel:1.1.0` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
 | iOS | `Levixel` | Checksum-pinned Swift Package that downloads the XCFramework ZIP |
-| HarmonyOS | `@sandrox/levixel@1.0.0` | OHPM HAR |
-| React Native | `@sandrox/levixel@1.0.0` | npm tarball containing thin Expo Modules bridges and the verified Android/iOS native artifacts |
+| HarmonyOS | `@sandrox/levixel@1.1.0` | OHPM HAR |
+| React Native | `@sandrox/levixel@1.1.0` | npm tarball containing thin Expo Modules bridges and the verified Android/iOS native artifacts |
+| UniApp | `SandroxUniPlugin-Levixel@1.1.0` | DCloud native-plugin ZIP containing thin Android/iOS bridges, the verified native artifacts, and the JavaScript SDK |
 
 The raw Android AAR remains an internal adapter input. It is not the preferred
 public Android installation format because an AAR alone cannot declare its
@@ -43,7 +44,7 @@ identity, version, or transitive dependencies.
 4. Manually verify transition and gesture behavior in all three shared native
    test hosts without rebuilding the plugin.
 5. Publish only files listed in
-   `dist/native-release/levixel-native-1.0.0.json`.
+   `dist/native-release/levixel-native-1.1.0.json`.
 
 ## Android / Maven Central
 
@@ -71,7 +72,7 @@ Central Portal upload without rebuilding:
 ./scripts/prepare-maven-central-bundle.sh
 ```
 
-Upload `dist/native-android/levixel-1.0.0-maven-central.zip` to the Central
+Upload `dist/native-android/levixel-1.1.0-maven-central.zip` to the Central
 Publisher Portal in user-managed mode. Publish it only after portal validation.
 
 The retained `PhotoView 2.3.0` dependency is hosted by JitPack, so Android
@@ -81,12 +82,12 @@ folded into release packaging work.
 
 ## iOS / Swift Package Manager
 
-1. Create the source tag `levixel-v1.0.0` on the canonical release commit.
+1. Create the source tag `levixel-v1.1.0` on the canonical release commit.
 2. Push the generated Swift Package contents to the public product repository
    at `https://gitee.com/sandrox/levixel`.
-3. Tag the public product repository `1.0.0`.
+3. Tag the public product repository `1.1.0`.
 4. Create the matching public Gitee release and attach
-   `dist/native-ios/levixel-1.0.0.xcframework.zip` without rebuilding.
+   `dist/native-ios/levixel-1.1.0.xcframework.zip` without rebuilding.
 5. Confirm the release asset is anonymously downloadable and matches the
    checksum pinned in `Package.swift`.
 6. Resolve the public package in a clean iOS consumer and run one final smoke
@@ -97,7 +98,7 @@ contains the checksum computed from the verified XCFramework ZIP. Override the
 URL before packaging only when the permanent binary host changes:
 
 ```sh
-LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-1.0.0.xcframework.zip \
+LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-1.1.0.xcframework.zip \
   ./scripts/package-native-ios.sh
 ```
 
@@ -106,14 +107,14 @@ LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-1.0.0.xcframework.zip \
 1. Confirm the `@sandrox` OHPM scope and package name are available to the
    publisher account.
 2. Authenticate `ohpm` with the publisher ID.
-3. Publish `dist/native-harmonyos/levixel-1.0.0.har` without rebuilding.
-4. Install `@sandrox/levixel@1.0.0` into a clean HarmonyOS consumer and run a
+3. Publish `dist/native-harmonyos/levixel-1.1.0.har` without rebuilding.
+4. Install `@sandrox/levixel@1.1.0` into a clean HarmonyOS consumer and run a
    final smoke test.
 
 ## React Native / npm
 
 The npm product embeds the exact Android AAR and iOS XCFramework recorded in
-`dist/native-release/levixel-native-1.0.0.json`. It must not compile copied
+`dist/native-release/levixel-native-1.1.0.json`. It must not compile copied
 native viewer source or resolve an unpinned native core during consumer install.
 
 1. Package the npm candidate once:
@@ -137,7 +138,7 @@ native viewer source or resolve an unpinned native core during consumer install.
    then create the canonical tag on that commit:
 
    ```sh
-   git tag -a levixel-react-native-v1.0.0 -m "Levixel React Native 1.0.0"
+   git tag -a levixel-react-native-v1.1.0 -m "Levixel React Native 1.1.0"
    ```
 
 4. Check the exact accepted archive and npm publication metadata:
@@ -154,9 +155,34 @@ native viewer source or resolve an unpinned native core during consumer install.
    ./scripts/publish-react-native.sh --publish
    ```
 
-6. Install `@sandrox/levixel@1.0.0` from npm in a clean consumer and run the
+6. Install `@sandrox/levixel@1.1.0` from npm in a clean consumer and run the
    final Android/iOS smoke test. Public npm versions are immutable; never reuse
-   `1.0.0` for different bytes.
+   `1.1.0` for different bytes.
+
+## UniApp / DCloud Native Plugin
+
+The UniApp product embeds the exact Android AAR and iOS device framework from
+the `1.1.0` native release. Its bridges own only DCloud lifecycle, DOM source
+geometry conversion, bounded preview warmup, and event/error transport.
+
+1. Build the candidate once with the matching DCloud SDK:
+
+   ```sh
+   DCLOUD_ANDROID_UNIAPP_AAR=/absolute/path/to/uniapp-v8-release.aar \
+     ./scripts/package-uniapp.sh
+   ```
+
+2. Verify and stage the exact candidate without rebuilding:
+
+   ```sh
+   ./scripts/verify-uniapp.sh
+   ```
+
+3. Open `uniapp-plugins-test` in HBuilderX, build a custom base or offline
+   package for AppID `__UNI__A92914D`, and verify Android and iOS transition,
+   paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
+4. Publish `dist/uniapp/sandrox-levixel-uniapp-1.1.0.zip` unchanged. Never
+   rebuild after hand verification or reuse `1.1.0` for different bytes.
 
 ## Provenance
 

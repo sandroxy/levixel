@@ -176,7 +176,11 @@ public final class LevixelViewerTransitionController {
     ) {
         RectF visibleFrame = interpolateRect(start.getVisibleFrameInWindow(), end.getVisibleFrameInWindow(), progress);
         RectF contentFrame = interpolateRect(start.getContentFrameInVisibleBounds(), end.getContentFrameInVisibleBounds(), progress);
-        return new LevixelSharedElementGeometry(visibleFrame, contentFrame);
+        return new LevixelSharedElementGeometry(
+                visibleFrame,
+                contentFrame,
+                lerp(start.getCornerRadius(), end.getCornerRadius(), progress)
+        );
     }
 
     @NonNull
@@ -197,7 +201,8 @@ public final class LevixelViewerTransitionController {
         visibleFrame.offset(-location[0], -location[1]);
         return new LevixelSharedElementGeometry(
                 visibleFrame,
-                geometry.getContentFrameInVisibleBounds()
+                geometry.getContentFrameInVisibleBounds(),
+                geometry.getCornerRadius()
         );
     }
 

@@ -1,7 +1,7 @@
 # Levixel
 
-Levixel is a shared-transition image and video viewer for native and React
-Native applications.
+Levixel is a shared-transition image and video viewer for native, React Native,
+and UniApp applications.
 
 This directory is the only source of truth. Shared test hosts consume packaged
 artifacts from `dist/`; they never compile plugin source directly. A release
@@ -37,7 +37,7 @@ Verify the Maven coordinate and its transitive metadata in the Android host:
 ./scripts/verify-native-android.sh
 ```
 
-Public coordinate: `io.gitee.sandrox:levixel:1.0.0`.
+Public coordinate: `io.gitee.sandrox:levixel:1.1.0`.
 
 The current Android core intentionally retains the already validated
 `PhotoView 2.3.0` implementation. Consumers must make JitPack available until
@@ -76,7 +76,7 @@ On macOS the scripts discover a standard DevEco Studio installation. Set
 `DEVECO_STUDIO_CONTENTS`, or set `DEVECO_SDK_HOME`, `HVIGORW`, and `OHPM`
 individually, for a custom installation.
 
-Public package: `@sandrox/levixel@1.0.0`.
+Public package: `@sandrox/levixel@1.1.0`.
 
 ## React Native
 
@@ -98,6 +98,22 @@ Inspect the immutable npm tarball without rebuilding it:
 After the exact tarball passes Android and iOS hand verification, follow the
 tagged publication procedure in [RELEASING.md](RELEASING.md). Do not rebuild
 between hand verification and npm publication.
+
+## UniApp
+
+The UniApp adapter combines thin Android/iOS bridges, the canonical native
+artifacts, and a strict JavaScript SDK into one DCloud native-plugin package:
+
+```sh
+DCLOUD_ANDROID_UNIAPP_AAR=/absolute/path/to/uniapp-v8-release.aar \
+  ./scripts/package-uniapp.sh
+./scripts/verify-uniapp.sh
+```
+
+The verifier stages the exact ZIP in `uniapp-plugins-test/nativeplugins/` for
+HBuilderX custom-base or offline-package validation. See
+[adapters/uniapp/README.md](adapters/uniapp/README.md) for the public SDK and
+source-geometry contract.
 
 ## License And Provenance
 

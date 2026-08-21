@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 - 2026-08-20
+
+- Aligns the package version with the Levixel 1.1.0 cross-platform release.
+- Keeps the verified HarmonyOS viewer behavior unchanged.
+
 ## 1.0.0 - 2026-08-20
 
 - First public HarmonyOS release.

@@ -96,6 +96,8 @@ extension UIImageView {
         switch contentMode {
         case .scaleAspectFill:
             scale = max(widthRatio, heightRatio)
+        case .scaleToFill:
+            return frameInWindow()
         default:
             scale = min(widthRatio, heightRatio)
         }
@@ -117,7 +119,11 @@ extension UIImageView {
         guard let image = image else { return nil }
         guard image.size.width > 0, image.size.height > 0 else { return nil }
 
-        let clippingFrame = clippingFrameInWindow ?? frameInWindow()
+        let frame = frameInWindow()
+        let clippingFrame = clippingFrameInWindow
+            ?? window.map { frame.intersection($0.bounds) }
+            ?? frame
+        guard clippingFrame.isNull == false, clippingFrame.isEmpty == false else { return nil }
         guard clippingFrame.width > 0, clippingFrame.height > 0 else { return nil }
 
         let contentFrame = imageContentFrameInWindow()

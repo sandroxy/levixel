@@ -29,6 +29,13 @@ if [[ "${ios_versions}" != "${version}" ]]; then
   exit 1
 fi
 
+uniapp_ios_versions="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' \
+  "${plugin_dir}/adapters/uniapp/ios/LevixelUniApp.xcodeproj/project.pbxproj" | sort -u)"
+if [[ "${uniapp_ios_versions}" != "${version}" ]]; then
+  echo "UniApp iOS marketing version does not match ${version}: ${uniapp_ios_versions}" >&2
+  exit 1
+fi
+
 if ! ruby -ryaml -e '
   manifest = YAML.load_file(ARGV.fetch(0))
   version = manifest.fetch("version")
@@ -66,7 +73,10 @@ if rg -n -i 'galeria|nandorojo|com\.chris' \
   "${plugin_dir}/native/harmonyos/levixel/src" \
   "${plugin_dir}/adapters/react-native/src" \
   "${plugin_dir}/adapters/react-native/android/src" \
-  "${plugin_dir}/adapters/react-native/ios"; then
+  "${plugin_dir}/adapters/react-native/ios" \
+  "${plugin_dir}/adapters/uniapp/android/levixel-uniapp/src/main" \
+  "${plugin_dir}/adapters/uniapp/ios/LevixelUniApp" \
+  "${plugin_dir}/adapters/uniapp/js_sdk/index.js"; then
   echo "Legacy Galeria identifiers remain in runtime source." >&2
   exit 1
 fi

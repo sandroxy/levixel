@@ -94,6 +94,10 @@
         "coordinateSpace": {
           "enum": ["screen", "viewport"]
         },
+        "rectScale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "cornerRadius": {
           "type": "number",
           "minimum": 0

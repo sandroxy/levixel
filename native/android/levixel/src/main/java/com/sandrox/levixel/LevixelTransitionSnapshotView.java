@@ -1,9 +1,12 @@
 package com.sandrox.levixel;
 
 import android.content.Context;
+import android.graphics.Outline;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
+import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -11,6 +14,7 @@ import androidx.annotation.NonNull;
 
 public final class LevixelTransitionSnapshotView extends FrameLayout {
     private final ImageView imageView;
+    private float cornerRadius;
 
     public LevixelTransitionSnapshotView(@NonNull Context context, @NonNull Drawable drawable) {
         super(context);
@@ -20,6 +24,12 @@ public final class LevixelTransitionSnapshotView extends FrameLayout {
         imageView.setScaleType(ImageView.ScaleType.FIT_XY);
         imageView.setImageDrawable(drawable);
         addView(imageView);
+        setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cornerRadius);
+            }
+        });
     }
 
     public void applyGeometry(@NonNull LevixelSharedElementGeometry geometry) {
@@ -56,5 +66,11 @@ public final class LevixelTransitionSnapshotView extends FrameLayout {
         imageView.setLayoutParams(imageLayoutParams);
         imageView.setX(contentFrame.left);
         imageView.setY(contentFrame.top);
+
+        cornerRadius = Math.max(0f, geometry.getCornerRadius());
+        setClipToOutline(cornerRadius > 0.01f);
+        if (cornerRadius > 0.01f) {
+            invalidateOutline();
+        }
     }
 }

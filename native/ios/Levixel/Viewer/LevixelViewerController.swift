@@ -15,8 +15,10 @@ final class LevixelViewerController: UIViewController {
     private let navigationItemRef = UINavigationItem()
 
     private var transitionCoordinatorRef: LevixelViewerTransitionCoordinator?
+    private var presentationSession: LevixelViewerSession?
     private var hasPerformedOpenTransition = false
     private var pendingDismissal = false
+    private var hasNotifiedDismissal = false
     private var pendingInitialScroll = false
 
     private var currentIndex = 0
@@ -148,6 +150,24 @@ final class LevixelViewerController: UIViewController {
 
     deinit {
         restoreHiddenActiveSourceView()
+        notifyDismissed()
+    }
+
+    func attachPresentationSession(_ session: LevixelViewerSession) {
+        presentationSession = session
+    }
+
+    func requestDismissal(animated: Bool = true) {
+        guard pendingDismissal == false else { return }
+        guard animated, hasPerformedOpenTransition, transitionCoordinatorRef != nil else {
+            pendingDismissal = true
+            restoreHiddenActiveSourceView()
+            dismiss(animated: false) { [weak self] in
+                self?.notifyDismissed()
+            }
+            return
+        }
+        performDismissTransition()
     }
 
     private var currentPageView: LevixelViewerPageView? {
@@ -265,9 +285,20 @@ final class LevixelViewerController: UIViewController {
             backgroundView: backgroundView,
             contentView: contentView
         ) { [weak self] in
-            self?.restoreHiddenActiveSourceView()
-            self?.dismiss(animated: false)
+            guard let self else { return }
+            self.restoreHiddenActiveSourceView()
+            self.dismiss(animated: false) { [weak self] in
+                self?.notifyDismissed()
+            }
         }
+    }
+
+    private func notifyDismissed() {
+        guard hasNotifiedDismissal == false else { return }
+        hasNotifiedDismissal = true
+        configuration.onDismiss?()
+        presentationSession?.invalidate()
+        presentationSession = nil
     }
 
     private func anchorView(for index: Int) -> UIImageView? {
@@ -597,7 +628,7 @@ final class LevixelViewerController: UIViewController {
 
     @objc
     private func handleCloseButton() {
-        performDismissTransition()
+        requestDismissal()
     }
 
     @objc
@@ -694,7 +725,7 @@ extension LevixelViewerController: UIGestureRecognizerDelegate {
 extension LevixelViewerController: LevixelViewerPageViewDelegate {
     func levixelViewerPageViewDidRequestDismiss(_ pageView: LevixelViewerPageView) {
         guard pageView.index == currentIndex else { return }
-        performDismissTransition()
+        requestDismissal()
     }
 
     func levixelViewerPageViewDidToggleVideoChrome(_ pageView: LevixelViewerPageView) {

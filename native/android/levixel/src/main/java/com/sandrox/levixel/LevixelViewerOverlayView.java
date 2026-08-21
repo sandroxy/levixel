@@ -3,6 +3,7 @@ package com.sandrox.levixel;
 import android.content.Context;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -21,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class LevixelViewerOverlayView extends FrameLayout implements LevixelViewerPageView.Listener {
+    private static final long SOURCE_HINT_READY_TIMEOUT_MS = 180L;
+
     public interface Listener {
         void onOverlayDismissed();
 
@@ -28,6 +31,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     }
 
     private final List<LevixelMediaItem> items;
+    private final List<LevixelSourceHint> sourceHints;
     @Nullable
     private final String galleryId;
     @Nullable
@@ -61,6 +65,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     private float hiddenActiveSourcePreviousAlpha = 1f;
     private boolean closing;
     private boolean openingTransitionStarted;
+    private long openTransitionWaitStartedAt;
     private boolean contentPresented;
     private boolean finished;
 
@@ -75,7 +80,12 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                 postOnAnimation(this);
                 return;
             }
-            startOpenTransition(pageView, pageView.sharedElementState());
+            LevixelSharedElementState pageState = pageView.sharedElementState();
+            if (shouldWaitForSourceHintDrawable(pageState)) {
+                postOnAnimation(this);
+                return;
+            }
+            startOpenTransition(pageView, pageState);
         }
     };
 
@@ -87,8 +97,21 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             @Nullable String galleryId,
             @Nullable Listener listener
     ) {
+        this(context, sourceItems, null, startIndex, lightTheme, galleryId, listener);
+    }
+
+    public LevixelViewerOverlayView(
+            @NonNull Context context,
+            @NonNull List<LevixelMediaItem> sourceItems,
+            @Nullable List<LevixelSourceHint> sourceHints,
+            int startIndex,
+            boolean lightTheme,
+            @Nullable String galleryId,
+            @Nullable Listener listener
+    ) {
         super(context);
         this.items = new ArrayList<>(sourceItems);
+        this.sourceHints = sourceHints == null ? new ArrayList<>() : new ArrayList<>(sourceHints);
         this.currentIndex = Math.max(0, Math.min(startIndex, items.size() - 1));
         this.lightTheme = lightTheme;
         this.galleryId = galleryId;
@@ -339,6 +362,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         }
         openingTransitionStarted = true;
         LevixelMediaItem item = items.get(currentIndex);
+        LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
         String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
         ImageView sourceView = LevixelSourceViewRegistry.find(anchorKey);
         LevixelSharedElementState sourceState = LevixelLayoutSupport.captureImageViewState(sourceView);
@@ -346,11 +370,17 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         pageView.prepareForOpenTransition();
         pageView.setMediaHidden(true);
 
-        Drawable fallbackDrawable = sourceState != null ? sourceState.getDrawable() : null;
         RectF overlayBounds = LevixelLayoutSupport.viewBoundsOnScreen(this);
         LevixelSharedElementState effectivePageState = usableSharedElementState(resolvedPageState)
                 ? resolvedPageState
                 : pageView.sharedElementState();
+        if (sourceState == null) {
+            Drawable hintDrawable = effectivePageState != null ? effectivePageState.getDrawable() : null;
+            sourceState = sourceStateFromHint(sourceHint, hintDrawable, overlayBounds);
+        }
+        Drawable fallbackDrawable = sourceState != null
+                ? sourceState.getDrawable()
+                : effectivePageState != null ? effectivePageState.getDrawable() : null;
         LevixelSharedElementGeometry targetGeometry = usableSharedElementState(effectivePageState)
                 ? effectivePageState.getGeometry()
                 : defaultOpenGeometryFromSource(sourceState, overlayBounds, pageView, fallbackDrawable);
@@ -402,6 +432,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         pageView.setMediaHidden(true);
 
         LevixelMediaItem item = items.get(currentIndex);
+        LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
         String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
         ImageView targetView = LevixelSourceViewRegistry.findVisible(anchorKey);
         LevixelSharedElementState targetState = LevixelLayoutSupport.captureImageViewState(targetView);
@@ -411,6 +442,12 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                         targetView,
                         pageState != null ? pageState.getDrawable() : null
                 );
+        if (targetGeometry == null) {
+            targetGeometry = geometryFromHint(
+                    sourceHint,
+                    pageState != null ? pageState.getDrawable() : null
+            );
+        }
 
         transitionController.performCloseTransition(
                 pageState,
@@ -529,6 +566,66 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         if (pageView != null) {
             pageView.setAllowParentInterceptOnImageEdge(canPage);
         }
+    }
+
+    private boolean shouldWaitForSourceHintDrawable(@Nullable LevixelSharedElementState pageState) {
+        if (pageState != null || items.isEmpty()) {
+            return false;
+        }
+        LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
+        if (sourceHint == null || sourceViewForIndex(currentIndex) != null) {
+            return false;
+        }
+        if (sourceHint.resolveGeometry(LevixelLayoutSupport.viewBoundsOnScreen(this), null) == null) {
+            return false;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (openTransitionWaitStartedAt <= 0L) {
+            openTransitionWaitStartedAt = now;
+        }
+        return now - openTransitionWaitStartedAt < SOURCE_HINT_READY_TIMEOUT_MS;
+    }
+
+    @Nullable
+    private LevixelSharedElementState sourceStateFromHint(
+            @Nullable LevixelSourceHint hint,
+            @Nullable Drawable drawable,
+            @NonNull RectF overlayBounds
+    ) {
+        if (hint == null || drawable == null) {
+            return null;
+        }
+        LevixelSharedElementGeometry geometry = hint.resolveGeometry(overlayBounds, drawable);
+        if (geometry == null) {
+            return null;
+        }
+        Drawable transitionDrawable = LevixelLayoutSupport.cloneDrawable(drawable, this);
+        if (transitionDrawable == null) {
+            return null;
+        }
+        return new LevixelSharedElementState(transitionDrawable, geometry);
+    }
+
+    @Nullable
+    private LevixelSharedElementGeometry geometryFromHint(
+            @Nullable LevixelSourceHint hint,
+            @Nullable Drawable fallbackDrawable
+    ) {
+        if (hint == null) {
+            return null;
+        }
+        return hint.resolveGeometry(
+                LevixelLayoutSupport.viewBoundsOnScreen(this),
+                fallbackDrawable
+        );
+    }
+
+    @Nullable
+    private LevixelSourceHint sourceHintForIndex(int index) {
+        if (index < 0 || index >= sourceHints.size()) {
+            return null;
+        }
+        return sourceHints.get(index);
     }
 
     @NonNull

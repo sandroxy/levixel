@@ -34,18 +34,21 @@ public struct LevixelViewerConfiguration {
     public var closeIcon: UIImage?
     public var rightBarButton: LevixelViewerBarButton?
     public var onIndexChange: ((Int) -> Void)?
+    public var onDismiss: (() -> Void)?
 
     public init(
         theme: LevixelViewerTheme = .light,
         contentMode: UIView.ContentMode = .scaleAspectFit,
         closeIcon: UIImage? = nil,
         rightBarButton: LevixelViewerBarButton? = nil,
-        onIndexChange: ((Int) -> Void)? = nil
+        onIndexChange: ((Int) -> Void)? = nil,
+        onDismiss: (() -> Void)? = nil
     ) {
         self.theme = theme
         self.contentMode = contentMode
         self.closeIcon = closeIcon
         self.rightBarButton = rightBarButton
         self.onIndexChange = onIndexChange
+        self.onDismiss = onDismiss
     }
 }
