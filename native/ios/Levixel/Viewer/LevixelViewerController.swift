@@ -17,6 +17,7 @@ final class LevixelViewerController: UIViewController {
     private var transitionCoordinatorRef: LevixelViewerTransitionCoordinator?
     private var presentationSession: LevixelViewerSession?
     private var hasPerformedOpenTransition = false
+    private var hasViewAppeared = false
     private var pendingDismissal = false
     private var hasNotifiedDismissal = false
     private var pendingInitialScroll = false
@@ -116,28 +117,15 @@ final class LevixelViewerController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-
-        guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
-        let itemSize = collectionView.bounds.size
-        guard itemSize.width > 0, itemSize.height > 0 else { return }
-        if layout.itemSize != itemSize {
-            layout.itemSize = itemSize
-            layout.invalidateLayout()
-            scrollToIndex(currentIndex, animated: false)
-        } else if pendingInitialScroll {
-            scrollToIndex(currentIndex, animated: false)
-            pendingInitialScroll = false
-        }
+        guard prepareCollectionLayoutForPresentation() else { return }
+        beginOpenTransitionIfReady()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if hasPerformedOpenTransition == false {
-            hasPerformedOpenTransition = true
-            scrollToIndex(currentIndex, animated: false)
-            transitionCoordinatorRef = LevixelViewerTransitionCoordinator(containerView: view)
-            performOpenTransition()
-        }
+        hasViewAppeared = true
+        view.layoutIfNeeded()
+        beginOpenTransitionIfReady()
     }
 
     override var prefersStatusBarHidden: Bool {
@@ -268,6 +256,44 @@ final class LevixelViewerController: UIViewController {
             self.hideActiveSourceViewForCurrentIndex()
             self.configuration.onIndexChange?(self.currentIndex)
         }
+    }
+
+    private func prepareCollectionLayoutForPresentation() -> Bool {
+        guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
+            return false
+        }
+
+        let itemSize = collectionView.bounds.size
+        guard itemSize.width > 0, itemSize.height > 0 else { return false }
+
+        let sizeChanged = layout.itemSize != itemSize
+        if sizeChanged {
+            layout.itemSize = itemSize
+            layout.invalidateLayout()
+        }
+
+        if sizeChanged || pendingInitialScroll {
+            collectionView.layoutIfNeeded()
+            pendingInitialScroll = false
+            scrollToIndex(currentIndex, animated: false)
+            collectionView.layoutIfNeeded()
+        }
+
+        return true
+    }
+
+    private func beginOpenTransitionIfReady() {
+        guard hasViewAppeared, hasPerformedOpenTransition == false else { return }
+        guard prepareCollectionLayoutForPresentation() else {
+            view.setNeedsLayout()
+            return
+        }
+
+        hasPerformedOpenTransition = true
+        scrollToIndex(currentIndex, animated: false)
+        collectionView.layoutIfNeeded()
+        transitionCoordinatorRef = LevixelViewerTransitionCoordinator(containerView: view)
+        performOpenTransition()
     }
 
     private func performDismissTransition(anchorOverride: UIImageView? = nil) {

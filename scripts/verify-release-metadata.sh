@@ -7,6 +7,12 @@ repo_root="$(cd "${plugin_dir}/../.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${plugin_dir}/adapters/react-native/package.json")"
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
+android_host_version="$(ruby -e '
+  source = File.read(ARGV.fetch(0))
+  match = source.match(/def levixelVersion = .*getOrElse\("([^"]+)"\)/)
+  abort("Android test host does not declare a default Levixel version.") unless match
+  print match[1]
+' "${repo_root}/android-plugins-test/app/build.gradle")"
 harmony_host_version="$(ruby -rjson -e '
   packages = JSON.parse(File.read(ARGV.fetch(0))).fetch("packages").values
   package = packages.find { |entry| entry["name"] == "@sandrox/levixel" }
@@ -26,6 +32,11 @@ fi
 
 if [[ "${harmony_version}" != "${version}" ]]; then
   echo "HarmonyOS version ${harmony_version} does not match ${version}." >&2
+  exit 1
+fi
+
+if [[ "${android_host_version}" != "${version}" ]]; then
+  echo "Android test host version ${android_host_version} does not match ${version}." >&2
   exit 1
 fi
 
