@@ -38,6 +38,16 @@ export interface LevixelSelectorSourceStyle {
   cornerRadius?: number
 }
 
+export interface LevixelPrepareOptions {
+  priority?: boolean
+}
+
+export interface LevixelPreparedPreview {
+  src: string
+  width: number
+  height: number
+}
+
 export interface LevixelSelectorOpenOptions {
   items: LevixelMediaItem[]
   index?: number
@@ -56,6 +66,10 @@ export interface LevixelEvent {
 export function openLevixel(options: LevixelOpenOptions): Promise<Record<string, unknown>>
 export function closeLevixel(): Promise<Record<string, unknown>>
 export function onLevixelEvent(listener: (event: LevixelEvent) => void): () => void
+export function prepareLevixelItem(
+  item: LevixelMediaItem,
+  options?: LevixelPrepareOptions,
+): Promise<LevixelPreparedPreview | undefined>
 export function warmupLevixelItem(item: LevixelMediaItem, loadEvent?: unknown): Promise<void>
 export function openLevixelFromSelector(
   options: LevixelSelectorOpenOptions,
@@ -65,6 +79,7 @@ declare const levixel: {
   open: typeof openLevixel
   close: typeof closeLevixel
   onEvent: typeof onLevixelEvent
+  prepareItem: typeof prepareLevixelItem
   warmupItem: typeof warmupLevixelItem
   openFromSelector: typeof openLevixelFromSelector
 }

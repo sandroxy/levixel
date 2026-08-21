@@ -19,6 +19,7 @@ const savedPreviews = []
 const removedSavedFiles = []
 const convertedLocalPaths = []
 const forcedDownloadFailures = new Set()
+const downloadedPathOverrides = new Map()
 const forcedSaveFailures = new Set()
 const storage = new Map([[registryKey, ['/_doc/uniapp_save/stale.preview']]])
 
@@ -43,8 +44,10 @@ globalThis.plus = {
   },
   io: {
     convertLocalFileSystemURL(path) {
-      assert.ok(path.startsWith('_doc/'))
+      assert.ok(path.startsWith('_doc/') || path.startsWith('/storage/'))
       convertedLocalPaths.push(path)
+      if (path.startsWith('/storage/'))
+        return path
       return `/native/${path}`
     },
   },
@@ -80,7 +83,7 @@ function completeImageInfoRequest(request) {
 
 function completePreviewDownload(request) {
   activePreviewDownloads -= 1
-  const filename = request.options.filename
+  const filename = downloadedPathOverrides.get(request.url) || request.options.filename
   if (forcedDownloadFailures.has(request.url)) {
     request.callback({ filename }, 500)
     return
@@ -191,6 +194,21 @@ assert.equal(downloadedPreviews[1].owner, 'https://example.com/poster.jpg')
 assert.notEqual(downloadedPreviews[0].savedFilePath, downloadedPreviews[1].savedFilePath)
 assert.deepEqual(convertedLocalPaths.slice(0, 2), downloadedPreviews.slice(0, 2).map(({ savedFilePath }) => savedFilePath))
 
+const preparedCachedImage = await sdk.prepareLevixelItem(items[0])
+assert.deepEqual(preparedCachedImage, {
+  src: downloadedPreviews[0].savedFilePath,
+  width: 400,
+  height: 600,
+})
+await assert.rejects(
+  sdk.prepareLevixelItem(items[0], { eager: true }),
+  /eager is not part of the Levixel SDK contract/,
+)
+await assert.rejects(
+  sdk.prepareLevixelItem(items[0], { priority: 'yes' }),
+  /priority must be a boolean/,
+)
+
 const result = await sdk.openLevixelFromSelector({
   items,
   index: 1,
@@ -216,6 +234,33 @@ assert.deepEqual(nativeOpenOptions.sourceHints[0], {
 assert.equal(nativeOpenOptions.sourceHints[1].objectFit, 'contain')
 assert.deepEqual(nativeOpenOptions.sourceHints[1].imageSize, { width: 800, height: 450 })
 assert.equal(nativeOpenOptions.sourceVisibility, 'visible')
+
+const preparedItem = {
+  id: 'prepared-image',
+  type: 'image',
+  url: 'https://example.com/prepared-image.jpg',
+}
+const preparedPreview = await sdk.prepareLevixelItem(preparedItem, { priority: true })
+const preparedDownload = downloadedPreviews.find(preview => preview.owner === preparedItem.url)
+assert.ok(preparedDownload)
+assert.deepEqual(preparedPreview, {
+  src: preparedDownload.savedFilePath,
+  width: 400,
+  height: 600,
+})
+assert.ok(imageInfoRequests.includes(`file:///native/${preparedDownload.savedFilePath}`))
+
+const absolutePathItem = {
+  id: 'absolute-path-image',
+  type: 'image',
+  url: 'https://example.com/absolute-path-image.jpg',
+}
+downloadedPathOverrides.set(absolutePathItem.url, '/storage/emulated/0/levixel.preview')
+assert.deepEqual(await sdk.prepareLevixelItem(absolutePathItem, { priority: true }), {
+  src: 'file:///storage/emulated/0/levixel.preview',
+  width: 400,
+  height: 600,
+})
 
 await assert.rejects(
   sdk.openLevixelFromSelector({ items, sourceSelector: '.source', galleryId: 'old-contract' }),

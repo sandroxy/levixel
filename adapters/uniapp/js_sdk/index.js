@@ -16,6 +16,7 @@ const ITEM_KEYS = new Set([
   'alt',
 ])
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius'])
+const PREPARE_ITEM_KEYS = new Set(['priority'])
 const SELECTOR_OPEN_KEYS = new Set([
   'items',
   'index',
@@ -134,6 +135,21 @@ function nativeFileURL(savedFilePath) {
   catch (_) {
     return isDCloudVirtualPath ? '' : normalizedPath
   }
+}
+
+function webFileURL(info) {
+  if (!info)
+    return ''
+
+  const savedFilePath = normalizeURL(info.savedFilePath)
+  if (savedFilePath) {
+    const isDCloudVirtualPath = /^\/?_(?:www|doc|documents|downloads)(?:\/|$)/.test(savedFilePath)
+    if (isDCloudVirtualPath && savedFilePath.startsWith('/'))
+      return savedFilePath.slice(1)
+    if (isDCloudVirtualPath || /^[a-z][a-z0-9+.-]*:\/\//i.test(savedFilePath))
+      return savedFilePath
+  }
+  return normalizeURL(info.path) || savedFilePath
 }
 
 function requireNonEmptyString(value, path) {
@@ -708,6 +724,29 @@ export function onLevixelEvent(listener) {
   return () => eventListeners.delete(listener)
 }
 
+export async function prepareLevixelItem(item, options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw new Error('$.options must be an object')
+  rejectUnknownKeys(options, PREPARE_ITEM_KEYS, '$.options')
+  if (options.priority !== undefined && typeof options.priority !== 'boolean')
+    throw new Error('$.options.priority must be a boolean')
+
+  const normalizedItem = sanitizeItem(item, 0)
+  const url = transitionURL(normalizedItem)
+  if (!url)
+    return undefined
+
+  const info = await ensureStableImageInfo(url, options.priority === true)
+  const src = webFileURL(info)
+  if (!src || !(info && info.width > 0 && info.height > 0))
+    return undefined
+  return {
+    src,
+    width: info.width,
+    height: info.height,
+  }
+}
+
 export function warmupLevixelItem(item, loadEvent) {
   const normalizedItem = sanitizeItem(item, 0)
   const url = transitionURL(normalizedItem)
@@ -798,6 +837,7 @@ export default {
   open: openLevixel,
   close: closeLevixel,
   onEvent: onLevixelEvent,
+  prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,
   openFromSelector: openLevixelFromSelector,
 }

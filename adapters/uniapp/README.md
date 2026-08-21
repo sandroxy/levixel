@@ -12,28 +12,33 @@ its JavaScript SDK:
 ```js
 import {
   openLevixelFromSelector,
+  prepareLevixelItem,
   warmupLevixelItem,
 } from '@/nativeplugins/SandroxUniPlugin-Levixel/js_sdk/index.js'
 ```
 
 Each rendered source element must use the same selector and order as `items`.
-The helper measures those DOM rectangles and prepares identity-safe local
-previews as each HTML image finishes loading. Some UniApp runtimes reuse one
-temporary path across different `getImageInfo` requests, so remote previews are
-downloaded into distinct managed files instead. Background preparation remains
-serialized to avoid unnecessary network pressure, while the tapped item may
-use its own isolated foreground download and cannot be blocked by that queue.
+For deterministic shared transitions, prepare each item first and render the
+returned local `src` in the HTML image. That exact managed file is also handed
+to the native viewer, so an image that is visible and clickable cannot still be
+waiting on a second transition-only download. Keep bulk preparation bounded;
+the example app uses three workers and passes `priority: true` to each worker.
+Some UniApp runtimes reuse one temporary path across different `getImageInfo`
+requests, so remote previews are downloaded into distinct managed files.
 The adapter keeps DCloud's virtual path for lifecycle management and resolves
 a native-readable `file://` URL before handing the preview across the bridge.
-A source confirmed visible by its load event gets a bounded foreground wait;
-an unavailable source falls back quickly to its stable remote URL. Saved
-previews use an LRU limit and files left by a terminated process are removed on
-the next startup. Android CSS pixels are normalized to native window pixels by
-an explicit `rectScale`; no hidden native image view is created for an HTML
-source:
+Saved previews use an LRU limit and files left by a terminated process are
+removed on the next startup. Android CSS pixels are normalized to native
+window pixels by an explicit `rectScale`; no hidden native image view is
+created for an HTML source:
 
 ```js
-// The returned promise is optional; normal image load handlers can ignore it.
+const prepared = await prepareLevixelItem(item, { priority: true })
+if (prepared)
+  previewSources[item.id] = prepared.src
+
+// Call this from the local image's load handler. It records that the source is
+// actually decoded and preserves compatibility with the warmup-only workflow.
 warmupLevixelItem(item, loadEvent)
 
 await openLevixelFromSelector({
