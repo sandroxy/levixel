@@ -19,6 +19,8 @@
   serialized background queue without reintroducing runtime temp-path reuse.
   Loaded sources receive a bounded foreground wait before fallback; LRU
   eviction and stale-file cleanup remain in place.
+- Rotates the Maven Central release-signing key while retaining the `1.0.0`
+  public key for historical artifact verification.
 
 ## 1.0.0 - 2026-08-20
 

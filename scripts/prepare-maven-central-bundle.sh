@@ -8,7 +8,7 @@ repository_path="${plugin_dir}/dist/native-android/levixel-${version}-maven.zip"
 artifact_dir="${plugin_dir}/dist/native-android"
 bundle_name="levixel-${version}-maven-central.zip"
 bundle_path="${artifact_dir}/${bundle_name}"
-expected_signing_fingerprint="B7D159C354B9EF7318D3544200BE5C219A0DD690"
+expected_signing_fingerprint="76C15313941EDE0281DB835E36B1957F0CEFA6B3"
 
 if [[ ! -f "${repository_path}" ]]; then
   echo "Build and verify the native release candidate before preparing Maven Central." >&2

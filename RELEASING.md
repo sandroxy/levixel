@@ -59,8 +59,13 @@ The canonical release-signing key is published through the key servers
 supported by Maven Central. Its full fingerprint is:
 
 ```text
-B7D159C354B9EF7318D3544200BE5C219A0DD690
+76C15313941EDE0281DB835E36B1957F0CEFA6B3
 ```
+
+This key signs `1.1.0` and later releases. The immutable `1.0.0` artifacts
+remain signed by the retired release key
+`B7D159C354B9EF7318D3544200BE5C219A0DD690`; retain its public key and backup
+for historical verification, but do not use it for new releases.
 
 `prepare-maven-central-bundle.sh` rejects missing signatures, signatures made
 by any other key, and incomplete checksum sets before producing an upload.
