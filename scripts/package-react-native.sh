@@ -8,7 +8,7 @@ version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")'
 package_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${adapter_dir}/package.json")"
 dist_dir="${plugin_dir}/dist/react-native"
 staging_dir="${dist_dir}/package"
-artifact_name="sandrox-levixel-${version}.tgz"
+artifact_name="levixel-react-native-${version}.tgz"
 artifact_path="${dist_dir}/${artifact_name}"
 
 if [[ "${package_version}" != "${version}" ]]; then

@@ -12,7 +12,7 @@ plugin_dir="$(cd "${script_dir}/.." && pwd)"
 repo_root="$(cd "${plugin_dir}/../.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 package_name="@sandrox/levixel"
-artifact_path="${plugin_dir}/dist/react-native/sandrox-levixel-${version}.tgz"
+artifact_path="${plugin_dir}/dist/react-native/levixel-react-native-${version}.tgz"
 release_tag="levixel-react-native-v${version}"
 registry="https://registry.npmjs.org/"
 

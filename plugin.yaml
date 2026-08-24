@@ -129,7 +129,7 @@ targets:
     artifacts:
       - id: npm-package
         format: npm-tarball
-        output: dist/react-native/sandrox-levixel-1.1.0.tgz
+        output: dist/react-native/levixel-react-native-1.1.0.tgz
         distribution:
           channel: npm
           packageId: '@sandrox/levixel'
@@ -161,7 +161,7 @@ targets:
     artifacts:
       - id: native-plugin
         format: native-plugin-zip
-        output: dist/uniapp/sandrox-levixel-uniapp-1.1.0.zip
+        output: dist/uniapp/levixel-uniapp-1.1.0.zip
         distribution:
           channel: uniapp-marketplace
           packageId: Sandrox-Levixel

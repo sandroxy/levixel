@@ -162,8 +162,8 @@ long-lived npm token.
 5. Attach all accepted files to the existing `1.1.0` release in the public
    `sandroxy/levixel` repository without repacking them:
 
-   - `dist/react-native/sandrox-levixel-1.1.0.tgz`
-   - `dist/react-native/sandrox-levixel-1.1.0.tgz.sha256`
+   - `dist/react-native/levixel-react-native-1.1.0.tgz`
+   - `dist/react-native/levixel-react-native-1.1.0.tgz.sha256`
    - `dist/native-release/levixel-native-1.1.0.json`
 
 6. Before running the public workflow, configure npm Trusted Publishing for
@@ -212,7 +212,7 @@ geometry conversion, bounded preview warmup, and event/error transport.
 3. Open `uniapp-plugins-test` in HBuilderX, build a custom base or offline
    package for AppID `__UNI__A92914D`, and verify Android and iOS transition,
    paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
-4. Publish `dist/uniapp/sandrox-levixel-uniapp-1.1.0.zip` unchanged. Never
+4. Publish `dist/uniapp/levixel-uniapp-1.1.0.zip` unchanged. Never
    rebuild after hand verification or reuse `1.1.0` for different bytes.
 
 ## Provenance
