@@ -83,7 +83,7 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          npm publish "dist/levixel-react-native-${VERSION}.tgz" \
+          npm publish "./dist/levixel-react-native-${VERSION}.tgz" \
             --access public \
             --provenance \
             --registry https://registry.npmjs.org/
