@@ -13,7 +13,7 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` 审核中 |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
 | UniApp | `Sandrox-Levixel` 原生插件包 | 发布准备中 |
 
 ## 源码结构

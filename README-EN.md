@@ -13,7 +13,7 @@ This repository is the canonical source, public contract, packaging toolkit, and
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` under review |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
 | UniApp | `Sandrox-Levixel` native plugin | Preparing |
 
 ## Source Layout
