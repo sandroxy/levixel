@@ -122,6 +122,11 @@ The npm product embeds the exact Android AAR and iOS XCFramework recorded in
 `dist/native-release/levixel-native-1.1.0.json`. It must not compile copied
 native viewer source or resolve an unpinned native core during consumer install.
 
+The canonical public path uses npm Trusted Publishing from
+`.github/workflows/publish-levixel-npm.yml`. The workflow publishes only the
+checksum-verified archive attached to the matching GitHub Release; it does not
+rebuild the package in CI or use a long-lived npm token.
+
 1. Package the npm candidate once:
 
    ```sh
@@ -152,15 +157,32 @@ native viewer source or resolve an unpinned native core during consumer install.
    ./scripts/publish-react-native.sh --dry-run
    ```
 
-5. Authenticate with the public npm registry and publish the same archive
-   bytes, without rerunning `package-react-native.sh`:
+5. Create a GitHub Release for `levixel-react-native-v1.1.0` and attach all
+   accepted files without repacking them:
+
+   - `dist/react-native/sandrox-levixel-1.1.0.tgz`
+   - `dist/react-native/sandrox-levixel-1.1.0.tgz.sha256`
+   - `dist/native-release/levixel-native-1.1.0.json`
+
+6. Before publishing the release, configure npm Trusted Publishing for
+   `@sandrox/levixel` with these values:
+
+   - Provider: GitHub Actions
+   - Organization or user: `sandroxy`
+   - Repository: `integrated-plugins`
+   - Workflow filename: `publish-levixel-npm.yml`
+   - Allowed action: `npm publish`
+
+7. Publish the GitHub Release. The release event downloads, verifies, and
+   publishes the exact accepted archive through OIDC.
+
+Direct local publication remains an authenticated fallback when required:
 
    ```sh
-   npm login --scope=@sandrox --registry=https://registry.npmjs.org/
    ./scripts/publish-react-native.sh --publish
    ```
 
-6. Install `@sandrox/levixel@1.1.0` from npm in a clean consumer and run the
+8. Install `@sandrox/levixel@1.1.0` from npm in a clean consumer and run the
    final Android/iOS smoke test. Public npm versions are immutable; never reuse
    `1.1.0` for different bytes.
 
