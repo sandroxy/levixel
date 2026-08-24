@@ -37,6 +37,10 @@ dependencies {
 }
 ```
 
+Maven Central is the canonical Android dependency channel. The matching GitHub Release also
+provides `levixel-1.1.0.aar` and its SHA-256 file for offline or manual integration only. The AAR
+is byte-identical to the Maven Central artifact and is not an independent release source.
+
 The Android core currently retains the fully validated `PhotoView 2.3.0` integration, so consumers must keep JitPack available for now.
 
 Minimal viewer setup:

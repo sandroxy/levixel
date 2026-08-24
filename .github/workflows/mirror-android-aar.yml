@@ -1,0 +1,78 @@
+name: Mirror Android AAR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Levixel version to mirror from Maven Central
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release version
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${EVENT_NAME}" == "release" ]]; then
+            version="${RELEASE_TAG}"
+          else
+            version="${INPUT_VERSION}"
+          fi
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only stable semantic versions are mirrorable: ${version}" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out the public release verifier
+        uses: actions/checkout@v6
+
+      - name: Download accepted release metadata and Maven Central AAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir -p dist
+          gh release download "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "levixel-native-${VERSION}.json" \
+            --dir dist
+          curl --fail --location --retry 20 --retry-all-errors --retry-delay 15 \
+            --output "dist/levixel-${VERSION}.aar" \
+            "https://repo1.maven.org/maven2/io/gitee/sandrox/levixel/${VERSION}/levixel-${VERSION}.aar"
+
+      - name: Verify the exact accepted Android artifact
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          .github/scripts/verify-android-release-mirror.sh \
+            "${VERSION}" \
+            "dist/levixel-native-${VERSION}.json" \
+            "dist/levixel-${VERSION}.aar"
+          (
+            cd dist
+            sha256sum "levixel-${VERSION}.aar" > "levixel-${VERSION}.aar.sha256"
+          )
+
+      - name: Upload the verified GitHub Release mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          gh release upload "${VERSION}" \
+            "dist/levixel-${VERSION}.aar" \
+            "dist/levixel-${VERSION}.aar.sha256" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber

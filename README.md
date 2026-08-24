@@ -37,6 +37,10 @@ dependencies {
 }
 ```
 
+Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供
+`levixel-1.1.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与
+Maven Central 制品字节级一致，并不是独立的发布来源。
+
 当前 Android 核心保留了已经完整验收的 `PhotoView 2.3.0`，因此消费者需要暂时保留 JitPack 仓库。
 
 最小打开方式：
