@@ -12,7 +12,7 @@ Levixel uses one canonical version with ecosystem-specific products:
 | React Native | `@sandrox/levixel` | npm tarball containing thin Expo Modules bridges and the accepted Android/iOS native artifacts |
 | UniApp | `Sandrox-Levixel` | DCloud native-plugin ZIP containing thin Android/iOS bridges, accepted native artifacts, and the JavaScript SDK |
 
-The raw Android AAR is available for offline integration, but Maven Central is the preferred Android channel because it carries identity, version, and transitive dependency metadata.
+The raw Android AAR and HarmonyOS HAR are available for offline integration. Maven Central and OHPM remain the preferred channels because they carry package identity and version metadata.
 
 ## Immutable Candidate Rule
 
@@ -87,6 +87,7 @@ LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-<version>.xcframework.zip \
 3. Install that HAR in an artifact-only consumer and complete the HarmonyOS hand verification.
 4. Publish the accepted HAR to OHPM without rebuilding.
 5. Install the public package in a clean consumer and run a smoke test.
+6. Run the `Mirror HarmonyOS HAR` workflow for the approved version. It verifies the OHPM SHA-512 integrity and package metadata, mirrors the exact HAR and SHA-256 file to the matching GitHub Release, and reconciles the HAR entry in the native release manifest.
 
 ## React Native / npm
 

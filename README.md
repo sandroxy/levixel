@@ -13,7 +13,7 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | 发布准备中 |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` 审核中 |
 | UniApp | `Sandrox-Levixel` 原生插件包 | 发布准备中 |
 
 ## 源码结构
@@ -114,6 +114,16 @@ imageView.setupLevixelViewer(
 ```
 
 Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容与 `Package.swift` 中的 checksum 一致。
+
+## HarmonyOS
+
+OHPM 审核通过后安装：
+
+```sh
+ohpm install @sandrox/levixel@1.1.0
+```
+
+OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.0.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
 
 ## React Native / Expo
 

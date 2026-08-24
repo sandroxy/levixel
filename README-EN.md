@@ -13,7 +13,7 @@ This repository is the canonical source, public contract, packaging toolkit, and
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | Preparing |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` under review |
 | UniApp | `Sandrox-Levixel` native plugin | Preparing |
 
 ## Source Layout
@@ -114,6 +114,16 @@ imageView.setupLevixelViewer(
 ```
 
 The Swift Package references a checksum-pinned XCFramework. Xcode verifies the downloaded binary against the checksum in `Package.swift`.
+
+## HarmonyOS
+
+Install after OHPM approval:
+
+```sh
+ohpm install @sandrox/levixel@1.1.0
+```
+
+OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.1.0.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the approved OHPM artifact.
 
 ## React Native / Expo
 

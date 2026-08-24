@@ -1,0 +1,73 @@
+name: Mirror HarmonyOS HAR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Levixel version approved by OHPM
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release version
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "${INPUT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only stable semantic versions are mirrorable: ${INPUT_VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out the public release verifier
+        uses: actions/checkout@v6
+
+      - name: Download OHPM metadata, official HAR, and native manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir -p dist
+          curl --fail --location --retry 20 --retry-all-errors --retry-delay 15 \
+            --output dist/ohpm-metadata.json \
+            "https://ohpm.openharmony.cn/ohpm/@sandrox/levixel"
+          curl --fail --location --retry 20 --retry-all-errors --retry-delay 15 \
+            --output "dist/levixel-${VERSION}.har" \
+            "https://ohpm.openharmony.cn/ohpm/@sandrox/levixel/-/levixel-${VERSION}.har"
+          gh release download "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "levixel-native-${VERSION}.json" \
+            --dir dist
+
+      - name: Verify the official HarmonyOS artifact
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          .github/scripts/prepare-harmonyos-release-mirror.sh \
+            "${VERSION}" \
+            dist/ohpm-metadata.json \
+            "dist/levixel-native-${VERSION}.json" \
+            "dist/levixel-${VERSION}.har"
+          (
+            cd dist
+            sha256sum "levixel-${VERSION}.har" > "levixel-${VERSION}.har.sha256"
+          )
+
+      - name: Upload the verified GitHub Release mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          gh release upload "${VERSION}" \
+            "dist/levixel-${VERSION}.har" \
+            "dist/levixel-${VERSION}.har.sha256" \
+            "dist/levixel-native-${VERSION}.json" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
