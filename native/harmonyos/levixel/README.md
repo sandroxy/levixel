@@ -22,7 +22,6 @@ import {
 `LevixelGallery` provides the gallery surface. Media descriptors and source
 geometry use the exported model types.
 
-See the canonical repository for the maintained test host and release
-verification workflow:
+Public releases, documentation, and issue tracking are available at:
 
-https://github.com/sandroxy/integrated-plugins
+https://github.com/sandroxy/levixel

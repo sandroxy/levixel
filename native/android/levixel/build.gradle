@@ -138,9 +138,9 @@ afterEvaluate {
                     }
 
                     scm {
-                        connection = "scm:git:https://github.com/sandroxy/integrated-plugins.git"
-                        developerConnection = "scm:git:ssh://git@github.com/sandroxy/integrated-plugins.git"
-                        url = "https://github.com/sandroxy/integrated-plugins"
+                        connection = "scm:git:https://github.com/sandroxy/levixel.git"
+                        developerConnection = "scm:git:ssh://git@github.com/sandroxy/levixel.git"
+                        url = "https://github.com/sandroxy/levixel"
                     }
                 }
             }

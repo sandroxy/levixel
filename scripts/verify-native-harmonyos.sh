@@ -73,7 +73,7 @@ ruby -rjson -e '
     "name" => "@sandrox/levixel",
     "version" => ARGV.fetch(1),
     "homepage" => "https://github.com/sandroxy/levixel",
-    "repository" => "https://github.com/sandroxy/integrated-plugins",
+    "repository" => "https://github.com/sandroxy/levixel",
     "types" => "Index.d.ets",
     "artifactType" => "obfuscation",
     "compatibleSdkVersion" => 23,

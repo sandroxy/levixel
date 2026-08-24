@@ -97,15 +97,19 @@ ruby -rjson -e '
   repository = package.fetch("repository")
   abort("Unexpected npm repository") unless repository == {
     "type" => "git",
-    "url" => "https://github.com/sandroxy/integrated-plugins.git",
-    "directory" => "plugins/levixel/adapters/react-native"
+    "url" => "git+https://github.com/sandroxy/levixel.git"
   }
-  abort("Unexpected npm bugs URL") unless package.dig("bugs", "url") == "https://github.com/sandroxy/integrated-plugins/issues"
+  abort("Unexpected npm bugs URL") unless package.dig("bugs", "url") == "https://github.com/sandroxy/levixel/issues"
   abort("Package must publish publicly") unless package.dig("publishConfig", "access") == "public"
   abort("Package must use the public npm registry") unless package.dig("publishConfig", "registry") == "https://registry.npmjs.org/"
   lifecycle = package.fetch("scripts", {}).keys.grep(/^(preinstall|install|postinstall|prepublish|prepare)$/)
   abort("Unexpected lifecycle scripts: #{lifecycle.join(", ")}") unless lifecycle.empty?
 ' "${package_root}/package.json" "${version}"
+
+if rg -q 'github\.com/sandroxy/integrated-plugins' "${package_root}"; then
+  echo "React Native package exposes the internal build repository." >&2
+  exit 1
+fi
 
 for relative_path in \
   package.json \

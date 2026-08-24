@@ -122,10 +122,12 @@ The npm product embeds the exact Android AAR and iOS XCFramework recorded in
 `dist/native-release/levixel-native-1.1.0.json`. It must not compile copied
 native viewer source or resolve an unpinned native core during consumer install.
 
-The canonical public path uses npm Trusted Publishing from
-`.github/workflows/publish-levixel-npm.yml`. The workflow publishes only the
-checksum-verified archive attached to the matching GitHub Release; it does not
-rebuild the package in CI or use a long-lived npm token.
+The internal monorepo builds and deeply verifies the candidate. Public npm
+publishing is owned by the `sandroxy/levixel` product repository. Its trusted
+publisher workflow downloads the accepted candidate and native manifest from
+the matching public GitHub Release, verifies them against the public native
+artifacts, and publishes the exact archive without rebuilding it or using a
+long-lived npm token.
 
 1. Package the npm candidate once:
 
@@ -157,24 +159,26 @@ rebuild the package in CI or use a long-lived npm token.
    ./scripts/publish-react-native.sh --dry-run
    ```
 
-5. Create a GitHub Release for `levixel-react-native-v1.1.0` and attach all
-   accepted files without repacking them:
+5. Attach all accepted files to the existing `1.1.0` release in the public
+   `sandroxy/levixel` repository without repacking them:
 
    - `dist/react-native/sandrox-levixel-1.1.0.tgz`
    - `dist/react-native/sandrox-levixel-1.1.0.tgz.sha256`
    - `dist/native-release/levixel-native-1.1.0.json`
 
-6. Before publishing the release, configure npm Trusted Publishing for
+6. Before running the public workflow, configure npm Trusted Publishing for
    `@sandrox/levixel` with these values:
 
    - Provider: GitHub Actions
    - Organization or user: `sandroxy`
-   - Repository: `integrated-plugins`
-   - Workflow filename: `publish-levixel-npm.yml`
+   - Repository: `levixel`
+   - Workflow filename: `publish-npm.yml`
    - Allowed action: `npm publish`
 
-7. Publish the GitHub Release. The release event downloads, verifies, and
-   publishes the exact accepted archive through OIDC.
+7. Run the public `Publish npm` workflow for `1.1.0`. Future releases may run
+   it from the release event after every required asset has been attached. The
+   workflow downloads, verifies, and publishes the exact accepted archive
+   through OIDC.
 
 Direct local publication remains an authenticated fallback when required:
 
