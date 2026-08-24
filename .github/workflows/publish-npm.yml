@@ -1,0 +1,89 @@
+name: Publish npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Levixel version attached to a public release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release version
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${EVENT_NAME}" == "release" ]]; then
+            version="${RELEASE_TAG}"
+          else
+            version="${INPUT_VERSION}"
+          fi
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only stable semantic versions are publishable: ${version}" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out the public release verifier
+        uses: actions/checkout@v6
+
+      - name: Download accepted public artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir -p dist
+          gh release download "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "sandrox-levixel-${VERSION}.tgz" \
+            --pattern "sandrox-levixel-${VERSION}.tgz.sha256" \
+            --pattern "levixel-native-${VERSION}.json" \
+            --pattern "levixel-${VERSION}.xcframework.zip" \
+            --dir dist
+          curl --fail --location --retry 8 --retry-all-errors --retry-delay 5 \
+            --output "dist/levixel-${VERSION}.aar" \
+            "https://repo1.maven.org/maven2/io/gitee/sandrox/levixel/${VERSION}/levixel-${VERSION}.aar"
+
+      - name: Verify exact package and native cores
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          .github/scripts/verify-npm-package.sh \
+            "${VERSION}" \
+            "dist/sandrox-levixel-${VERSION}.tgz" \
+            "dist/sandrox-levixel-${VERSION}.tgz.sha256" \
+            "dist/levixel-native-${VERSION}.json" \
+            "dist/levixel-${VERSION}.aar" \
+            "dist/levixel-${VERSION}.xcframework.zip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org/'
+          package-manager-cache: false
+
+      - name: Set up an OIDC-capable npm client
+        run: npm install --global npm@11.17.0
+
+      - name: Publish verified package
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          npm publish "dist/sandrox-levixel-${VERSION}.tgz" \
+            --access public \
+            --provenance \
+            --registry https://registry.npmjs.org/

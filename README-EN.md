@@ -4,7 +4,7 @@
 
 Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
 
-This repository is the public product home and iOS Swift Package for Levixel. Core source, cross-platform adapters, and release builds are maintained in [Integrated Plugins](https://github.com/sandroxy/integrated-plugins); public consumers integrate versioned artifacts only.
+This repository is Levixel's public product home, artifact release repository, and iOS Swift Package. Core source, cross-platform adapters, and release builds are maintained by a separate internal pipeline; public consumers integrate only the versioned artifacts published here.
 
 ## Published Packages
 

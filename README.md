@@ -4,7 +4,7 @@
 
 Levixel 是一套强调原生手感的图片与视频查看器，提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放能力。
 
-这个仓库是 Levixel 的公共产品入口和 iOS Swift Package 仓库。核心源码、跨平台桥接层与制品构建在 [Integrated Plugins](https://github.com/sandroxy/integrated-plugins) 中统一维护；公开消费者始终通过版本化制品接入。
+这个仓库是 Levixel 的公共产品入口、制品发布仓库和 iOS Swift Package 仓库。核心源码、跨平台桥接层与制品构建由独立的内部流水线统一维护；公开消费者始终通过这里发布的版本化制品接入。
 
 ## 当前发布
 
