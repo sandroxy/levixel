@@ -47,6 +47,11 @@ ruby -rjson -e '
   expected = {
     "name" => "@sandrox/levixel",
     "version" => ARGV.fetch(1),
+    "author" => {
+      "name" => "SandroX",
+      "email" => "wangyifengjxc@gmail.com",
+      "url" => "https://github.com/sandroxy"
+    },
     "homepage" => "https://github.com/sandroxy/levixel",
     "repository" => "https://github.com/sandroxy/levixel",
     "types" => "Index.d.ets",

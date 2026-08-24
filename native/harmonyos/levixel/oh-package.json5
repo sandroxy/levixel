@@ -3,7 +3,11 @@
   "version": "1.1.0",
   "description": "Shared-transition image and video viewer for HarmonyOS.",
   "main": "Index.ets",
-  "author": "SandroX",
+  "author": {
+    "name": "SandroX",
+    "email": "wangyifengjxc@gmail.com",
+    "url": "https://github.com/sandroxy"
+  },
   "license": "MIT",
   "homepage": "https://github.com/sandroxy/levixel",
   "repository": "https://github.com/sandroxy/levixel",
