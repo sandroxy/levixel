@@ -4,14 +4,14 @@
 
 Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
 
-This repository is the public product home and iOS Swift Package for Levixel. Core source, cross-platform adapters, and release builds are maintained in a private canonical monorepo; public consumers integrate versioned artifacts only.
+This repository is the public product home and iOS Swift Package for Levixel. Core source, cross-platform adapters, and release builds are maintained in [Integrated Plugins](https://github.com/sandroxy/integrated-plugins); public consumers integrate versioned artifacts only.
 
 ## Published Packages
 
 | Platform | Public artifact | Current version |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.0.0` |
-| iOS | Swift Package `https://gitee.com/sandrox/levixel.git` | `1.0.0` |
+| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | HarmonyOS | OHPM `@sandrox/levixel` | Preparing |
 | React Native / UniApp / Web | npm and platform adapters | Preparing |
 
@@ -33,7 +33,7 @@ Add the dependency:
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.0.0")
+    implementation("io.gitee.sandrox:levixel:1.1.0")
 }
 ```
 
@@ -73,10 +73,10 @@ For complete system-bar transitions, use an edge-to-edge host and route system b
 In Xcode, choose **File > Add Package Dependencies** and enter:
 
 ```text
-https://gitee.com/sandrox/levixel.git
+https://github.com/sandroxy/levixel.git
 ```
 
-Select `1.0.0` or a compatible `1.x` version, then link the `Levixel` product.
+Select `1.1.0` or a compatible `1.x` version, then link the `Levixel` product.
 
 ```swift
 import Levixel
@@ -100,4 +100,3 @@ The Swift Package references a checksum-pinned XCFramework. Xcode verifies the d
 ## License And Provenance
 
 Levixel is released under the MIT License. The implementation has been substantially rewritten and polished across platforms, while retaining traceable MIT-licensed derivative lineage. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete attribution.
-

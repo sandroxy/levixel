@@ -4,14 +4,14 @@
 
 Levixel 是一套强调原生手感的图片与视频查看器，提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放能力。
 
-这个仓库是 Levixel 的公共产品入口和 iOS Swift Package 仓库。核心源码、跨平台桥接层与制品构建在私有母仓库中统一维护；公开消费者始终通过版本化制品接入。
+这个仓库是 Levixel 的公共产品入口和 iOS Swift Package 仓库。核心源码、跨平台桥接层与制品构建在 [Integrated Plugins](https://github.com/sandroxy/integrated-plugins) 中统一维护；公开消费者始终通过版本化制品接入。
 
 ## 当前发布
 
 | 平台 | 公开制品 | 当前版本 |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.0.0` |
-| iOS | Swift Package `https://gitee.com/sandrox/levixel.git` | `1.0.0` |
+| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | HarmonyOS | OHPM `@sandrox/levixel` | 准备中 |
 | React Native / UniApp / Web | npm 与平台适配制品 | 准备中 |
 
@@ -33,7 +33,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.0.0")
+    implementation("io.gitee.sandrox:levixel:1.1.0")
 }
 ```
 
@@ -73,10 +73,10 @@ rootView.addView(viewer);
 在 Xcode 中选择 **File > Add Package Dependencies**，输入：
 
 ```text
-https://gitee.com/sandrox/levixel.git
+https://github.com/sandroxy/levixel.git
 ```
 
-选择 `1.0.0` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
+选择 `1.1.0` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
 
 ```swift
 import Levixel
@@ -100,4 +100,3 @@ Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容
 ## 许可证与来源
 
 Levixel 以 MIT License 发布。当前实现经过了大量重构和跨平台打磨，但仍保留可追溯的 MIT 衍生代码来源。完整声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
