@@ -10,8 +10,8 @@ verification before any candidate reaches this repository.
 The release tagged `X.Y.Z` may contain these accepted artifacts:
 
 - `levixel-X.Y.Z.xcframework.zip`
-- `sandrox-levixel-X.Y.Z.tgz`
-- `sandrox-levixel-X.Y.Z.tgz.sha256`
+- `levixel-react-native-X.Y.Z.tgz`
+- `levixel-react-native-X.Y.Z.tgz.sha256`
 - `levixel-native-X.Y.Z.json`
 - HarmonyOS and UniApp artifacts with matching checksum sidecars
 

@@ -12,7 +12,7 @@ checksum_path="$3"
 native_manifest="$4"
 android_artifact="$5"
 ios_artifact="$6"
-artifact_name="sandrox-levixel-${version}.tgz"
+artifact_name="levixel-react-native-${version}.tgz"
 
 for required_file in \
   "${artifact_path}" \

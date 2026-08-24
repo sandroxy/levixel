@@ -48,8 +48,8 @@ jobs:
           mkdir -p dist
           gh release download "${VERSION}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --pattern "sandrox-levixel-${VERSION}.tgz" \
-            --pattern "sandrox-levixel-${VERSION}.tgz.sha256" \
+            --pattern "levixel-react-native-${VERSION}.tgz" \
+            --pattern "levixel-react-native-${VERSION}.tgz.sha256" \
             --pattern "levixel-native-${VERSION}.json" \
             --pattern "levixel-${VERSION}.xcframework.zip" \
             --dir dist
@@ -63,8 +63,8 @@ jobs:
         run: |
           .github/scripts/verify-npm-package.sh \
             "${VERSION}" \
-            "dist/sandrox-levixel-${VERSION}.tgz" \
-            "dist/sandrox-levixel-${VERSION}.tgz.sha256" \
+            "dist/levixel-react-native-${VERSION}.tgz" \
+            "dist/levixel-react-native-${VERSION}.tgz.sha256" \
             "dist/levixel-native-${VERSION}.json" \
             "dist/levixel-${VERSION}.aar" \
             "dist/levixel-${VERSION}.xcframework.zip"
@@ -83,7 +83,7 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          npm publish "dist/sandrox-levixel-${VERSION}.tgz" \
+          npm publish "dist/levixel-react-native-${VERSION}.tgz" \
             --access public \
             --provenance \
             --registry https://registry.npmjs.org/
