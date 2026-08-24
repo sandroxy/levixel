@@ -1,0 +1,172 @@
+# yaml-language-server: $schema=schema/plugin-manifest.schema.yaml
+
+schemaVersion: 1
+id: levixel
+displayName: Levixel
+version: 1.1.0
+summary: Shared-transition image and video viewer for native, React Native, and UniApp applications.
+
+contract:
+  version: 1
+  schema: contract/open.schema.json
+
+provenance:
+  repository: https://github.com/sandroxy/levixel.git
+  commit: 3285cc933e04c1772acb4c9e3b5610ae8cee86a5
+  paths:
+    - Android/Galeria
+    - Harmony/Galeria
+    - IOS/galeria
+    - ReactNativePlugins/galeria
+    - UniappNativePlugins/ChrisUniPlugin-Galeria
+
+targets:
+  - id: native-android
+    kind: native
+    platform: android
+    sourceRoot: native/android/levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-native-android.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-android.sh
+    artifacts:
+      - id: maven-repository
+        format: maven-repository-zip
+        output: dist/native-android/levixel-1.1.0-maven.zip
+        distribution:
+          channel: maven-central
+          packageId: io.gitee.sandrox:levixel
+      - id: aar
+        format: aar
+        output: dist/native-android/levixel-1.1.0.aar
+    constraints:
+      - name: minimum-sdk
+        value: 21
+  - id: native-ios
+    kind: native
+    platform: ios
+    sourceRoot: native/ios/Levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-native-ios.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-ios.sh
+    artifacts:
+      - id: xcframework
+        format: xcframework-zip
+        output: dist/native-ios/levixel-1.1.0.xcframework.zip
+        distribution:
+          channel: swift-package
+          packageId: Levixel
+      - id: swift-package
+        format: swift-package-zip
+        output: dist/native-ios/levixel-1.1.0-swift-package.zip
+    constraints:
+      - name: minimum-ios
+        value: '13.0'
+  - id: native-harmonyos
+    kind: native
+    platform: harmonyos
+    sourceRoot: native/harmonyos/levixel
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-native-harmonyos.sh
+    verify:
+      commands:
+        - ./scripts/verify-native-harmonyos.sh
+    artifacts:
+      - id: har
+        format: har
+        output: dist/native-harmonyos/levixel-1.1.0.har
+        distribution:
+          channel: ohpm
+          packageId: '@sandrox/levixel'
+    constraints:
+      - name: minimum-api
+        value: 23
+  - id: react-native
+    kind: adapter
+    runtime: react-native
+    platforms:
+      - android
+      - ios
+    sourceRoot: adapters/react-native
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-react-native.sh
+    verify:
+      commands:
+        - ./scripts/verify-react-native-package.sh
+    artifacts:
+      - id: npm-package
+        format: npm-tarball
+        output: dist/react-native/levixel-react-native-1.1.0.tgz
+        distribution:
+          channel: npm
+          packageId: '@sandrox/levixel'
+    constraints:
+      - name: minimum-expo
+        value: 54
+      - name: minimum-react-native
+        value: '0.81'
+  - id: uniapp
+    kind: adapter
+    runtime: uniapp
+    platforms:
+      - android
+      - ios
+    sourceRoot: adapters/uniapp
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-uniapp.sh
+    verify:
+      commands:
+        - ./scripts/verify-uniapp.sh
+    artifacts:
+      - id: native-plugin
+        format: native-plugin-zip
+        output: dist/uniapp/levixel-uniapp-1.1.0.zip
+        distribution:
+          channel: uniapp-marketplace
+          packageId: Sandrox-Levixel
+    constraints:
+      - name: minimum-android-sdk
+        value: 21
+      - name: minimum-ios
+        value: '13.0'

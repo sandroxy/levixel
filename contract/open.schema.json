@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:com.sandrox.levixel:contract:open:1",
+  "title": "Levixel open request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/mediaItem"
+      }
+    },
+    "index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "theme": {
+      "enum": ["dark", "light"]
+    },
+    "sourceHints": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "$ref": "#/$defs/sourceHint" },
+          { "type": "null" }
+        ]
+      }
+    },
+    "sourceVisibility": {
+      "enum": ["hidden", "visible"]
+    },
+    "counter": {
+      "type": "boolean"
+    },
+    "closeButton": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "mediaItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "url"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": ["image", "video"]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "posterUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "alt": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceHint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rect", "objectFit", "coordinateSpace"],
+      "properties": {
+        "rect": {
+          "$ref": "#/$defs/rect"
+        },
+        "imageSize": {
+          "$ref": "#/$defs/size"
+        },
+        "objectFit": {
+          "enum": ["contain", "cover", "fill"]
+        },
+        "coordinateSpace": {
+          "enum": ["screen", "viewport"]
+        },
+        "rectScale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cornerRadius": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "top", "width", "height"],
+      "properties": {
+        "left": { "type": "number" },
+        "top": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

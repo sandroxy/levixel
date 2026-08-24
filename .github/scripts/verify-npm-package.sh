@@ -136,8 +136,15 @@ ruby -rjson -e '
   abort("Unexpected lifecycle scripts: #{lifecycle.join(", ")}") unless lifecycle.empty?
 ' "${package_root}/package.json" "${version}"
 
-if rg -q 'github\.com/sandroxy/integrated-plugins' "${package_root}"; then
-  echo "The npm package exposes the internal build repository." >&2
+unexpected_project_urls="$(
+  rg --no-filename -o '(git\+)?https://github\.com/sandroxy/[A-Za-z0-9_.-]+' "${package_root}" \
+    | sort -u \
+    | grep -Ev '^(git\+)?https://github\.com/sandroxy/levixel(\.git)?$' \
+    || true
+)"
+if [[ -n "${unexpected_project_urls}" ]]; then
+  echo "The npm package exposes an unexpected project URL:" >&2
+  printf '%s\n' "${unexpected_project_urls}" >&2
   exit 1
 fi
 

@@ -1,0 +1,243 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Levixel plugin manifest
+description: Strict positive declaration of the plugin and its maintained delivery targets.
+type: object
+additionalProperties: false
+required:
+  - schemaVersion
+  - id
+  - displayName
+  - version
+  - summary
+  - targets
+properties:
+  schemaVersion:
+    const: 1
+  id:
+    type: string
+    pattern: '^(?!.*(?:^|-)(?:v[0-9]+|p[0-9]+|phase[0-9]+|new|old|legacy|temp|temporary|final|backup|copy)(?:-|$))[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+  displayName:
+    type: string
+    minLength: 1
+  version:
+    type: string
+    pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+  summary:
+    type: string
+    minLength: 1
+  contract:
+    $ref: '#/$defs/contract'
+  provenance:
+    $ref: '#/$defs/provenance'
+  targets:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: '#/$defs/target'
+$defs:
+  relativePath:
+    type: string
+    minLength: 1
+    pattern: '^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._/-]+$'
+  identifier:
+    type: string
+    pattern: '^(?!.*(?:^|-)(?:v[0-9]+|p[0-9]+|phase[0-9]+|new|old|legacy|temp|temporary|final|backup|copy)(?:-|$))[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+  contract:
+    type: object
+    additionalProperties: false
+    required:
+      - version
+      - schema
+    properties:
+      version:
+        type: integer
+        minimum: 1
+      schema:
+        $ref: '#/$defs/relativePath'
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - repository
+      - commit
+      - paths
+    properties:
+      repository:
+        type: string
+        minLength: 1
+      commit:
+        type: string
+        pattern: '^[0-9a-fA-F]{7,64}$'
+      paths:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  target:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - kind
+      - sourceRoot
+      - capabilities
+      - build
+      - verify
+      - artifacts
+    properties:
+      id:
+        $ref: '#/$defs/identifier'
+      kind:
+        enum:
+          - native
+          - adapter
+          - configuration
+      platform:
+        $ref: '#/$defs/identifier'
+      runtime:
+        $ref: '#/$defs/identifier'
+      platforms:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/identifier'
+      sourceRoot:
+        $ref: '#/$defs/relativePath'
+      capabilities:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/identifier'
+      build:
+        $ref: '#/$defs/build'
+      verify:
+        $ref: '#/$defs/verify'
+      artifacts:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/artifact'
+      constraints:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/constraint'
+    allOf:
+      - if:
+          properties:
+            kind:
+              const: native
+          required:
+            - kind
+        then:
+          properties:
+            platform:
+              $ref: '#/$defs/identifier'
+          required:
+            - platform
+      - if:
+          properties:
+            kind:
+              const: adapter
+          required:
+            - kind
+        then:
+          properties:
+            runtime:
+              $ref: '#/$defs/identifier'
+            platforms:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: '#/$defs/identifier'
+          required:
+            - runtime
+            - platforms
+      - if:
+          properties:
+            kind:
+              const: configuration
+          required:
+            - kind
+        then:
+          properties:
+            runtime:
+              $ref: '#/$defs/identifier'
+          required:
+            - runtime
+  build:
+    type: object
+    additionalProperties: false
+    required:
+      - command
+    properties:
+      command:
+        type: string
+        minLength: 1
+      workingDirectory:
+        $ref: '#/$defs/relativePath'
+  verify:
+    type: object
+    additionalProperties: false
+    required:
+      - commands
+    properties:
+      commands:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  artifact:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - format
+      - output
+    properties:
+      id:
+        $ref: '#/$defs/identifier'
+      format:
+        $ref: '#/$defs/identifier'
+      output:
+        allOf:
+          - $ref: '#/$defs/relativePath'
+          - type: string
+            pattern: '^dist/[a-z][a-z0-9]*(?:-[a-z0-9]+)*/'
+      distribution:
+        $ref: '#/$defs/distribution'
+  distribution:
+    type: object
+    additionalProperties: false
+    required:
+      - channel
+      - packageId
+    properties:
+      channel:
+        $ref: '#/$defs/identifier'
+      packageId:
+        type: string
+        minLength: 1
+  constraint:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - value
+    properties:
+      name:
+        $ref: '#/$defs/identifier'
+      value:
+        anyOf:
+          - type: string
+          - type: number
+          - type: boolean

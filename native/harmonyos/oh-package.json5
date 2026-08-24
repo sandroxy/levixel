@@ -1,0 +1,8 @@
+{
+  "modelVersion": "6.1.1",
+  "description": "Levixel HarmonyOS native library project.",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}

@@ -4,7 +4,7 @@
 
 Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
 
-This repository is Levixel's public product home, artifact release repository, and iOS Swift Package. Core source, cross-platform adapters, and release builds are maintained by a separate internal pipeline; public consumers integrate only the versioned artifacts published here.
+This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores and the React Native and UniApp adapters are maintained here. Every release version maps to one verified, immutable artifact set.
 
 ## Published Packages
 
@@ -12,8 +12,24 @@ This repository is Levixel's public product home, artifact release repository, a
 | --- | --- | --- |
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
+| React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
 | HarmonyOS | OHPM `@sandrox/levixel` | Preparing |
-| React Native / UniApp / Web | npm and platform adapters | Preparing |
+| UniApp | `Sandrox-Levixel` native plugin | Preparing |
+
+## Source Layout
+
+```text
+levixel/
+├── native/          # Android, iOS, and HarmonyOS native cores
+├── adapters/        # Thin React Native and UniApp bridges
+├── contract/        # Cross-platform public contract
+├── packaging/       # Platform artifact templates
+├── scripts/         # Build, artifact inspection, and release tools
+├── schema/          # Plugin manifest schema
+└── plugin.yaml      # Version, capability, and delivery manifest
+```
+
+Artifact-only consumer hosts install the final AAR, XCFramework, HAR, npm tarball, or UniApp ZIP. They never compile this source tree directly. The bytes accepted during hand verification are the same bytes released publicly.
 
 ## Android
 
@@ -37,9 +53,7 @@ dependencies {
 }
 ```
 
-Maven Central is the canonical Android dependency channel. The matching GitHub Release also
-provides `levixel-1.1.0.aar` and its SHA-256 file for offline or manual integration only. The AAR
-is byte-identical to the Maven Central artifact and is not an independent release source.
+Maven Central is the canonical Android dependency channel. The matching GitHub Release also provides `levixel-1.1.0.aar` and its SHA-256 file for offline or manual integration. The AAR is byte-identical to the Maven Central artifact.
 
 The Android core currently retains the fully validated `PhotoView 2.3.0` integration, so consumers must keep JitPack available for now.
 
@@ -101,6 +115,23 @@ imageView.setupLevixelViewer(
 
 The Swift Package references a checksum-pinned XCFramework. Xcode verifies the downloaded binary against the checksum in `Package.swift`.
 
+## React Native / Expo
+
+```sh
+pnpm add @sandrox/levixel
+npx expo prebuild
+```
+
+The npm package contains thin bridges and the verified Android/iOS native artifacts. It does not copy or rebuild the viewer core in the consuming application. See the [React Native adapter guide](adapters/react-native/README.md) for the component API.
+
+## UniApp
+
+The UniApp adapter supports Android and iOS with a strict JavaScript SDK, DOM source-geometry conversion, and native-artifact bridges. Source and packaging support are available while public distribution is being prepared. See the [UniApp adapter guide](adapters/uniapp/README.md) for the contract.
+
+## Development And Releases
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for local builds, artifact checks, and SDK prerequisites. See [RELEASING.md](RELEASING.md) for immutable artifact and publication rules.
+
 ## License And Provenance
 
-Levixel is released under the MIT License. The implementation has been substantially rewritten and polished across platforms, while retaining traceable MIT-licensed derivative lineage. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete attribution.
+Levixel is released under the MIT License. The implementation has been substantially rewritten and polished across platforms while retaining traceable MIT-licensed derivative lineage. See [PROVENANCE.md](PROVENANCE.md), [LICENSE](LICENSE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

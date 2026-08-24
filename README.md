@@ -4,7 +4,7 @@
 
 Levixel 是一套强调原生手感的图片与视频查看器，提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放能力。
 
-这个仓库是 Levixel 的公共产品入口、制品发布仓库和 iOS Swift Package 仓库。核心源码、跨平台桥接层与制品构建由独立的内部流水线统一维护；公开消费者始终通过这里发布的版本化制品接入。
+本仓库是 Levixel 的规范源码、公共契约、打包工具与公开发布入口。Android、iOS、HarmonyOS 原生核心以及 React Native、UniApp 适配器都在这里维护；每个发布版本对应一组经过校验且不可变的制品。
 
 ## 当前发布
 
@@ -12,8 +12,24 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | --- | --- | --- |
 | Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | 准备中 |
-| React Native / UniApp / Web | npm 与平台适配制品 | 准备中 |
+| React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
+| HarmonyOS | OHPM `@sandrox/levixel` | 发布准备中 |
+| UniApp | `Sandrox-Levixel` 原生插件包 | 发布准备中 |
+
+## 源码结构
+
+```text
+levixel/
+├── native/          # Android、iOS、HarmonyOS 原生核心
+├── adapters/        # React Native 与 UniApp 薄桥接层
+├── contract/        # 跨平台公共契约
+├── packaging/       # 平台制品模板
+├── scripts/         # 构建、制品检查与发布工具
+├── schema/          # 插件清单 Schema
+└── plugin.yaml      # 版本、能力与交付目标清单
+```
+
+测试宿主只消费最终 AAR、XCFramework、HAR、npm tarball 或 UniApp ZIP，不直接编译本仓库源码。通过人工验收后发布的是同一份制品，不会重新构建一个未经验证的副本。
 
 ## Android
 
@@ -37,11 +53,9 @@ dependencies {
 }
 ```
 
-Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供
-`levixel-1.1.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与
-Maven Central 制品字节级一致，并不是独立的发布来源。
+Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
 
-当前 Android 核心保留了已经完整验收的 `PhotoView 2.3.0`，因此消费者需要暂时保留 JitPack 仓库。
+当前 Android 核心保留了完整验收的 `PhotoView 2.3.0`，因此消费者暂时需要保留 JitPack 仓库。
 
 最小打开方式：
 
@@ -101,6 +115,23 @@ imageView.setupLevixelViewer(
 
 Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容与 `Package.swift` 中的 checksum 一致。
 
+## React Native / Expo
+
+```sh
+pnpm add @sandrox/levixel
+npx expo prebuild
+```
+
+该 npm 包只包含薄桥接层与校验过的 Android/iOS 原生制品，不在消费者项目中复制或重新编译查看器核心。完整组件接口见 [React Native 适配器文档](adapters/react-native/README.md)。
+
+## UniApp
+
+UniApp 适配器支持 Android 与 iOS，包含严格 JavaScript SDK、DOM 源图几何转换与原生制品桥接。当前源码与打包流程已收录，公共分发渠道仍在准备；接入协议见 [UniApp 适配器文档](adapters/uniapp/README.md)。
+
+## 开发与发布
+
+本地构建、制品自检与所需 SDK 见 [DEVELOPMENT.md](DEVELOPMENT.md)。不可变制品和版本发布流程见 [RELEASING.md](RELEASING.md)。
+
 ## 许可证与来源
 
-Levixel 以 MIT License 发布。当前实现经过了大量重构和跨平台打磨，但仍保留可追溯的 MIT 衍生代码来源。完整声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Levixel 以 MIT License 发布。当前实现经过大量重构和跨平台打磨，但仍保留可追溯的 MIT 衍生代码来源。完整审计见 [PROVENANCE.md](PROVENANCE.md)、[LICENSE](LICENSE) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

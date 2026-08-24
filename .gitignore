@@ -1,4 +1,61 @@
+# Operating systems and editors
 .DS_Store
-.build/
-.swiftpm/
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+local.properties
+*.jks
+*.keystore
+*.p12
+*.p7b
+*.pfx
+*.cer
+*.mobileprovision
+
+# Android and Gradle
+.gradle/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+**/captures/
+
+# Apple platforms
+DerivedData/
+**/DerivedData/
+**/xcuserdata/
+**/*.xcuserstate
+**/.swiftpm/
+**/.build/
+**/Pods/
+**/.xcode.env.local
 Package.resolved
+
+# JavaScript
+**/node_modules/
+**/coverage/
+**/*.tgz
+**/.expo/
+**/.vite/
+**/.parcel-cache/
+npm-debug.log*
+pnpm-debug.log*
+
+# HarmonyOS
+**/.hvigor/
+**/oh_modules/
+**/.arkui-x/
+**/BuildProfile.ets
+
+# UniApp and HBuilderX
+**/unpackage/
+**/.hbuilderx/
+
+# Generated release output
+dist/

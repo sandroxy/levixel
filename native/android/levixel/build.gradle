@@ -1,0 +1,163 @@
+plugins {
+    id "com.android.library"
+    id "maven-publish"
+    id "signing"
+}
+
+group = "io.gitee.sandrox"
+version = rootProject.ext.levixelVersion
+
+def pluginRoot = file("../../..")
+def generatedLegalResources = layout.buildDirectory.dir("generated/levixel-legal-resources")
+def signingKey = providers.environmentVariable("LEVIXEL_SIGNING_KEY").orNull
+def signingPassword = providers.environmentVariable("LEVIXEL_SIGNING_PASSWORD").orNull
+
+base {
+    archivesName = "levixel"
+}
+
+android {
+    namespace = "com.sandrox.levixel"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 21
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+
+    sourceSets {
+        main.resources.srcDir(generatedLegalResources)
+    }
+}
+
+tasks.register("prepareLegalResources", Sync) {
+    into(generatedLegalResources.map { it.dir("META-INF") })
+    from(new File(pluginRoot, "LICENSE")) {
+        rename { "LEVIXEL_LICENSE" }
+    }
+    from(new File(pluginRoot, "THIRD_PARTY_NOTICES.md"))
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("prepareLegalResources")
+}
+
+def releaseJavadocs = tasks.register("releaseJavadocs", Javadoc) {
+    dependsOn("compileReleaseJavaWithJavac")
+    source = android.sourceSets.main.java.srcDirs
+    destinationDir = layout.buildDirectory.dir("docs/javadoc").get().asFile
+    failOnError = true
+    options.encoding = "UTF-8"
+    options.charSet = "UTF-8"
+    options.addStringOption("Xdoclint:none", "-quiet")
+
+    doFirst {
+        def releaseJavaCompile = tasks.named("compileReleaseJavaWithJavac", JavaCompile).get()
+        classpath = files(android.bootClasspath) \
+            + releaseJavaCompile.classpath \
+            + files(layout.buildDirectory.file(
+                "intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar"
+            ))
+    }
+}
+
+def releaseJavadocsJar = tasks.register("releaseJavadocsJar", Jar) {
+    dependsOn(releaseJavadocs, "prepareLegalResources")
+    archiveClassifier = "javadoc"
+    from(releaseJavadocs.map { it.destinationDir })
+    from(generatedLegalResources)
+}
+
+tasks.withType(Jar).configureEach {
+    if (name == "sourceReleaseJar") {
+        dependsOn("prepareLegalResources")
+        from(generatedLegalResources)
+    }
+}
+
+dependencies {
+    api "androidx.appcompat:appcompat:1.7.1"
+    api "androidx.recyclerview:recyclerview:1.4.0"
+    api "androidx.viewpager2:viewpager2:1.1.0"
+    api "androidx.media3:media3-exoplayer:1.5.1"
+    api "androidx.media3:media3-ui:1.5.1"
+    api "com.github.bumptech.glide:glide:4.16.0"
+    api "com.github.chrisbanes:PhotoView:2.3.0"
+    testImplementation "junit:junit:4.13.2"
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                artifactId = "levixel"
+                artifact(releaseJavadocsJar)
+
+                pom {
+                    name = "Levixel"
+                    description = "Shared-transition image and video viewer for Android."
+                    url = "https://github.com/sandroxy/levixel"
+                    inceptionYear = "2026"
+
+                    licenses {
+                        license {
+                            name = "MIT License"
+                            url = "https://opensource.org/license/mit"
+                            distribution = "repo"
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id = "sandrox"
+                            name = "SandroX"
+                            email = "wangyifengjxc@gmail.com"
+                        }
+                    }
+
+                    scm {
+                        connection = "scm:git:https://github.com/sandroxy/levixel.git"
+                        developerConnection = "scm:git:ssh://git@github.com/sandroxy/levixel.git"
+                        url = "https://github.com/sandroxy/levixel"
+                    }
+                }
+            }
+        }
+
+        repositories {
+            maven {
+                name = "localRelease"
+                url = layout.buildDirectory.dir("maven-repository")
+            }
+        }
+    }
+
+    if (signingKey) {
+        signing {
+            useInMemoryPgpKeys(signingKey, signingPassword)
+            sign(publishing.publications.release)
+        }
+    }
+}
