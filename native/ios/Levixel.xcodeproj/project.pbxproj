@@ -6,8 +6,25 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8B68E6612F87329600109120 /* Levixel.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B68E6562F87329600109120 /* Levixel.framework */; };
+		8B68E6622F87329600109120 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B68E6642F87329600109120 /* XCTest.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8B68E66A2F87329600109120 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B68E64D2F87329600109120 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B68E6552F87329600109120;
+			remoteInfo = Levixel;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		8B68E6562F87329600109120 /* Levixel.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Levixel.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		8B68E6632F87329600109120 /* LevixelTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LevixelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8B68E6642F87329600109120 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -29,6 +46,11 @@
 			path = Levixel;
 			sourceTree = "<group>";
 		};
+		8B68E6652F87329600109120 /* LevixelTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LevixelTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,6 +61,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8B68E6662F87329600109120 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B68E6612F87329600109120 /* Levixel.framework in Frameworks */,
+				8B68E6622F87329600109120 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -46,6 +77,8 @@
 			isa = PBXGroup;
 			children = (
 				8B68E6582F87329600109120 /* Levixel */,
+				8B68E6652F87329600109120 /* LevixelTests */,
+				8B68E66F2F87329600109120 /* Frameworks */,
 				8B68E6572F87329600109120 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,8 +87,17 @@
 			isa = PBXGroup;
 			children = (
 				8B68E6562F87329600109120 /* Levixel.framework */,
+				8B68E6632F87329600109120 /* LevixelTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8B68E66F2F87329600109120 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8B68E6642F87329600109120 /* XCTest.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -94,6 +136,29 @@
 			productReference = 8B68E6562F87329600109120 /* Levixel.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		8B68E6692F87329600109120 /* LevixelTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B68E66E2F87329600109120 /* Build configuration list for PBXNativeTarget "LevixelTests" */;
+			buildPhases = (
+				8B68E6672F87329600109120 /* Sources */,
+				8B68E6662F87329600109120 /* Frameworks */,
+				8B68E6682F87329600109120 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8B68E66B2F87329600109120 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8B68E6652F87329600109120 /* LevixelTests */,
+			);
+			name = LevixelTests;
+			packageProductDependencies = (
+			);
+			productName = LevixelTests;
+			productReference = 8B68E6632F87329600109120 /* LevixelTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -105,6 +170,10 @@
 				TargetAttributes = {
 					8B68E6552F87329600109120 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					8B68E6692F87329600109120 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 8B68E6552F87329600109120;
 					};
 				};
 			};
@@ -123,12 +192,20 @@
 			projectRoot = "";
 			targets = (
 				8B68E6552F87329600109120 /* Levixel */,
+				8B68E6692F87329600109120 /* LevixelTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8B68E6542F87329600109120 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B68E6682F87329600109120 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -145,7 +222,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8B68E6672F87329600109120 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8B68E66B2F87329600109120 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B68E6552F87329600109120 /* Levixel */;
+			targetProxy = 8B68E66A2F87329600109120 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8B68E65D2F87329600109120 /* Debug */ = {
@@ -338,6 +430,53 @@
 			};
 			name = Release;
 		};
+		8B68E66C2F87329600109120 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sandrox.levixel.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Levixel;
+			};
+			name = Debug;
+		};
+		8B68E66D2F87329600109120 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sandrox.levixel.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Levixel;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -355,6 +494,15 @@
 			buildConfigurations = (
 				8B68E65D2F87329600109120 /* Debug */,
 				8B68E65E2F87329600109120 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B68E66E2F87329600109120 /* Build configuration list for PBXNativeTarget "LevixelTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B68E66C2F87329600109120 /* Debug */,
+				8B68E66D2F87329600109120 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

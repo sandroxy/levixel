@@ -17,6 +17,7 @@ final class LevixelViewerController: UIViewController {
     private var transitionCoordinatorRef: LevixelViewerTransitionCoordinator?
     private var presentationSession: LevixelViewerSession?
     private var hasPerformedOpenTransition = false
+    private var hasCompletedOpenTransition = false
     private var hasViewAppeared = false
     private var pendingDismissal = false
     private var hasNotifiedDismissal = false
@@ -249,6 +250,8 @@ final class LevixelViewerController: UIViewController {
             contentView: contentView
         ) { [weak self] in
             guard let self = self else { return }
+            self.hasCompletedOpenTransition = true
+            self.completeOpenTransitionPreviewHandoffForVisiblePages()
             self.setVideoRevealAllowedForVisiblePages(true)
             self.pageView(at: self.currentIndex)?.setActive(true)
             self.refreshNavigationItems()
@@ -422,6 +425,13 @@ final class LevixelViewerController: UIViewController {
             guard let pageCell = cell as? LevixelViewerPageCell else { continue }
             let index = collectionView.indexPath(for: pageCell)?.item ?? -1
             pageCell.pageView.setVideoRevealAllowed(allowed && index == currentIndex)
+        }
+    }
+
+    private func completeOpenTransitionPreviewHandoffForVisiblePages() {
+        for cell in collectionView.visibleCells {
+            guard let pageCell = cell as? LevixelViewerPageCell else { continue }
+            pageCell.pageView.completeOpenTransitionPreviewHandoff()
         }
     }
 
@@ -688,6 +698,9 @@ extension LevixelViewerController: UICollectionViewDataSource, UICollectionViewD
             )
             cell.pageView.setActive(indexPath.item == currentIndex)
             cell.pageView.setVideoRevealAllowed(hasPerformedOpenTransition && indexPath.item == currentIndex)
+            if hasCompletedOpenTransition {
+                cell.pageView.completeOpenTransitionPreviewHandoff()
+            }
         }
 
         return cell
@@ -697,6 +710,9 @@ extension LevixelViewerController: UICollectionViewDataSource, UICollectionViewD
         guard let pageCell = cell as? LevixelViewerPageCell else { return }
         pageCell.pageView.setActive(indexPath.item == currentIndex)
         pageCell.pageView.setVideoRevealAllowed(hasPerformedOpenTransition && indexPath.item == currentIndex)
+        if hasCompletedOpenTransition {
+            pageCell.pageView.completeOpenTransitionPreviewHandoff()
+        }
     }
 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {

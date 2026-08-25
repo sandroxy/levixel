@@ -65,6 +65,7 @@ final class LevixelViewerTransitionCoordinator {
         completion: @escaping () -> Void
     ) {
         guard let containerView = containerView else {
+            pageView?.completeOpenTransitionPreviewHandoff()
             completion()
             return
         }
@@ -78,6 +79,7 @@ final class LevixelViewerTransitionCoordinator {
 
         flushLayoutForSharedElementSampling(of: sourceView)
         guard let sourceView = sourceView, let sourceState = sourceView.levixelSharedElementState() else {
+            pageView?.completeOpenTransitionPreviewHandoff()
             animateSimpleAppearance(
                 backgroundView: backgroundView,
                 contentView: contentView,
@@ -98,6 +100,7 @@ final class LevixelViewerTransitionCoordinator {
 
         let animateIntoPage: (Bool) -> Void = { [weak self] isReady in
             guard let self = self, let containerView = self.containerView else {
+                pageView?.completeOpenTransitionPreviewHandoff()
                 completion()
                 return
             }
@@ -122,6 +125,7 @@ final class LevixelViewerTransitionCoordinator {
                 backgroundView.alpha = 1
                 self.apply(targetGeometry, to: snapshotView)
             } completion: { _ in
+                pageView?.completeOpenTransitionPreviewHandoff()
                 self.restoreHiddenViews()
                 contentView.alpha = 1
                 snapshotView.removeFromSuperview()

@@ -30,8 +30,11 @@ final class LevixelViewerPageView: UIView {
     private var imageLoader: LevixelImageLoading?
     private var mediaContentMode: UIView.ContentMode = .scaleAspectFit
     private var loadGeneration = 0
+    private var initialImageFitPending = false
     private var fullImageReady = false
     private var fullImageHandoffPending = false
+    private var pendingFullImageViewportState: LevixelImageViewportState?
+    private var sourcePreviewHandoffAllowed = false
     private var delayedImageLoadingWorkItem: DispatchWorkItem?
 
     private var active = false
@@ -112,10 +115,22 @@ final class LevixelViewerPageView: UIView {
     }
 
     func refreshLayoutForCurrentBounds() {
-        let shouldResetZoom = fullImageHandoffPending
-        let didLayoutImage = layoutImageIfNeeded(resetZoom: shouldResetZoom)
-        if shouldResetZoom && didLayoutImage {
+        prepareSourcePreviewHandoffIfNeeded()
+
+        let isCompletingFullImageHandoff = fullImageHandoffPending
+        let shouldResetZoom = initialImageFitPending
+            || (isCompletingFullImageHandoff && pendingFullImageViewportState == nil)
+        let didLayoutImage = layoutImageIfNeeded(
+            resetZoom: shouldResetZoom,
+            restoringViewport: isCompletingFullImageHandoff ? pendingFullImageViewportState : nil
+        )
+        guard didLayoutImage else { return }
+
+        initialImageFitPending = false
+        if isCompletingFullImageHandoff {
             finishFullImageHandoff()
+        } else {
+            finishSourcePreviewHandoffIfPossible()
         }
     }
 
@@ -131,8 +146,11 @@ final class LevixelViewerPageView: UIView {
         self.imageLoader = imageLoader
         self.mediaContentMode = normalizedContentMode(from: mediaContentMode)
         loadGeneration += 1
+        initialImageFitPending = false
         fullImageReady = false
         fullImageHandoffPending = false
+        pendingFullImageViewportState = nil
+        sourcePreviewHandoffAllowed = false
         cancelDelayedImageLoading()
 
         activityIndicator.stopAnimating()
@@ -197,8 +215,11 @@ final class LevixelViewerPageView: UIView {
         videoControlsVisible = false
         videoControlsVisibleBeforeDismissDrag = false
         videoControlsInteractionActive = false
+        initialImageFitPending = false
         fullImageReady = false
         fullImageHandoffPending = false
+        pendingFullImageViewportState = nil
+        sourcePreviewHandoffAllowed = false
 
         imageScrollView.zoomScale = 1
         imageScrollView.minimumZoomScale = 1
@@ -236,6 +257,13 @@ final class LevixelViewerPageView: UIView {
     func setActive(_ active: Bool) {
         self.active = active
         updateVideoPlaybackIfNeeded()
+    }
+
+    func completeOpenTransitionPreviewHandoff() {
+        guard !isVideoPage else { return }
+        // The fixed preview is only needed while the shared-element snapshot owns the transition.
+        sourcePreviewHandoffAllowed = true
+        refreshLayoutForCurrentBounds()
     }
 
     func setVideoRevealAllowed(_ allowed: Bool) {
@@ -411,7 +439,8 @@ final class LevixelViewerPageView: UIView {
         videoContainer.isHidden = true
         imageView.image = image
         if image != nil {
-            layoutImageIfNeeded(resetZoom: true)
+            initialImageFitPending = true
+            refreshLayoutForCurrentBounds()
             hideLoading()
         } else {
             hideLoading()
@@ -467,6 +496,10 @@ final class LevixelViewerPageView: UIView {
     }
 
     private func completeFullImageHandoff() {
+        guard !fullImageReady else { return }
+        // The image has changed, but the frame and scroll metrics still describe the preview
+        // until the next layout pass, so capture the user's viewport before relayout.
+        pendingFullImageViewportState = captureZoomedImageViewportState()
         fullImageReady = true
         fullImageHandoffPending = true
         setNeedsLayout()
@@ -476,6 +509,7 @@ final class LevixelViewerPageView: UIView {
     private func finishFullImageHandoff() {
         guard fullImageHandoffPending else { return }
         fullImageHandoffPending = false
+        pendingFullImageViewportState = nil
         let handoffGeneration = loadGeneration
         DispatchQueue.main.async {
             guard self.loadGeneration == handoffGeneration, self.fullImageReady else { return }
@@ -495,6 +529,8 @@ final class LevixelViewerPageView: UIView {
             guard let self = self else { return }
             if self.fullImageReady || loadedImage == nil {
                 self.hideSourcePreview()
+            } else if self.sourcePreviewHandoffAllowed {
+                self.refreshLayoutForCurrentBounds()
             }
         }
     }
@@ -540,6 +576,9 @@ final class LevixelViewerPageView: UIView {
         sourcePreviewImageView.contentMode = mediaContentMode
         sourcePreviewImageView.image = image
         sourcePreviewImageView.isHidden = false
+        if sourcePreviewHandoffAllowed {
+            refreshLayoutForCurrentBounds()
+        }
     }
 
     private func hideSourcePreview() {
@@ -634,7 +673,10 @@ final class LevixelViewerPageView: UIView {
     }
 
     @discardableResult
-    private func layoutImageIfNeeded(resetZoom: Bool) -> Bool {
+    private func layoutImageIfNeeded(
+        resetZoom: Bool,
+        restoringViewport viewportState: LevixelImageViewportState? = nil
+    ) -> Bool {
         guard !isVideoPage else { return false }
         guard bounds.width > 0, bounds.height > 0 else { return false }
         guard let image = imageView.image else { return false }
@@ -642,23 +684,23 @@ final class LevixelViewerPageView: UIView {
         let scrollBounds = imageScrollView.bounds.size
         guard scrollBounds.width > 0, scrollBounds.height > 0 else { return false }
 
-        guard image.size.width > 0, image.size.height > 0 else { return false }
-
-        let widthRatio = scrollBounds.width / image.size.width
-        let heightRatio = scrollBounds.height / image.size.height
-        let minimumScale: CGFloat
-        switch mediaContentMode {
-        case .scaleAspectFill:
-            minimumScale = max(widthRatio, heightRatio)
-        default:
-            minimumScale = min(widthRatio, heightRatio)
-        }
+        guard let minimumScale = LevixelImageViewportLayout.minimumZoomScale(
+            imageSize: image.size,
+            viewportSize: scrollBounds,
+            aspectFill: mediaContentMode == .scaleAspectFill
+        ) else { return false }
 
         let maximumScale = max(minimumScale * 4.0, 3.0)
 
         imageScrollView.minimumZoomScale = minimumScale
         imageScrollView.maximumZoomScale = maximumScale
-        if resetZoom || imageScrollView.zoomScale < minimumScale {
+        if let viewportState {
+            imageScrollView.zoomScale = LevixelImageViewportLayout.restoredZoomScale(
+                for: viewportState,
+                minimumZoomScale: minimumScale,
+                maximumZoomScale: maximumScale
+            )
+        } else if resetZoom || imageScrollView.zoomScale < minimumScale {
             imageScrollView.zoomScale = minimumScale
         }
 
@@ -677,7 +719,41 @@ final class LevixelViewerPageView: UIView {
             width: scaledSize.width,
             height: scaledSize.height
         )
+        if let viewportState {
+            imageScrollView.contentOffset = LevixelImageViewportLayout.restoredContentOffset(
+                for: viewportState,
+                imageFrame: imageView.frame,
+                contentSize: contentSize,
+                viewportSize: scrollBounds
+            )
+        } else if resetZoom {
+            imageScrollView.contentOffset = .zero
+        }
         return true
+    }
+
+    private func captureZoomedImageViewportState() -> LevixelImageViewportState? {
+        guard !initialImageFitPending else { return nil }
+        return LevixelImageViewportLayout.captureZoomedState(
+            zoomScale: imageScrollView.zoomScale,
+            minimumZoomScale: imageScrollView.minimumZoomScale,
+            imageFrame: imageView.frame,
+            contentOffset: imageScrollView.contentOffset,
+            viewportSize: imageScrollView.bounds.size
+        )
+    }
+
+    private func prepareSourcePreviewHandoffIfNeeded() {
+        guard sourcePreviewHandoffAllowed, !fullImageReady else { return }
+        guard imageView.image == nil, let previewImage = sourcePreviewImageView.image else { return }
+        imageView.image = previewImage
+        initialImageFitPending = true
+    }
+
+    private func finishSourcePreviewHandoffIfPossible() {
+        guard sourcePreviewHandoffAllowed else { return }
+        guard imageView.image != nil else { return }
+        hideSourcePreview()
     }
 
     private func zoomRect(for scale: CGFloat, centeredAt point: CGPoint) -> CGRect {

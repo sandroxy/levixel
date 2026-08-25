@@ -7,6 +7,23 @@ version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")'
 artifact_path="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
 swift_package_dir="${plugin_dir}/dist/native-ios/swift-package"
 
+bash "${plugin_dir}/native/ios/verify-viewport-layout.sh"
+
+test_derived_data="$(mktemp -d)"
+trap 'rm -rf "${test_derived_data}"' EXIT
+xcodebuild \
+  -quiet \
+  build-for-testing \
+  -project "${plugin_dir}/native/ios/Levixel.xcodeproj" \
+  -scheme Levixel \
+  -configuration Debug \
+  -destination "generic/platform=iOS Simulator" \
+  -derivedDataPath "${test_derived_data}" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO
+rm -rf "${test_derived_data}"
+trap - EXIT
+
 if [[ "${LEVIXEL_SKIP_PACKAGE:-0}" != "1" ]]; then
   "${script_dir}/package-native-ios.sh"
 fi
