@@ -57,7 +57,7 @@ Build and inspect the DCloud Marketplace UTS candidate:
 ./scripts/verify-uniapp-uts-compiler.sh
 ```
 
-The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification uses HBuilderX 5.07 by default; set `HBUILDERX_CONTENTS` when it is installed elsewhere. The generated ZIP must be installed unchanged in a classic uni-app consumer and hand-verified with a matching custom base, cloud package, or offline package on Android and iOS devices.
+The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification uses HBuilderX 5.07 by default; set `HBUILDERX_CONTENTS` when it is installed elsewhere. The Marketplace ZIP root directly contains `package.json` and `utssdk/`; install those exact contents under `uni_modules/Sandrox-Levixel/` in a classic uni-app consumer, then hand-verify with a matching custom base, cloud package, or offline package on Android and iOS devices.
 
 The accepted App native-plugin bridge remains available for existing and offline consumers. It is built separately because it requires the DCloud legacy SDK and is not a Marketplace upload candidate:
 

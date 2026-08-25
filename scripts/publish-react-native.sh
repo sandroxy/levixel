@@ -12,7 +12,7 @@ plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 package_name="@sandrox/levixel"
 artifact_path="${plugin_dir}/dist/react-native/levixel-react-native-${version}.tgz"
-release_tag="levixel-react-native-v${version}"
+release_tag="refs/tags/${version}"
 registry="https://registry.npmjs.org/"
 
 if [[ -n "$(git -C "${plugin_dir}" status --porcelain --untracked-files=all)" ]]; then
@@ -23,7 +23,7 @@ fi
 head_commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
 tag_commit="$(git -C "${plugin_dir}" rev-list -n 1 "${release_tag}" 2>/dev/null || true)"
 if [[ "${tag_commit}" != "${head_commit}" ]]; then
-  echo "Tag ${release_tag} must point to the current commit before publication." >&2
+  echo "Canonical tag ${version} must point to the current commit before publication." >&2
   exit 1
 fi
 

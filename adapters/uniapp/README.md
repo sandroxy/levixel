@@ -78,7 +78,7 @@ iOS UTS 不再另存一份事件回调，而是把回调交给 `LevixelUniRuntim
 - `dist/uniapp/levixel-uniapp-<version>.zip.sha256`
 - `dist/uniapp/levixel-uniapp-<version>-marketplace.md`
 
-宿主验收必须把该 ZIP 原样安装到只消费制品的 UniApp 工程，并用包含插件的自定义基座、云打包或离线包完成 Android/iOS 真机矩阵。
+市场 ZIP 的根目录就是插件根目录，直接包含 `package.json` 和 `utssdk/`，以符合 DCloud Web 发布器的格式校验。手动安装候选包时，应将 ZIP 内容解压到宿主工程的 `uni_modules/Sandrox-Levixel/`，不能在 ZIP 内或安装目录中额外套一层同名目录。随后用包含插件的自定义基座、云打包或离线包完成 Android/iOS 真机矩阵。
 
 ## 既有 App 原生插件
 

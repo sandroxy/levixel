@@ -18,14 +18,19 @@ android_adapter_dir="${plugin_dir}/adapters/uniapp/android"
 ios_adapter_dir="${plugin_dir}/adapters/uniapp/ios"
 source_root="${plugin_dir}/${source_root_relative}"
 artifact_dir="${plugin_dir}/dist/uniapp"
-package_id="Sandrox-Levixel"
-package_root="${artifact_dir}/package/${package_id}"
+staging_dir="$(mktemp -d)"
+package_root="${staging_dir}/package"
 archive_name="levixel-uniapp-${version}.zip"
 archive_path="${artifact_dir}/${archive_name}"
 marketplace_template="${plugin_dir}/adapters/uniapp/MARKETPLACE.md"
 marketplace_path="${artifact_dir}/levixel-uniapp-${version}-marketplace.md"
 core_android_aar="${plugin_dir}/dist/native-android/levixel-${version}.aar"
 core_ios_zip="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
+
+cleanup() {
+  rm -rf "${staging_dir}"
+}
+trap cleanup EXIT
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 
@@ -56,7 +61,6 @@ ruby -rjson -e '
 LEVIXEL_IOS_XCFRAMEWORK_ZIP="${core_ios_zip}" \
   bash "${ios_adapter_dir}/build-runtime-framework.sh" >/dev/null
 
-rm -rf "${artifact_dir}/package"
 mkdir -p "${package_root}"
 ditto "${source_root}" "${package_root}"
 mkdir -p \
@@ -96,8 +100,8 @@ cmp "${source_root}/js_sdk/canonical.js" \
 
 rm -f "${archive_path}" "${archive_path}.sha256" "${marketplace_path}"
 (
-  cd "${artifact_dir}/package"
-  zip -qry "${archive_path}" "${package_id}"
+  cd "${package_root}"
+  zip -qry "${archive_path}" .
 )
 checksum="$(shasum -a 256 "${archive_path}" | awk '{print $1}')"
 printf '%s  %s\n' "${checksum}" "${archive_name}" > "${archive_path}.sha256"

@@ -34,11 +34,11 @@ for required_path in \
   fi
 done
 
-mkdir -p "${work_dir}/input/uni_modules"
-unzip -q "${archive_path}" -d "${work_dir}/input/uni_modules"
 package_root="${work_dir}/input/uni_modules/Sandrox-Levixel"
+mkdir -p "${package_root}"
+unzip -q "${archive_path}" -d "${package_root}"
 if [[ ! -f "${package_root}/package.json" ]]; then
-  echo "Sandrox-Levixel/package.json is missing from ${archive_path}" >&2
+  echo "package.json is missing from the Marketplace ZIP root: ${archive_path}" >&2
   exit 1
 fi
 

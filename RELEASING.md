@@ -37,6 +37,19 @@ For a local pipeline rehearsal only:
 
 The formal candidate requires a clean worktree and Maven signing credentials.
 
+## Canonical Git Tag
+
+Each coordinated Levixel release uses exactly one annotated Git tag named
+`<version>` and one matching GitHub Release. Android, iOS, HarmonyOS, React
+Native, and UniApp all refer to that shared release identity; do not create
+product-prefixed tags such as `levixel-v<version>` or
+`levixel-react-native-v<version>`.
+
+```sh
+git tag -a "<version>" -m "Levixel <version>"
+git push origin "<version>"
+```
+
 ## Android / Maven Central
 
 Supply the ASCII-armored private key and passphrase without committing them:
@@ -66,12 +79,11 @@ The retained `PhotoView 2.3.0` dependency is hosted by JitPack. Replacing or ven
 
 ## iOS / Swift Package Manager
 
-1. Create the source tag `levixel-v<version>` on the canonical source commit.
-2. Build and verify `dist/native-ios/levixel-<version>.xcframework.zip` once.
-3. Attach that exact ZIP to the matching GitHub Release.
-4. Update the root `Package.swift` to the release URL and computed checksum.
-5. Tag the public package repository with `<version>`.
-6. Resolve the tag in a clean iOS consumer and run the final smoke test.
+1. Build and verify `dist/native-ios/levixel-<version>.xcframework.zip` once.
+2. Update the root `Package.swift` to the release URL and computed checksum.
+3. Create the canonical `<version>` tag on the release commit.
+4. Attach the accepted ZIP to the matching GitHub Release without rebuilding.
+5. Resolve the tag in a clean iOS consumer and run the final smoke test.
 
 The default binary URL is the GitHub Release asset. Override it only when the permanent binary host changes:
 
@@ -99,6 +111,33 @@ The packaging script verifies the supplied SHA-256, embedded framework version, 
 5. Install the public package in a clean consumer and run a smoke test.
 6. Run the `Mirror HarmonyOS HAR` workflow for the approved version. It verifies the OHPM SHA-512 integrity and package metadata, mirrors the exact HAR and SHA-256 file to the matching GitHub Release, and reconciles the HAR entry in the native release manifest.
 
+Publish from an interactive terminal so OHPM can request the passphrase for an
+encrypted private key. The following proxy-free command is the verified release
+path for the public OHPM registry:
+
+```sh
+LEVIXEL_VERSION="<version>"
+LEVIXEL_OHPM_PUBLISH_ID="<publish-id>"
+LEVIXEL_OHPM_KEY_PATH="/absolute/path/to/private-key"
+LEVIXEL_OHPM_BIN="/Applications/DevEco-Studio.app/Contents/tools/ohpm/bin/ohpm"
+
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+  -u http_proxy -u https_proxy -u all_proxy \
+  NO_PROXY=ohpm.openharmony.cn \
+  no_proxy=ohpm.openharmony.cn \
+  "${LEVIXEL_OHPM_BIN}" publish \
+  "dist/native-harmonyos/levixel-${LEVIXEL_VERSION}.har" \
+  --publish_registry https://ohpm.openharmony.cn/ohpm/ \
+  --publish_id "${LEVIXEL_OHPM_PUBLISH_ID}" \
+  --key_path "${LEVIXEL_OHPM_KEY_PATH}"
+```
+
+Do not pass `--tag latest`; OHPM rejects `latest` as an explicit custom tag and
+maintains the default tag itself. A successful upload prints the package name and
+version, then reports that the submission is under review. Track that review at
+<https://ohpm.openharmony.cn/#/cn/personalCenter/package>. Never paste the
+private key or its passphrase into release logs, commits, or chat.
+
 ## React Native / npm
 
 The npm product embeds the native artifacts recorded in `dist/native-release/levixel-native-<version>.json`. It must not compile copied viewer source or resolve an unpinned native core during consumer installation.
@@ -111,11 +150,8 @@ The npm product embeds the native artifacts recorded in `dist/native-release/lev
    ```
 
 2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
-3. Create the canonical source tag on the accepted commit:
-
-   ```sh
-   git tag -a levixel-react-native-v<version> -m "Levixel React Native <version>"
-   ```
+3. Confirm the shared canonical `<version>` tag points to the accepted release
+   commit. Do not create a React Native-specific tag.
 
 4. Attach the accepted files to the matching public GitHub Release without repacking:
 
@@ -159,9 +195,10 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
    ./scripts/verify-uniapp-uts-compiler.sh
    ```
 
-3. Install `dist/uniapp/levixel-uniapp-<version>.zip` unchanged under `uni_modules/` in the artifact-only consumer. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, and WebView return behavior on Android and iOS devices.
+3. The Marketplace ZIP root must directly contain `package.json` and `utssdk/`; DCloud rejects an archive wrapped in a `Sandrox-Levixel/` directory. For artifact-only consumer verification, extract the ZIP contents into `uni_modules/Sandrox-Levixel/`, then verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, and WebView return behavior on Android and iOS devices.
 4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
 5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the ZIP checksum still matches the accepted candidate.
+6. Import the public Marketplace version into a clean classic uni-app consumer and rerun the production build. DCloud may add a `name` field equal to `displayName` and reformat `package.json`; all other JSON values and every other payload file must still match the accepted ZIP.
 
 The separately generated `levixel-uniapp-legacy-<version>.zip` remains available for existing App native-plugin/offline consumers. It is not the Marketplace artifact and must never replace the UTS ZIP in this release flow.
 

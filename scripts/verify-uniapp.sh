@@ -50,9 +50,13 @@ if unzip -Z1 "${archive_path}" | rg -q '(^|/)(__MACOSX|\.DS_Store)(/|$)'; then
   echo "UniApp UTS artifact contains macOS metadata" >&2
   exit 1
 fi
+if unzip -Z1 "${archive_path}" | rg -q "^${package_id}/"; then
+  echo "UniApp Marketplace ZIP must expose package.json and utssdk at the archive root, not under ${package_id}/" >&2
+  exit 1
+fi
 
 unzip -q "${archive_path}" -d "${work_dir}/package"
-package_root="${work_dir}/package/${package_id}"
+package_root="${work_dir}/package"
 
 for required_path in \
   package.json \
