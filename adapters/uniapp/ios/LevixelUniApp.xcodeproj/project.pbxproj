@@ -8,11 +8,24 @@
 
 /* Begin PBXBuildFile section */
 		8B1100010000000000000001 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B1100020000000000000001 /* UIKit.framework */; };
+		8B1200010000000000000001 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B1100020000000000000001 /* UIKit.framework */; };
+		8B1200020000000000000001 /* LevixelUniRuntime.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B1200030000000000000001 /* LevixelUniRuntime.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8B1200150000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B11000F0000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B1200050000000000000001;
+			remoteInfo = LevixelUniRuntime;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		8B1100030000000000000001 /* LevixelUniApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LevixelUniApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B1100020000000000000001 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		8B1200030000000000000001 /* LevixelUniRuntime.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LevixelUniRuntime.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -23,6 +36,13 @@
 				LevixelUniModule.h,
 			);
 			target = 8B1100050000000000000001 /* LevixelUniApp */;
+		};
+		8B1200040000000000000001 /* Public headers for LevixelUniRuntime */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			publicHeaders = (
+				LevixelUniRuntime.h,
+			);
+			target = 8B1200050000000000000001 /* LevixelUniRuntime */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -35,6 +55,14 @@
 			path = LevixelUniApp;
 			sourceTree = "<group>";
 		};
+		8B1200060000000000000001 /* LevixelUniRuntime */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8B1200040000000000000001 /* Public headers for LevixelUniRuntime */,
+			);
+			path = LevixelUniRuntime;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +71,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				8B1100010000000000000001 /* UIKit.framework in Frameworks */,
+				8B1200020000000000000001 /* LevixelUniRuntime.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B1200070000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B1200010000000000000001 /* UIKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				8B1100060000000000000001 /* LevixelUniApp */,
+				8B1200060000000000000001 /* LevixelUniRuntime */,
 				8B1100090000000000000001 /* Frameworks */,
 				8B11000A0000000000000001 /* Products */,
 			);
@@ -70,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				8B1100030000000000000001 /* LevixelUniApp.framework */,
+				8B1200030000000000000001 /* LevixelUniRuntime.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -78,6 +117,13 @@
 
 /* Begin PBXHeadersBuildPhase section */
 		8B11000B0000000000000001 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B12000B0000000000000001 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -99,6 +145,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				8B1200160000000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8B1100060000000000000001 /* LevixelUniApp */,
@@ -108,6 +155,29 @@
 			);
 			productName = LevixelUniApp;
 			productReference = 8B1100030000000000000001 /* LevixelUniApp.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		8B1200050000000000000001 /* LevixelUniRuntime */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B12000C0000000000000001 /* Build configuration list for PBXNativeTarget "LevixelUniRuntime" */;
+			buildPhases = (
+				8B12000B0000000000000001 /* Headers */,
+				8B12000D0000000000000001 /* Sources */,
+				8B1200070000000000000001 /* Frameworks */,
+				8B12000E0000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8B1200060000000000000001 /* LevixelUniRuntime */,
+			);
+			name = LevixelUniRuntime;
+			packageProductDependencies = (
+			);
+			productName = LevixelUniRuntime;
+			productReference = 8B1200030000000000000001 /* LevixelUniRuntime.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
@@ -120,6 +190,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					8B1100050000000000000001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					8B1200050000000000000001 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -139,12 +212,20 @@
 			projectRoot = "";
 			targets = (
 				8B1100050000000000000001 /* LevixelUniApp */,
+				8B1200050000000000000001 /* LevixelUniRuntime */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8B11000E0000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B12000E0000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -161,7 +242,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8B12000D0000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8B1200160000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B1200050000000000000001 /* LevixelUniRuntime */;
+			targetProxy = 8B1200150000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8B1100110000000000000001 /* Debug */ = {
@@ -244,6 +340,78 @@
 			};
 			name = Release;
 		};
+		8B1200110000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = NO;
+				ARCHS = arm64;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				ENABLE_MODULE_VERIFIER = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LEVIXEL_FRAMEWORKS_DIR)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				MACH_O_TYPE = staticlib;
+				MARKETING_VERSION = 1.1.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sandrox.levixel.uniapp.runtime;
+				PRODUCT_MODULE_NAME = LevixelUniRuntime;
+				PRODUCT_NAME = LevixelUniRuntime;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SWIFT_INSTALL_OBJC_HEADER = YES;
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "LevixelUniRuntime-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8B1200120000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = NO;
+				ARCHS = arm64;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				ENABLE_MODULE_VERIFIER = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LEVIXEL_FRAMEWORKS_DIR)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				MACH_O_TYPE = staticlib;
+				MARKETING_VERSION = 1.1.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sandrox.levixel.uniapp.runtime;
+				PRODUCT_MODULE_NAME = LevixelUniRuntime;
+				PRODUCT_NAME = LevixelUniRuntime;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_INSTALL_OBJC_HEADER = YES;
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "LevixelUniRuntime-Swift.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		8B1100130000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -293,6 +461,15 @@
 			buildConfigurations = (
 				8B1100110000000000000001 /* Debug */,
 				8B1100120000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B12000C0000000000000001 /* Build configuration list for PBXNativeTarget "LevixelUniRuntime" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B1200110000000000000001 /* Debug */,
+				8B1200120000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -45,6 +45,7 @@
       "deploymentTarget": "13.0",
       "frameworks": [
         "LevixelUniApp.framework",
+        "LevixelUniRuntime.framework",
         "Levixel.framework",
         "AVFoundation.framework",
         "AVKit.framework"

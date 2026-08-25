@@ -10,7 +10,7 @@ Levixel uses one canonical version with ecosystem-specific products:
 | iOS | `Levixel` | Checksum-pinned Swift Package that downloads the XCFramework ZIP |
 | HarmonyOS | `@sandrox/levixel` | OHPM HAR |
 | React Native | `@sandrox/levixel` | npm tarball containing thin Expo Modules bridges and the accepted Android/iOS native artifacts |
-| UniApp | `Sandrox-Levixel` | DCloud native-plugin ZIP containing thin Android/iOS bridges, accepted native artifacts, and the JavaScript SDK |
+| UniApp | `Sandrox-Levixel` | DCloud UTS-plugin ZIP containing thin Android/iOS bridges, shared UniApp runtimes, accepted native artifacts, and the canonical JavaScript SDK |
 
 The raw Android AAR and HarmonyOS HAR are available for offline integration. Maven Central and OHPM remain the preferred channels because they carry package identity and version metadata.
 
@@ -128,26 +128,32 @@ The workflow downloads and verifies the accepted GitHub Release assets and publi
 ./scripts/publish-react-native.sh --publish
 ```
 
-## UniApp / DCloud Native Plugin
+## UniApp / DCloud UTS Plugin
 
-The UniApp product embeds the accepted Android AAR and iOS device framework. Its bridges own only DCloud lifecycle, DOM source geometry, bounded preview warmup, and event/error transport.
+The Marketplace product supports classic uni-app Vue pages on Android/iOS. It embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON conversion, and callback transport. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes. Do not claim uni-app x support for this release.
 
-1. Build the candidate once with explicit DCloud SDK inputs:
+The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and the legacy bridges remain in `adapters/uniapp`. `uni_modules/Sandrox-Levixel/js_sdk/canonical.js` is a checked-in generated mirror of `adapters/uniapp/js_sdk/index.js`. Regenerate it with `./scripts/sync-uniapp-canonical-js.sh` whenever the canonical SDK changes, then review the diff. Never hand-edit the generated mirror or rely on packaging to repair drift.
+
+1. Build the candidate once:
 
    ```sh
-   DCLOUD_ANDROID_UNIAPP_AAR=/absolute/path/to/uniapp-v8-release.aar \
-   DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
-     ./scripts/package-uniapp.sh
+   ./scripts/package-uniapp.sh
    ```
 
-2. Inspect the exact candidate:
+   Packaging fails before building if the generated canonical SDK or the declared source root has drifted.
+
+2. Inspect the exact bytes and compile both generated native bridges with HBuilderX 5.07:
 
    ```sh
    ./scripts/verify-uniapp.sh
+   ./scripts/verify-uniapp-uts-compiler.sh
    ```
 
-3. Install `dist/uniapp/levixel-uniapp-<version>.zip` unchanged in Android and iOS UniApp consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
-4. Publish the accepted ZIP without rebuilding.
+3. Install `dist/uniapp/levixel-uniapp-<version>.zip` unchanged under `uni_modules/` in the artifact-only consumer. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, and WebView return behavior on Android and iOS devices.
+4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
+5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the ZIP checksum still matches the accepted candidate.
+
+The separately generated `levixel-uniapp-legacy-<version>.zip` remains available for existing App native-plugin/offline consumers. It is not the Marketplace artifact and must never replace the UTS ZIP in this release flow.
 
 ## Provenance
 

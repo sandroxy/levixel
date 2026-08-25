@@ -6,6 +6,9 @@ plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${plugin_dir}/adapters/react-native/package.json")"
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
+uniapp_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json")"
+
+"${script_dir}/sync-uniapp-canonical-js.sh" --check
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid Levixel semantic version: ${version}" >&2
@@ -19,6 +22,11 @@ fi
 
 if [[ "${harmony_version}" != "${version}" ]]; then
   echo "HarmonyOS version ${harmony_version} does not match ${version}." >&2
+  exit 1
+fi
+
+if [[ "${uniapp_version}" != "${version}" ]]; then
+  echo "UniApp UTS version ${uniapp_version} does not match ${version}." >&2
   exit 1
 fi
 
@@ -39,15 +47,28 @@ fi
 if ! ruby -ryaml -e '
   manifest = YAML.load_file(ARGV.fetch(0))
   version = manifest.fetch("version")
-  outputs = manifest.fetch("targets").flat_map { |target| target.fetch("artifacts") }.map { |artifact| artifact.fetch("output") }
+  targets = manifest.fetch("targets")
+  outputs = targets.flat_map { |target| target.fetch("artifacts") }.map { |artifact| artifact.fetch("output") }
   missing = outputs.reject { |output| output.include?(version) }
   abort("Artifact paths missing version #{version}: #{missing.join(", ")}") unless missing.empty?
-' "${plugin_dir}/plugin.yaml"; then
+  uniapp = targets.find { |target| target.fetch("id") == "uniapp" }
+  abort("UniApp target is missing") unless uniapp
+  expected_source_root = "uni_modules/Sandrox-Levixel"
+  actual_source_root = uniapp.fetch("sourceRoot")
+  abort("UniApp sourceRoot must be #{expected_source_root}, got #{actual_source_root}") unless actual_source_root == expected_source_root
+  abort("UniApp sourceRoot does not exist: #{actual_source_root}") unless File.directory?(File.join(ARGV.fetch(1), actual_source_root))
+' "${plugin_dir}/plugin.yaml" "${plugin_dir}"; then
   exit 1
 fi
 
 cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
   "${plugin_dir}/native/harmonyos/levixel/THIRD_PARTY_NOTICES.md"
+cmp "${plugin_dir}/LICENSE" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/LICENSE"
+cmp "${plugin_dir}/LICENSE" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/license.md"
+cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/THIRD_PARTY_NOTICES.md"
 
 expected_harmony_license="$(mktemp)"
 trap 'rm -f "${expected_harmony_license}"' EXIT
@@ -75,11 +96,25 @@ if rg -n -i 'galeria|nandorojo|com\.chris' \
   "${plugin_dir}/adapters/react-native/android/src" \
   "${plugin_dir}/adapters/react-native/ios" \
   "${plugin_dir}/adapters/uniapp/android/levixel-uniapp/src/main" \
+  "${plugin_dir}/adapters/uniapp/android/levixel-uniapp-runtime/src/main" \
   "${plugin_dir}/adapters/uniapp/ios/LevixelUniApp" \
-  "${plugin_dir}/adapters/uniapp/js_sdk/index.js"; then
+  "${plugin_dir}/adapters/uniapp/ios/LevixelUniRuntime" \
+  "${plugin_dir}/adapters/uniapp/js_sdk/index.js" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/utssdk" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk"; then
   echo "Legacy Galeria identifiers remain in runtime source." >&2
   exit 1
 fi
+
+if ! rg -q "from './canonical.js'" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/index.js"; then
+  echo "UniApp UTS JavaScript wrapper is not linked to its checked-in canonical module." >&2
+  exit 1
+fi
+node --input-type=module --check < \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/index.js"
+node --input-type=module --check < \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/canonical.js"
 
 plutil -lint "${plugin_dir}/native/ios/Levixel/PrivacyInfo.xcprivacy" >/dev/null
 printf '%s\n' "Levixel ${version} release metadata is consistent."

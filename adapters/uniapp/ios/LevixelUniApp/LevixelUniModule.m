@@ -1,5 +1,5 @@
 #import "LevixelUniModule.h"
-#import <LevixelUniApp/LevixelUniApp-Swift.h>
+#import <LevixelUniRuntime/LevixelUniRuntime-Swift.h>
 
 @interface LevixelUniModule ()
 

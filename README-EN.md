@@ -14,7 +14,7 @@ This repository is the canonical source, public contract, packaging toolkit, and
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
-| UniApp | `Sandrox-Levixel` native plugin | Preparing |
+| UniApp | `Sandrox-Levixel` UTS plugin | Preparing |
 
 ## Source Layout
 
@@ -136,7 +136,7 @@ The npm package contains thin bridges and the verified Android/iOS native artifa
 
 ## UniApp
 
-The UniApp adapter supports Android and iOS with a strict JavaScript SDK, DOM source-geometry conversion, and native-artifact bridges. Source and packaging support are available while public distribution is being prepared. See the [UniApp adapter guide](adapters/uniapp/README.md) for the contract.
+The UniApp adapter provides a formal UTS API bridge for classic uni-app on Android and iOS while retaining the accepted App native-plugin bridge for existing consumers. Both bridges reuse one platform runtime, the canonical JavaScript SDK, and the published native cores; `sourceVisibility` remains `visible` by default. This release does not claim uni-app x support. See the [UniApp adapter guide](adapters/uniapp/README.md) for the contract and packaging workflow.
 
 ## Development And Releases
 

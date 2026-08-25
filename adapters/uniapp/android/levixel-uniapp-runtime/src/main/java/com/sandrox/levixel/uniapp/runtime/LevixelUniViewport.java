@@ -1,4 +1,4 @@
-package com.sandrox.levixel.uniapp;
+package com.sandrox.levixel.uniapp.runtime;
 
 import android.graphics.Rect;
 import android.view.View;

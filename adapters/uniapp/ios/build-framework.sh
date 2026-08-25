@@ -11,6 +11,7 @@ bridge_derived_data="${build_root}/BridgeDerivedData"
 core_artifact_dir="${build_root}/CoreArtifact"
 core_framework_dir="${core_artifact_dir}/Levixel.xcframework/ios-arm64"
 bridge_framework="${bridge_derived_data}/Build/Products/Release-iphoneos/LevixelUniApp.framework"
+runtime_framework="${bridge_derived_data}/Build/Products/Release-iphoneos/LevixelUniRuntime.framework"
 output_dir="${build_root}/Products"
 
 if [[ -z "${dcloud_sdk_root}" || ! -f "${dcloud_sdk_root}/SDK/inc/DCUni/DCUniModule.h" ]]; then
@@ -48,10 +49,18 @@ if [[ ! -d "${bridge_framework}" ]]; then
   echo "Framework was not produced: ${bridge_framework}" >&2
   exit 1
 fi
+if [[ ! -d "${runtime_framework}" ]]; then
+  echo "Framework was not produced: ${runtime_framework}" >&2
+  exit 1
+fi
 
 mkdir -p "${output_dir}"
-rm -rf "${output_dir}/LevixelUniApp.framework" "${output_dir}/Levixel.framework"
+rm -rf \
+  "${output_dir}/LevixelUniApp.framework" \
+  "${output_dir}/LevixelUniRuntime.framework" \
+  "${output_dir}/Levixel.framework"
 ditto "${bridge_framework}" "${output_dir}/LevixelUniApp.framework"
+ditto "${runtime_framework}" "${output_dir}/LevixelUniRuntime.framework"
 ditto "${core_framework_dir}/Levixel.framework" "${output_dir}/Levixel.framework"
 
 printf '%s\n' "${output_dir}"

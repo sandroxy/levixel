@@ -10,6 +10,7 @@ let maxActiveImageInfoRequests = 0
 let sharedPreviewOwner = ''
 let activePreviewDownloads = 0
 let maxActivePreviewDownloads = 0
+let systemInfoRequests = 0
 let heldPreviewDownload
 let holdNextPreviewDownload = false
 const imageInfoRequests = []
@@ -128,6 +129,7 @@ globalThis.uni = {
     storage.set(key, value)
   },
   getSystemInfoSync() {
+    systemInfoRequests += 1
     return { platform: 'android', pixelRatio: 3 }
   },
   createSelectorQuery() {
@@ -235,6 +237,16 @@ assert.equal(nativeOpenOptions.sourceHints[1].objectFit, 'contain')
 assert.deepEqual(nativeOpenOptions.sourceHints[1].imageSize, { width: 800, height: 450 })
 assert.equal(nativeOpenOptions.sourceVisibility, 'visible')
 
+const androidSystemInfoRequests = systemInfoRequests
+globalThis.plus.os = { name: 'iOS' }
+await sdk.openLevixelFromSelector({
+  items,
+  sourceSelector: '.source',
+})
+assert.equal(systemInfoRequests, androidSystemInfoRequests)
+assert.equal(nativeOpenOptions.sourceHints[0].rectScale, 1)
+delete globalThis.plus.os
+
 const preparedItem = {
   id: 'prepared-image',
   type: 'image',
@@ -278,6 +290,9 @@ const removeListener = sdk.onLevixelEvent((event) => {
 nativeEventCallback({ type: 'dismiss', payload: {}, time: 1 })
 assert.deepEqual(receivedEvent, { type: 'dismiss', payload: {}, time: 1 })
 removeListener()
+receivedEvent = undefined
+nativeEventCallback({ type: 'indexChange', payload: { currentIndex: 1 }, time: 2 })
+assert.equal(receivedEvent, undefined)
 
 const priorityItems = ['a', 'b', 'c'].map(id => ({
   id: `priority-${id}`,
@@ -338,3 +353,40 @@ assert.ok(removedSavedFiles.some(path => path !== '/_doc/uniapp_save/stale.previ
 assert.ok(storage.get(registryKey).length <= 80)
 
 await sdk.closeLevixel()
+
+let injectedEventCallback
+const injectedCalls = []
+const utsSdk = await import(
+  `data:text/javascript;base64,${Buffer.from(sdkSource).toString('base64')}#uts-transport`
+)
+utsSdk.__setLevixelNativeTransport({
+  invoke(method, options) {
+    injectedCalls.push({ method, options })
+    if (method === 'open') {
+      return Promise.resolve({
+        ok: true,
+        data: { index: options.index ?? 0, count: options.items.length },
+      })
+    }
+    return Promise.resolve({ ok: true, data: { closed: true } })
+  },
+  subscribe(callback) {
+    injectedEventCallback = callback
+    return true
+  },
+})
+
+assert.deepEqual(await utsSdk.openLevixel({ items, index: 1 }), { index: 1, count: 2 })
+assert.deepEqual(await utsSdk.closeLevixel(), { closed: true })
+assert.deepEqual(injectedCalls.map(call => call.method), ['open', 'close'])
+
+let injectedEvent
+const removeInjectedListener = utsSdk.onLevixelEvent((event) => {
+  injectedEvent = event
+})
+injectedEventCallback({ type: 'ready', payload: {}, time: 2 })
+assert.deepEqual(injectedEvent, { type: 'ready', payload: {}, time: 2 })
+removeInjectedListener()
+injectedEvent = undefined
+injectedEventCallback({ type: 'dismiss', payload: {}, time: 3 })
+assert.equal(injectedEvent, undefined)

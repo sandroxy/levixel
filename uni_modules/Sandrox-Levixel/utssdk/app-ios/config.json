@@ -1,0 +1,11 @@
+{
+  "deploymentTarget": "13.0",
+  "identifier": "com.sandrox.levixel.uniapp.uts",
+  "validArchitectures": [
+    "arm64"
+  ],
+  "frameworks": [
+    "AVFoundation.framework",
+    "AVKit.framework"
+  ]
+}

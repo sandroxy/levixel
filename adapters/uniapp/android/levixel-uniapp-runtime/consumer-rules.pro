@@ -1,0 +1,3 @@
+-keep public class com.sandrox.levixel.uniapp.runtime.LevixelUniRuntime { public *; }
+-keep public interface com.sandrox.levixel.uniapp.runtime.LevixelUniJsonCallback { public *; }
+-keep public interface com.sandrox.levixel.uniapp.runtime.LevixelUniJsonEventListener { public *; }

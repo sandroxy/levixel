@@ -1,0 +1,15 @@
+export type LevixelNativeCallback = (json: string) => void
+
+export type OpenLevixelNative = (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+) => void
+
+export type CloseLevixelNative = (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+) => void
+
+export type OnLevixelNativeEvent = (
+  callback: LevixelNativeCallback
+) => void

@@ -1,0 +1,80 @@
+import {
+  CloseLevixelNative,
+  LevixelNativeCallback,
+  OnLevixelNativeEvent,
+  OpenLevixelNative,
+} from '../interface.uts'
+import LevixelUniJsonCallback from 'com.sandrox.levixel.uniapp.runtime.LevixelUniJsonCallback'
+import LevixelUniJsonEventListener from 'com.sandrox.levixel.uniapp.runtime.LevixelUniJsonEventListener'
+import LevixelUniRuntime from 'com.sandrox.levixel.uniapp.runtime.LevixelUniRuntime'
+
+class RuntimeResultCallback implements LevixelUniJsonCallback {
+  private callback: LevixelNativeCallback
+
+  constructor(callback: LevixelNativeCallback) {
+    this.callback = callback
+  }
+
+  override onResult(resultJson: string): void {
+    this.callback(resultJson)
+  }
+}
+
+class RuntimeEventListener implements LevixelUniJsonEventListener {
+  private callback: LevixelNativeCallback
+
+  constructor(callback: LevixelNativeCallback) {
+    this.callback = callback
+  }
+
+  override onEvent(eventJson: string): void {
+    this.callback(eventJson)
+  }
+}
+
+let destroyHookRegistered = false
+
+function ensureDestroyHook(): void {
+  if (destroyHookRegistered)
+    return
+  destroyHookRegistered = true
+  UTSAndroid.onAppActivityDestroy(() => {
+    LevixelUniRuntime.getShared().closeImmediately()
+    LevixelUniRuntime.getShared().setJsonEventListener(null)
+  })
+}
+
+export const openLevixelNative: OpenLevixelNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  ensureDestroyHook()
+  const activity = UTSAndroid.getUniActivity()
+  if (activity == null) {
+    callback('{"ok":false,"code":"NO_ACTIVITY","path":"$","message":"Unable to find the current Activity"}')
+    return
+  }
+  LevixelUniRuntime.getShared().openJson(
+    activity,
+    optionsJson,
+    new RuntimeResultCallback(callback)
+  )
+}
+
+export const closeLevixelNative: CloseLevixelNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniRuntime.getShared().closeJson(
+    optionsJson,
+    new RuntimeResultCallback(callback)
+  )
+}
+
+export const onLevixelNativeEvent: OnLevixelNativeEvent = function (
+  callback: LevixelNativeCallback
+): void {
+  ensureDestroyHook()
+  const listener = new RuntimeEventListener(callback)
+  LevixelUniRuntime.getShared().setJsonEventListener(listener)
+}

@@ -22,4 +22,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "LevixelUniAppAndroid"
+include(":levixel-uniapp-runtime")
 include(":levixel-uniapp")

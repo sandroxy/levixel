@@ -29,6 +29,7 @@ local.properties
 # Apple platforms
 DerivedData/
 **/DerivedData/
+adapters/uniapp/ios/build-runtime/
 **/xcuserdata/
 **/*.xcuserstate
 **/.swiftpm/

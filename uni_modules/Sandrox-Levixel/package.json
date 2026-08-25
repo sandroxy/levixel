@@ -1,0 +1,107 @@
+{
+  "id": "Sandrox-Levixel",
+  "displayName": "Levixel 共享转场图片视频查看器",
+  "version": "1.1.0",
+  "description": "经典 uni-app Android/iOS 的 Levixel 原生共享转场图片与视频查看器 UTS 薄桥。",
+  "keywords": [
+    "UTS",
+    "uni-app",
+    "图片预览",
+    "视频预览",
+    "共享转场"
+  ],
+  "repository": "https://github.com/sandroxy/levixel",
+  "license": "MIT",
+  "engines": {
+    "HBuilderX": "^5.07",
+    "uni-app": "^3.1.0"
+  },
+  "dcloudext": {
+    "type": "uts",
+    "sale": {
+      "regular": {
+        "price": "0.00"
+      },
+      "sourcecode": {
+        "price": "0.00"
+      }
+    },
+    "contact": {
+      "qq": ""
+    },
+    "declaration": {
+      "ads": "无",
+      "data": "插件不采集或上传个人信息；远程媒体仅向业务传入的 URL 发起请求，本地预览仅用于展示与转场缓存。",
+      "permissions": "无"
+    },
+    "npmurl": "",
+    "darkmode": "-",
+    "i18n": "-",
+    "widescreen": "-"
+  },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "cloud": {
+        "tcb": "x",
+        "aliyun": "x",
+        "alipay": "x"
+      },
+      "client": {
+        "uni-app": {
+          "vue": {
+            "vue2": "√",
+            "vue3": "√"
+          },
+          "web": {
+            "safari": "x",
+            "chrome": "x"
+          },
+          "app": {
+            "vue": "√",
+            "nvue": "x",
+            "android": {
+              "extVersion": "1.1.0",
+              "minVersion": "21"
+            },
+            "ios": {
+              "extVersion": "1.1.0",
+              "minVersion": "13.0"
+            },
+            "harmony": "x"
+          },
+          "mp": {
+            "weixin": "x",
+            "alipay": "x",
+            "toutiao": "x",
+            "baidu": "x",
+            "kuaishou": "x",
+            "jd": "x",
+            "harmony": "x",
+            "qq": "x",
+            "lark": "x"
+          },
+          "quickapp": {
+            "huawei": "x",
+            "union": "x"
+          }
+        },
+        "uni-app-x": {
+          "web": {
+            "safari": "x",
+            "chrome": "x"
+          },
+          "app": {
+            "android": "x",
+            "ios": "x",
+            "harmony": "x"
+          },
+          "mp": {
+            "weixin": "x"
+          }
+        }
+      }
+    }
+  }
+}

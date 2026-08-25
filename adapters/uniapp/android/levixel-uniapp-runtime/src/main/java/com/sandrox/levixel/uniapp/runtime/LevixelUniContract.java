@@ -1,4 +1,4 @@
-package com.sandrox.levixel.uniapp;
+package com.sandrox.levixel.uniapp.runtime;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

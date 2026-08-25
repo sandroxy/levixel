@@ -14,7 +14,7 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
-| UniApp | `Sandrox-Levixel` 原生插件包 | 发布准备中 |
+| UniApp | `Sandrox-Levixel` UTS 插件包 | 发布准备中 |
 
 ## 源码结构
 
@@ -136,7 +136,7 @@ npx expo prebuild
 
 ## UniApp
 
-UniApp 适配器支持 Android 与 iOS，包含严格 JavaScript SDK、DOM 源图几何转换与原生制品桥接。当前源码与打包流程已收录，公共分发渠道仍在准备；接入协议见 [UniApp 适配器文档](adapters/uniapp/README.md)。
+UniApp 适配器面向经典 uni-app Android/iOS 提供正式 UTS API 薄桥，同时保留已有 App 原生插件桥。两条桥复用同一套平台 runtime、canonical JavaScript SDK 与已发布原生核心；`sourceVisibility` 默认保持 `visible`。本版不声明 uni-app x 支持，完整接入与打包说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
 
 ## 开发与发布
 

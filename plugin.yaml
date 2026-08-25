@@ -144,7 +144,7 @@ targets:
     platforms:
       - android
       - ios
-    sourceRoot: adapters/uniapp
+    sourceRoot: uni_modules/Sandrox-Levixel
     capabilities:
       - drag-dismiss
       - horizontal-paging
@@ -158,14 +158,21 @@ targets:
     verify:
       commands:
         - ./scripts/verify-uniapp.sh
+        - ./scripts/verify-uniapp-uts-compiler.sh
     artifacts:
-      - id: native-plugin
-        format: native-plugin-zip
+      - id: uts-plugin
+        format: uts-plugin-zip
         output: dist/uniapp/levixel-uniapp-1.1.0.zip
         distribution:
           channel: uniapp-marketplace
           packageId: Sandrox-Levixel
     constraints:
+      - name: minimum-hbuilderx
+        value: '5.07'
+      - name: uniapp-runtime
+        value: classic-uni-app
+      - name: uni-app-x
+        value: unsupported
       - name: minimum-android-sdk
         value: 21
       - name: minimum-ios

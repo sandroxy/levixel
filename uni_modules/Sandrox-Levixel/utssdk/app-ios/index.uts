@@ -1,0 +1,41 @@
+import {
+  CloseLevixelNative,
+  LevixelNativeCallback,
+  OnLevixelNativeEvent,
+  OpenLevixelNative,
+} from '../interface.uts'
+import { LevixelUniPresenter } from 'LevixelUniRuntime'
+
+export const openLevixelNative: OpenLevixelNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniPresenter.shared.openJSON(
+    optionsJson,
+    rootView = null,
+    viewController = null,
+    completion = (resultJson: string) => {
+      callback(resultJson)
+    }
+  )
+}
+
+export const closeLevixelNative: CloseLevixelNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniPresenter.shared.closeJSON(
+    optionsJson,
+    completion = (resultJson: string) => {
+      callback(resultJson)
+    }
+  )
+}
+
+export const onLevixelNativeEvent: OnLevixelNativeEvent = function (
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniPresenter.shared.setJSONEventHandler((eventJson: string) => {
+    callback(eventJson)
+  })
+}

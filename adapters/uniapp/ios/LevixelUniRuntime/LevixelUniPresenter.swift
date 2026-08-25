@@ -43,6 +43,7 @@ public final class LevixelUniPresenter: NSObject {
     public static let shared = LevixelUniPresenter()
 
     public var eventHandler: ((NSDictionary) -> Void)?
+    private let jsonEventRelay = LevixelUniJSONEventRelay()
 
     private static let initialPreviewTimeout: TimeInterval = 0.12
 
@@ -52,6 +53,76 @@ public final class LevixelUniPresenter: NSObject {
 
     private override init() {
         super.init()
+    }
+
+    @objc(openWithJSON:rootView:viewController:completion:)
+    public func openJSON(
+        _ optionsJSON: String,
+        rootView: UIView?,
+        viewController: UIViewController?,
+        completion: @escaping (String) -> Void
+    ) {
+        performOnMain { [weak self] in
+            guard let self else { return }
+            guard
+                let data = optionsJSON.data(using: .utf8),
+                let options = try? JSONSerialization.jsonObject(with: data)
+            else {
+                completion(self.jsonString(self.error(
+                    code: "INVALID_JSON",
+                    path: "$",
+                    message: "Request must be a valid JSON object"
+                )))
+                return
+            }
+            self.open(
+                options: options,
+                rootView: rootView,
+                viewController: viewController
+            ) { [weak self] result in
+                guard let self else { return }
+                completion(self.jsonString(result))
+            }
+        }
+    }
+
+    @objc(closeWithJSON:completion:)
+    public func closeJSON(
+        _ optionsJSON: String,
+        completion: @escaping (String) -> Void
+    ) {
+        performOnMain { [weak self] in
+            guard let self else { return }
+            guard
+                let data = optionsJSON.data(using: .utf8),
+                let options = try? JSONSerialization.jsonObject(with: data)
+            else {
+                completion(self.jsonString(self.error(
+                    code: "INVALID_JSON",
+                    path: "$",
+                    message: "Request must be a valid JSON object"
+                )))
+                return
+            }
+            self.close(options: options) { [weak self] result in
+                guard let self else { return }
+                completion(self.jsonString(result))
+            }
+        }
+    }
+
+    @objc(setJSONEventHandler:)
+    public func setJSONEventHandler(_ handler: @escaping (String) -> Void) {
+        performOnMain { [weak self] in
+            guard let self else { return }
+            self.jsonEventRelay.replaceHandler(handler)
+            let readyEvent: NSDictionary = [
+                "type": "ready",
+                "payload": ["message": "levixel event channel ready"],
+                "time": Int64(Date().timeIntervalSince1970 * 1000),
+            ]
+            self.jsonEventRelay.emit(self.jsonString(readyEvent))
+        }
     }
 
     @objc(openWithOptions:rootView:viewController:completion:)
@@ -440,11 +511,13 @@ public final class LevixelUniPresenter: NSObject {
     }
 
     private func emit(type: String, payload: [String: Any]) {
-        eventHandler?([
+        let event: NSDictionary = [
             "type": type,
             "payload": payload,
             "time": Int64(Date().timeIntervalSince1970 * 1000),
-        ])
+        ]
+        eventHandler?(event)
+        jsonEventRelay.emit(jsonString(event))
     }
 
     private func ok(data: [String: Any]) -> NSDictionary {
@@ -453,5 +526,24 @@ public final class LevixelUniPresenter: NSObject {
 
     private func error(code: String, path: String, message: String) -> NSDictionary {
         ["ok": false, "code": code, "path": path, "message": message]
+    }
+
+    private func jsonString(_ value: NSDictionary) -> String {
+        guard
+            JSONSerialization.isValidJSONObject(value),
+            let data = try? JSONSerialization.data(withJSONObject: value),
+            let json = String(data: data, encoding: .utf8)
+        else {
+            return "{\"ok\":false,\"code\":\"ENCODING_FAILED\",\"path\":\"$\",\"message\":\"Unable to encode the Levixel response\"}"
+        }
+        return json
+    }
+
+    private func performOnMain(_ action: @escaping () -> Void) {
+        if Thread.isMainThread {
+            action()
+        } else {
+            DispatchQueue.main.async(execute: action)
+        }
     }
 }

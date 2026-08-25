@@ -41,17 +41,32 @@ The tarball embeds the accepted Android AAR and iOS XCFramework. It must be test
 
 ## UniApp
 
-The UniApp package requires explicit DCloud offline SDK inputs:
+The public UTS plugin source root is `uni_modules/Sandrox-Levixel`; the DCloud-independent Android/iOS runtimes and the legacy bridges remain under `adapters/uniapp`. `adapters/uniapp/js_sdk/index.js` is the only hand-maintained canonical JavaScript SDK. After changing it, regenerate the checked-in plugin copy and review the resulting diff:
+
+```sh
+./scripts/sync-uniapp-canonical-js.sh
+```
+
+Do not edit `uni_modules/Sandrox-Levixel/js_sdk/canonical.js` directly. Packaging and release verification use `--check` and fail on any byte-level drift instead of overwriting the generated file.
+
+Build and inspect the DCloud Marketplace UTS candidate:
+
+```sh
+./scripts/package-uniapp.sh
+./scripts/verify-uniapp.sh
+./scripts/verify-uniapp-uts-compiler.sh
+```
+
+The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification uses HBuilderX 5.07 by default; set `HBUILDERX_CONTENTS` when it is installed elsewhere. The generated ZIP must be installed unchanged in a classic uni-app consumer and hand-verified with a matching custom base, cloud package, or offline package on Android and iOS devices.
+
+The accepted App native-plugin bridge remains available for existing and offline consumers. It is built separately because it requires the DCloud legacy SDK and is not a Marketplace upload candidate:
 
 ```sh
 DCLOUD_ANDROID_UNIAPP_AAR=/absolute/path/to/uniapp-v8-release.aar \
 DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
-  ./scripts/package-uniapp.sh
-
-./scripts/verify-uniapp.sh
+  ./scripts/package-uniapp-legacy.sh
+./scripts/verify-uniapp-legacy.sh
 ```
-
-The generated ZIP must be installed unchanged in HBuilderX custom-base or offline-package consumers for Android and iOS hand verification.
 
 ## Release Metadata
 
