@@ -43,7 +43,7 @@
 
 ## 更新日志
 
-> 新增经典 uni-app Android/iOS 的正式 UTS API 薄桥；两端复用既有 UniApp runtime 与 Levixel 原生核心；canonical JS SDK 和 `sourceVisibility: 'visible'` 默认策略保持不变。
+> 新增经典 uni-app Android/iOS 的正式 UTS API 薄桥；两端复用既有 UniApp runtime 与 Levixel 原生核心；修复 iOS 横图首次打开处于放大状态及慢网 loading 期间缩放出现双层预览的问题；canonical JS SDK 和 `sourceVisibility: 'visible'` 默认策略保持不变。
 
 ## 上传文件
 

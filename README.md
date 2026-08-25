@@ -10,11 +10,11 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 
 | 平台 | 公开制品 | 当前版本 |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
-| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
-| React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
-| UniApp | `Sandrox-Levixel` UTS 插件包 | 发布准备中 |
+| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.1` |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.1` |
+| React Native / Expo | npm `@sandrox/levixel` | `1.1.1` |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
+| UniApp | `Sandrox-Levixel` UTS 插件包 | `1.1.1` |
 
 ## 源码结构
 
@@ -49,11 +49,11 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.1.0")
+    implementation("io.gitee.sandrox:levixel:1.1.1")
 }
 ```
 
-Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
+Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.1.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
 
 当前 Android 核心保留了完整验收的 `PhotoView 2.3.0`，因此消费者暂时需要保留 JitPack 仓库。
 
@@ -94,7 +94,7 @@ rootView.addView(viewer);
 https://github.com/sandroxy/levixel.git
 ```
 
-选择 `1.1.0` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
+选择 `1.1.1` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
 
 ```swift
 import Levixel
@@ -120,10 +120,10 @@ Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容
 OHPM 审核通过后安装：
 
 ```sh
-ohpm install @sandrox/levixel@1.1.0
+ohpm install @sandrox/levixel@1.1.1
 ```
 
-OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.0.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
+OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.1.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
 
 ## React Native / Expo
 

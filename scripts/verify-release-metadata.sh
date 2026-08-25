@@ -7,6 +7,7 @@ version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")'
 react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${plugin_dir}/adapters/react-native/package.json")"
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
 uniapp_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json")"
+harmony_app_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("app").fetch("versionName")' "${plugin_dir}/native/harmonyos/AppScope/app.json5")"
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 
@@ -30,6 +31,20 @@ if [[ "${uniapp_version}" != "${version}" ]]; then
   exit 1
 fi
 
+if [[ "${harmony_app_version}" != "${version}" ]]; then
+  echo "HarmonyOS app version ${harmony_app_version} does not match ${version}." >&2
+  exit 1
+fi
+
+ruby -rjson -e '
+  package = JSON.parse(File.read(ARGV.fetch(0)))
+  version = ARGV.fetch(1)
+  android = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "android", "extVersion")
+  ios = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "ios", "extVersion")
+  abort("UniApp Android extVersion #{android.inspect} does not match #{version}") unless android == version
+  abort("UniApp iOS extVersion #{ios.inspect} does not match #{version}") unless ios == version
+' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json" "${version}"
+
 ios_versions="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' \
   "${plugin_dir}/native/ios/Levixel.xcodeproj/project.pbxproj" | sort -u)"
 if [[ "${ios_versions}" != "${version}" ]]; then
@@ -42,6 +57,26 @@ uniapp_ios_versions="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' \
 if [[ "${uniapp_ios_versions}" != "${version}" ]]; then
   echo "UniApp iOS marketing version does not match ${version}: ${uniapp_ios_versions}" >&2
   exit 1
+fi
+
+swift_package_url="$(sed -n 's/.*url: "\([^"]*\)".*/\1/p' "${plugin_dir}/Package.swift")"
+expected_swift_package_url="https://github.com/sandroxy/levixel/releases/download/${version}/levixel-${version}.xcframework.zip"
+if [[ "${swift_package_url}" != "${expected_swift_package_url}" ]]; then
+  echo "Root Swift Package URL does not match ${version}: ${swift_package_url}" >&2
+  exit 1
+fi
+swift_package_checksum="$(sed -n 's/.*checksum: "\([0-9a-f]*\)".*/\1/p' "${plugin_dir}/Package.swift")"
+if [[ ! "${swift_package_checksum}" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "Root Swift Package checksum is invalid: ${swift_package_checksum}" >&2
+  exit 1
+fi
+ios_artifact="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
+if [[ -f "${ios_artifact}" ]]; then
+  actual_ios_checksum="$(swift package compute-checksum "${ios_artifact}")"
+  if [[ "${swift_package_checksum}" != "${actual_ios_checksum}" ]]; then
+    echo "Root Swift Package checksum does not match ${ios_artifact}." >&2
+    exit 1
+  fi
 fi
 
 if ! ruby -ryaml -e '

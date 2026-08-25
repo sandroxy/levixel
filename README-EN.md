@@ -10,11 +10,11 @@ This repository is the canonical source, public contract, packaging toolkit, and
 
 | Platform | Public artifact | Current version |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.0` |
-| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.0` |
-| React Native / Expo | npm `@sandrox/levixel` | `1.1.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.0` |
-| UniApp | `Sandrox-Levixel` UTS plugin | Preparing |
+| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.1` |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.1` |
+| React Native / Expo | npm `@sandrox/levixel` | `1.1.1` |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
+| UniApp | `Sandrox-Levixel` UTS plugin | `1.1.1` |
 
 ## Source Layout
 
@@ -49,11 +49,11 @@ Add the dependency:
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.1.0")
+    implementation("io.gitee.sandrox:levixel:1.1.1")
 }
 ```
 
-Maven Central is the canonical Android dependency channel. The matching GitHub Release also provides `levixel-1.1.0.aar` and its SHA-256 file for offline or manual integration. The AAR is byte-identical to the Maven Central artifact.
+Maven Central is the canonical Android dependency channel. The matching GitHub Release also provides `levixel-1.1.1.aar` and its SHA-256 file for offline or manual integration. The AAR is byte-identical to the Maven Central artifact.
 
 The Android core currently retains the fully validated `PhotoView 2.3.0` integration, so consumers must keep JitPack available for now.
 
@@ -94,7 +94,7 @@ In Xcode, choose **File > Add Package Dependencies** and enter:
 https://github.com/sandroxy/levixel.git
 ```
 
-Select `1.1.0` or a compatible `1.x` version, then link the `Levixel` product.
+Select `1.1.1` or a compatible `1.x` version, then link the `Levixel` product.
 
 ```swift
 import Levixel
@@ -120,10 +120,10 @@ The Swift Package references a checksum-pinned XCFramework. Xcode verifies the d
 Install after OHPM approval:
 
 ```sh
-ohpm install @sandrox/levixel@1.1.0
+ohpm install @sandrox/levixel@1.1.1
 ```
 
-OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.1.0.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the approved OHPM artifact.
+OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.1.1.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the approved OHPM artifact.
 
 ## React Native / Expo
 

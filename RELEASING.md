@@ -80,6 +80,16 @@ LEVIXEL_IOS_BINARY_URL=https://example.com/levixel-<version>.xcframework.zip \
   ./scripts/package-native-ios.sh
 ```
 
+If device acceptance was completed on a one-time XCFramework candidate before the release-metadata commit, promote those exact accepted bytes instead of rebuilding them:
+
+```sh
+LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_ZIP=/absolute/path/to/accepted.xcframework.zip \
+LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_SHA256=<accepted-sha256> \
+  ./scripts/prepare-native-release.sh
+```
+
+The packaging script verifies the supplied SHA-256, embedded framework version, slices, privacy manifest, and legal notices before copying the ZIP byte-for-byte to its canonical release filename. Use this path only when the release commit changes metadata or packaging and the accepted candidate was built from the same native source; record both the source commit and accepted checksum in the release review.
+
 ## HarmonyOS / OHPM
 
 1. Confirm the `@sandrox` scope and publisher access.

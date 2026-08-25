@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 - 2026-08-25
+
+- Added the first DCloud Marketplace-ready UTS package for classic uni-app on Android and iOS while keeping the accepted legacy bridges and shared platform runtimes.
+- Fixed iOS landscape previews opening above their fitted zoom level when their first layout occurred before valid view bounds were available.
+- Fixed the duplicate loading-preview layer exposed by pinching during the iOS opening transition.
+- Preserved the user's relative zoom level and visual center when an iOS loading preview hands off to the full-resolution image.
+- Carried the accepted iOS core into the React Native and UniApp packages; Android and HarmonyOS native behavior remain unchanged in this coordinated version release.
+
 ## 1.1.0 - 2026-08-24
 
 - Improved shared-transition behavior for loaded, loading, cached, and off-screen media.

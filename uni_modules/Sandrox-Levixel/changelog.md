@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1
+
+- 首个可提交 DCloud 插件市场的正式 UTS 版本，支持经典 uni-app Vue 页面 App-Android 与 App-iOS。
+- UTS 与 legacy 桥继续共用同一套 Android/iOS UniApp runtime，高层接口继续复用 canonical JavaScript SDK。
+- 修复 iOS 横图首次打开处于放大状态，以及慢网 loading 期间缩放出现双层预览的问题。
+- iOS 原图交接时保留用户相对缩放倍率与视觉中心；`sourceVisibility` 默认值继续保持 `visible`。
+- Android 原生查看器行为保持不变。
+
 ## 1.1.0
 
 - 新增面向 DCloud 插件市场与新项目的正式 UTS API 薄桥。
