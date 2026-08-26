@@ -177,3 +177,45 @@ targets:
         value: 21
       - name: minimum-ios
         value: '13.0'
+  - id: uniapp-native-compat
+    kind: adapter
+    runtime: uniapp
+    platforms:
+      - android
+      - ios
+    sourceRoot: adapters/uniapp
+    capabilities:
+      - drag-dismiss
+      - horizontal-paging
+      - image-viewing
+      - pan
+      - pinch-zoom
+      - shared-transition
+      - video-viewing
+    build:
+      command: ./scripts/package-uniapp-legacy.sh
+    verify:
+      commands:
+        - ./scripts/verify-uniapp-legacy.sh
+    artifacts:
+      - id: app-native-plugin
+        format: app-native-plugin-zip
+        output: dist/uniapp/levixel-uniapp-legacy-1.1.1.zip
+        distribution:
+          channel: github-release
+          packageId: Sandrox-Levixel
+    constraints:
+      - name: minimum-hbuilderx
+        value: '5.07'
+      - name: uniapp-runtime
+        value: classic-uni-app
+      - name: uni-app-x
+        value: unsupported
+      - name: marketplace
+        value: false
+      - name: delivery
+        value: existing-projects-and-offline-packaging
+      - name: minimum-android-sdk
+        value: 21
+      - name: minimum-ios
+        value: '13.0'

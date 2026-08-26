@@ -1,0 +1,125 @@
+name: Verify UniApp Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Levixel version whose ZIPs are already attached to the GitHub Release
+        required: true
+        type: string
+      uts_sha256:
+        description: SHA-256 accepted during UTS device and Marketplace verification
+        required: true
+        type: string
+      include_legacy:
+        description: Also verify the separately accepted App native-plugin compatibility ZIP
+        required: true
+        default: false
+        type: boolean
+      legacy_sha256:
+        description: Required only when include_legacy is enabled
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate immutable candidate inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          UTS_SHA256: ${{ inputs.uts_sha256 }}
+          INCLUDE_LEGACY: ${{ inputs.include_legacy }}
+          LEGACY_SHA256: ${{ inputs.legacy_sha256 }}
+        run: |
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only stable semantic versions are verifiable: ${VERSION}" >&2
+            exit 1
+          fi
+          if [[ ! "${UTS_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "UTS SHA-256 is invalid." >&2
+            exit 1
+          fi
+          if [[ "${INCLUDE_LEGACY}" == "true" && ! "${LEGACY_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Legacy SHA-256 is required when legacy verification is enabled." >&2
+            exit 1
+          fi
+          if [[ "${INCLUDE_LEGACY}" != "true" && -n "${LEGACY_SHA256}" ]]; then
+            echo "Do not provide a legacy SHA-256 unless legacy verification is enabled." >&2
+            exit 1
+          fi
+
+      - name: Check out the public release verifier
+        uses: actions/checkout@v6
+        with:
+          path: verifier
+
+      - name: Check out the canonical release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.version }}
+          path: release-source
+
+      - name: Set up Java archive inspection
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up JavaScript contract verification
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Download accepted public release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          INCLUDE_LEGACY: ${{ inputs.include_legacy }}
+        run: |
+          mkdir -p dist
+          gh release download "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "levixel-uniapp-${VERSION}.zip" \
+            --pattern "levixel-uniapp-${VERSION}.zip.sha256" \
+            --pattern "levixel-native-${VERSION}.json" \
+            --pattern "levixel-${VERSION}.aar" \
+            --pattern "levixel-${VERSION}.xcframework.zip" \
+            --dir dist
+          if [[ "${INCLUDE_LEGACY}" == "true" ]]; then
+            gh release download "${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --pattern "levixel-uniapp-legacy-${VERSION}.zip" \
+              --pattern "levixel-uniapp-legacy-${VERSION}.zip.sha256" \
+              --dir dist
+          fi
+
+      - name: Verify exact UniApp release bytes and provenance
+        env:
+          VERSION: ${{ inputs.version }}
+          UTS_SHA256: ${{ inputs.uts_sha256 }}
+          INCLUDE_LEGACY: ${{ inputs.include_legacy }}
+          LEGACY_SHA256: ${{ inputs.legacy_sha256 }}
+        run: |
+          arguments=(
+            "${VERSION}"
+            release-source
+            "dist/levixel-native-${VERSION}.json"
+            "dist/levixel-${VERSION}.aar"
+            "dist/levixel-${VERSION}.xcframework.zip"
+            "dist/levixel-uniapp-${VERSION}.zip"
+            "dist/levixel-uniapp-${VERSION}.zip.sha256"
+            "${UTS_SHA256}"
+          )
+          if [[ "${INCLUDE_LEGACY}" == "true" ]]; then
+            arguments+=(
+              "dist/levixel-uniapp-legacy-${VERSION}.zip"
+              "dist/levixel-uniapp-legacy-${VERSION}.zip.sha256"
+              "${LEGACY_SHA256}"
+            )
+          fi
+          verifier/.github/scripts/verify-uniapp-release-assets.sh "${arguments[@]}"

@@ -138,6 +138,8 @@ npx expo prebuild
 
 UniApp 适配器面向经典 uni-app Android/iOS 提供正式 UTS API 薄桥，同时保留已有 App 原生插件桥。两条桥复用同一套平台 runtime、canonical JavaScript SDK 与已发布原生核心；`sourceVisibility` 默认保持 `visible`。本版不声明 uni-app x 支持，完整接入与打包说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
 
+DCloud 插件市场是新项目的首选渠道。匹配版本的 GitHub Release 另行提供 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。经过单独验收的 `levixel-uniapp-legacy-<version>.zip` 仅服务已有 App 原生插件项目与离线打包，不是 UTS 市场包，也不应作为新项目默认入口。
+
 ## 开发与发布
 
 本地构建、制品自检与所需 SDK 见 [DEVELOPMENT.md](DEVELOPMENT.md)。不可变制品和版本发布流程见 [RELEASING.md](RELEASING.md)。

@@ -68,6 +68,8 @@ DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
 ./scripts/verify-uniapp-legacy.sh
 ```
 
+The legacy ZIP is a compatibility artifact, not a second UniApp implementation. It may be attached to a GitHub Release only after that exact ZIP has passed Android and iOS artifact-only smoke tests. The package must not embed or redistribute the DCloud Android/iOS SDK used to compile the bridge.
+
 ## Release Metadata
 
 Validate versions, target declarations, notices, privacy metadata, and runtime identifiers:

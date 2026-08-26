@@ -199,8 +199,26 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
 4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
 5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the ZIP checksum still matches the accepted candidate.
 6. Import the public Marketplace version into a clean classic uni-app consumer and rerun the production build. DCloud may add a `name` field equal to `displayName` and reformat `package.json`; all other JSON values and every other payload file must still match the accepted ZIP.
+7. Attach the exact accepted UTS ZIP and its existing SHA-256 sidecar to the matching GitHub Release without rebuilding or re-zipping it. DCloud remains the primary installation channel; the GitHub asset is the anonymous direct-download and offline mirror.
+8. Run `Verify UniApp Release Assets` with the stable version and the SHA-256 recorded during device acceptance. The workflow checks the public ZIP against the canonical release tag, native release manifest, mirrored AAR/XCFramework, canonical JavaScript SDK, licenses, UTS metadata, and archive layout. It never builds or alters the candidate.
+
+For a user-managed upload of the already accepted UTS bytes:
+
+```sh
+LEVIXEL_VERSION="<version>"
+
+gh release upload "${LEVIXEL_VERSION}" \
+  "dist/uniapp/levixel-uniapp-${LEVIXEL_VERSION}.zip" \
+  "dist/uniapp/levixel-uniapp-${LEVIXEL_VERSION}.zip.sha256" \
+  --repo sandroxy/levixel \
+  --clobber
+```
+
+GitHub Actions cannot receive a local file through `workflow_dispatch`, and the DCloud Marketplace requires an authenticated download and may normalize `package.json`. Therefore the release workflow verifies an already uploaded immutable candidate instead of silently rebuilding it or persisting a DCloud session.
 
 The separately generated `levixel-uniapp-legacy-<version>.zip` remains available for existing App native-plugin/offline consumers. It is not the Marketplace artifact and must never replace the UTS ZIP in this release flow.
+
+The legacy compatibility ZIP may be attached to the same GitHub Release only after that exact archive passes Android and iOS offline-consumer smoke tests. Upload its existing sidecar alongside it, then rerun `Verify UniApp Release Assets` with `include_legacy` enabled and the independently recorded legacy SHA-256. Label it as an existing-project/offline-packaging compatibility artifact; do not present it as a Marketplace package, a uni-app x package, or the recommended path for new projects. The ZIP must not redistribute the DCloud SDK used to build its bridge.
 
 ## Provenance
 

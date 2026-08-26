@@ -80,6 +80,8 @@ iOS UTS 不再另存一份事件回调，而是把回调交给 `LevixelUniRuntim
 
 市场 ZIP 的根目录就是插件根目录，直接包含 `package.json` 和 `utssdk/`，以符合 DCloud Web 发布器的格式校验。手动安装候选包时，应将 ZIP 内容解压到宿主工程的 `uni_modules/Sandrox-Levixel/`，不能在 ZIP 内或安装目录中额外套一层同名目录。随后用包含插件的自定义基座、云打包或离线包完成 Android/iOS 真机矩阵。
 
+正式版本还可以把同一份已验收 ZIP 及其 SHA-256 文件附加到对应 GitHub Release，作为无需登录的直接下载镜像。该镜像必须复用上传 DCloud 的原文件，不能从 `master` 或 release tag 重新构建。DCloud 市场仍是新项目的首选安装渠道。
+
 ## 既有 App 原生插件
 
 已有项目仍可使用 `nativeplugins/Sandrox-Levixel` 和原来的 SDK 路径。其候选包单独生成，不是插件市场上传物：
@@ -90,3 +92,7 @@ DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
   ./scripts/package-uniapp-legacy.sh
 ./scripts/verify-uniapp-legacy.sh
 ```
+
+解压后应得到 `nativeplugins/Sandrox-Levixel/`。该兼容包仅面向已有 classic uni-app App 原生插件项目、自定义基座和离线打包，不支持 uni-app x，也不能上传到当前 DCloud 插件市场。新项目应使用 UTS 包。
+
+只有精确的 legacy ZIP 分别通过 Android/iOS 离线宿主烟测后，才可把 ZIP 与 SHA-256 文件附加到对应 GitHub Release。公开包不得包含构建 bridge 时使用的 DCloud Android AAR 或 iOS SDK；消费者仍应通过自己的 HBuilderX/离线 SDK 环境完成集成。

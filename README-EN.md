@@ -138,6 +138,8 @@ The npm package contains thin bridges and the verified Android/iOS native artifa
 
 The UniApp adapter provides a formal UTS API bridge for classic uni-app on Android and iOS while retaining the accepted App native-plugin bridge for existing consumers. Both bridges reuse one platform runtime, the canonical JavaScript SDK, and the published native cores; `sourceVisibility` remains `visible` by default. This release does not claim uni-app x support. See the [UniApp adapter guide](adapters/uniapp/README.md) for the contract and packaging workflow.
 
+The DCloud Marketplace is the preferred channel for new projects. The matching GitHub Release may also provide `levixel-uniapp-<version>.zip` and its SHA-256 file for direct downloads, offline archives, and manual installation under `uni_modules/Sandrox-Levixel/`. A separately accepted `levixel-uniapp-legacy-<version>.zip` is only for existing App native-plugin projects and offline packaging; it is not the UTS Marketplace package or the default path for new projects.
+
 ## Development And Releases
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for local builds, artifact checks, and SDK prerequisites. See [RELEASING.md](RELEASING.md) for immutable artifact and publication rules.
