@@ -4,7 +4,7 @@
 
 Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
 
-This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores and the React Native and UniApp adapters are maintained here. Every release version maps to one verified, immutable artifact set.
+This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores, the React Native and UniApp adapters, and the Web source candidate are maintained here. Every release version maps to one verified, immutable artifact set.
 
 ## Published Packages
 
@@ -16,12 +16,14 @@ This repository is the canonical source, public contract, packaging toolkit, and
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
 | UniApp | [UTS Marketplace plugin](https://ext.dcloud.net.cn/plugin?id=29394) / [App native-plugin ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
 
+The Web runtime is undergoing pre-release interaction validation under `adapters/web`. It has not been published and is therefore not part of the 1.1.1 product table above.
+
 ## Source Layout
 
 ```text
 levixel/
 ├── native/          # Android, iOS, and HarmonyOS native cores
-├── adapters/        # Thin React Native and UniApp bridges
+├── adapters/        # React Native and UniApp adapters, plus the Web source candidate
 ├── uni_modules/     # DCloud Marketplace UTS plugin source
 ├── contract/        # Cross-platform public contract
 ├── packaging/       # Platform artifact templates

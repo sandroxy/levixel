@@ -28,6 +28,13 @@ The imported iOS source also carried the ImageViewer.swift MIT notice. Product
 renaming, cross-platform ports, new behavior, and extensive later refactors do
 not erase that direct source lineage.
 
+The framework-independent runtime under `adapters/web` is implemented against
+Levixel's canonical contract and the accepted current native behavior. Earlier
+H5 exploration was consulted only as a technical reference; it is neither a
+source dependency nor the product authority, and its experimental UI is not
+part of the Web runtime. This does not change the repository-wide derivative
+classification or the notice policy above.
+
 ## Release Policy
 
 - Keep Levixel as the only product and runtime name.

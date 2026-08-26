@@ -70,6 +70,23 @@ DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
 
 The legacy ZIP is a compatibility artifact, not a second UniApp implementation. It may be attached to a GitHub Release only after that exact ZIP has passed Android and iOS artifact-only smoke tests. The package must not embed or redistribute the DCloud Android/iOS SDK used to compile the bridge.
 
+## Web candidate
+
+The framework-independent browser runtime is developed under `adapters/web`. It preserves the canonical JavaScript fields and event JSON but owns only browser-specific DOM geometry, media elements, input handling, accessibility, and lifecycle restoration. The accepted Android/iOS/UniApp implementations remain the product authority; the earlier H5 proof of concept is not a source dependency.
+
+Install its locked development tooling, run the real-browser demo, and execute all checks with:
+
+```sh
+cd adapters/web
+npm ci
+npm run dev
+npm run verify
+```
+
+The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates legal-file bytes and performs an npm pack dry run.
+
+Until browser hand verification is accepted, the package must remain private at `0.0.0-development`, must not appear as a released target in `plugin.yaml`, and must not be described as a current public product. This guard separates source work from the immutable release-candidate flow.
+
 ## Release Metadata
 
 Validate versions, target declarations, notices, privacy metadata, and runtime identifiers:

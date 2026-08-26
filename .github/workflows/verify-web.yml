@@ -1,0 +1,43 @@
+name: Verify Web
+
+on:
+  pull_request:
+    paths:
+      - 'adapters/web/**'
+      - 'contract/**'
+      - 'scripts/verify-web.sh'
+      - '.github/workflows/verify-web.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'adapters/web/**'
+      - 'contract/**'
+      - 'scripts/verify-web.sh'
+      - '.github/workflows/verify-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: adapters/web/package-lock.json
+
+      - name: Install locked Web tooling
+        working-directory: adapters/web
+        run: npm ci
+
+      - name: Verify Web source candidate
+        run: ./scripts/verify-web.sh

@@ -1,0 +1,161 @@
+:root {
+  color: #17385f;
+  background: #f8fafc;
+  font-family: Georgia, "Times New Roman", serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% -10%, rgb(29 78 126 / 12%), transparent 32rem),
+    #f8fafc;
+}
+
+main {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 56px 0 96px;
+}
+
+header {
+  max-width: 760px;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #5d708a;
+  font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.14em;
+}
+
+h1 {
+  margin: 0;
+  color: #17385f;
+  font-size: clamp(36px, 7vw, 68px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.lede {
+  max-width: 680px;
+  margin: 20px 0 0;
+  color: #52647c;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.status {
+  display: inline-flex;
+  margin-top: 20px;
+  padding: 8px 12px;
+  color: #17385f;
+  background: #edf3fa;
+  border: 1px solid #d3dfed;
+  border-radius: 999px;
+  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #fff;
+  background: #d9e1eb;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgb(20 50 84 / 10%);
+  cursor: zoom-in;
+  appearance: none;
+}
+
+.card:nth-child(4n + 1),
+.card:nth-child(4n + 4) {
+  aspect-ratio: 2 / 3;
+}
+
+.card:nth-child(4n + 2),
+.card:nth-child(4n + 3) {
+  aspect-ratio: 3 / 2;
+}
+
+.card:focus-visible {
+  outline: 3px solid #2a6fb0;
+  outline-offset: 4px;
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms ease;
+}
+
+.card:hover img {
+  transform: scale(1.015);
+}
+
+.label {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  overflow: hidden;
+  color: #fff;
+  background: rgb(6 20 37 / 72%);
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.video-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 6px 9px;
+  color: #fff;
+  background: rgb(6 20 37 / 72%);
+  border-radius: 8px;
+  font: 700 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(8px);
+}
+
+@media (min-width: 760px) {
+  .gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card:nth-child(6n + 1),
+  .card:nth-child(6n + 5) {
+    aspect-ratio: 2 / 3;
+  }
+
+  .card:nth-child(6n + 2),
+  .card:nth-child(6n + 3),
+  .card:nth-child(6n + 4),
+  .card:nth-child(6n + 6) {
+    aspect-ratio: 3 / 2;
+  }
+}

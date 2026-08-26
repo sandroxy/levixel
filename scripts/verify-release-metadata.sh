@@ -9,6 +9,14 @@ harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fe
 uniapp_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json")"
 harmony_app_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("app").fetch("versionName")' "${plugin_dir}/native/harmonyos/AppScope/app.json5")"
 
+node -e '
+  const packageJson = require(process.argv[1])
+  if (packageJson.name !== "@sandrox/levixel-web")
+    throw new Error(`Unexpected Web package name: ${packageJson.name}`)
+  if (packageJson.version !== "0.0.0-development" || packageJson.private !== true)
+    throw new Error("Unaccepted Web source must remain private at 0.0.0-development")
+' "${plugin_dir}/adapters/web/package.json"
+
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
@@ -104,6 +112,10 @@ cmp "${plugin_dir}/LICENSE" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/license.md"
 cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/THIRD_PARTY_NOTICES.md"
+cmp "${plugin_dir}/LICENSE" \
+  "${plugin_dir}/adapters/web/LICENSE"
+cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
+  "${plugin_dir}/adapters/web/THIRD_PARTY_NOTICES.md"
 
 expected_harmony_license="$(mktemp)"
 trap 'rm -f "${expected_harmony_license}"' EXIT
@@ -135,6 +147,7 @@ if rg -n -i 'galeria|nandorojo|com\.chris' \
   "${plugin_dir}/adapters/uniapp/ios/LevixelUniApp" \
   "${plugin_dir}/adapters/uniapp/ios/LevixelUniRuntime" \
   "${plugin_dir}/adapters/uniapp/js_sdk/index.js" \
+  "${plugin_dir}/adapters/web/src" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/utssdk" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk"; then
   echo "Legacy Galeria identifiers remain in runtime source." >&2

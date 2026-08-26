@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Levixel browser fixture</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body { margin: 0; min-height: 1600px; font-family: sans-serif; }
+      #sources { display: grid; grid-template-columns: 160px 220px; gap: 20px; padding: 40px; }
+      button { height: 180px; padding: 0; overflow: hidden; border: 0; border-radius: 12px; }
+      img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="sources"></div>
+    <script type="module">
+      import {
+        closeLevixel,
+        onLevixelEvent,
+        openLevixel,
+        openLevixelFromSelector,
+      } from '../dist/index.js';
+
+      const svg = (width, height, color, label) =>
+        `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${color}"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="48">${label}</text></svg>`)}`;
+      const items = [
+        { id: 'portrait', type: 'image', url: svg(1200, 1800, '#496d89', 'FULL A'), thumbnailUrl: svg(240, 360, '#496d89', 'A'), width: 1200, height: 1800, alt: 'Portrait' },
+        { id: 'wide', type: 'image', url: svg(2400, 1600, '#9b624c', 'FULL B'), thumbnailUrl: svg(600, 400, '#9b624c', 'B'), width: 2400, height: 1600, alt: 'Wide Coast' },
+        { id: 'video', type: 'video', url: 'data:video/mp4;base64,', posterUrl: svg(800, 450, '#465272', 'VIDEO'), width: 16, height: 9, alt: 'Video' },
+      ];
+      const sources = document.querySelector('#sources');
+      const events = [];
+      const results = [];
+      onLevixelEvent(event => events.push(event));
+      const open = async (index) => {
+        const result = await openLevixelFromSelector({
+          items,
+          index,
+          sourceSelector: '.source',
+          sourceStyles: items.map(() => ({ objectFit: 'cover', cornerRadius: 12 })),
+        });
+        results.push(result);
+        return result;
+      };
+      items.forEach((item, index) => {
+        const button = document.createElement('button');
+        button.className = 'source';
+        button.dataset.index = String(index);
+        const image = document.createElement('img');
+        image.src = item.thumbnailUrl;
+        image.alt = item.alt;
+        button.append(image);
+        button.addEventListener('click', () => void open(index));
+        sources.append(button);
+      });
+      window.levixelFixture = { events, results, closeLevixel, openLevixel, open, items };
+    </script>
+  </body>
+</html>

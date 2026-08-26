@@ -16,12 +16,14 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
 | UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
 
+Web 运行时正在 `adapters/web` 中进行发布前手感验证，尚未作为公开制品发布，因此不列入上表的 1.1.1 产品集合。
+
 ## 源码结构
 
 ```text
 levixel/
 ├── native/          # Android、iOS、HarmonyOS 原生核心
-├── adapters/        # React Native 与 UniApp 薄桥接层
+├── adapters/        # React Native、UniApp 适配层与 Web 候选运行时
 ├── uni_modules/     # DCloud 市场 UTS 插件源目录
 ├── contract/        # 跨平台公共契约
 ├── packaging/       # 平台制品模板

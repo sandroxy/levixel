@@ -220,6 +220,19 @@ The separately generated `levixel-uniapp-legacy-<version>.zip` remains available
 
 The legacy compatibility ZIP may be attached to the same GitHub Release only after that exact archive passes Android and iOS offline-consumer smoke tests. Upload its existing sidecar alongside it, then rerun `Verify UniApp Release Assets` with `include_legacy` enabled and the independently recorded legacy SHA-256. Label it as an existing-project/offline-packaging compatibility artifact; do not present it as a Marketplace package, a uni-app x package, or the recommended path for new projects. The ZIP must not redistribute the DCloud SDK used to build its bridge.
 
+## Web candidate gate
+
+Web source remains `private: true` at `0.0.0-development` while interaction acceptance is in progress. This state is intentionally absent from `plugin.yaml` and the public product table.
+
+After desktop/mobile browser hand verification is accepted, promote Web through the normal coordinated release rather than publishing an ad-hoc package:
+
+1. Choose the next canonical Levixel version and update the repository version metadata once.
+2. Remove the private development guard, set the Web package to that canonical version, and add the Web target, packaging script, immutable artifact path, and release verification.
+3. Pack once, install that exact tarball in artifact-only browser consumers, and complete the declared Chrome/Safari desktop/mobile matrix.
+4. Publish and mirror only the accepted tarball and checksum under the shared canonical tag.
+
+Do not label the development tarball as `1.1.1`, because Web was not part of the already published 1.1.1 product set.
+
 ## Provenance
 
 `THIRD_PARTY_NOTICES.md` is mandatory release content. Levixel branding does not require Galeria names in runtime APIs, but the MIT notices remain attached to every artifact that carries derivative code. See [PROVENANCE.md](PROVENANCE.md) for the audited lineage and classification.
