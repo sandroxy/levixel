@@ -399,6 +399,8 @@ try {
   assert.deepEqual(reducedMotionState, { hostState: 'true', transitionDuration: '0s' });
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+  await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   assert.deepEqual(pageErrors, []);
 }
 finally {
@@ -408,6 +410,117 @@ finally {
 }
 
 console.log('Levixel Web browser interaction checks passed.');
+
+async function verifySingleTouchReopen(targetBrowser, fixtureURL) {
+  const touchPage = await targetBrowser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const errors = [];
+  touchPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await touchPage.goto(fixtureURL);
+    await touchPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+
+    const firstSource = await centerOf(touchPage, '.source[data-index="0"]');
+    await dragTouch(touchPage, firstSource, { x: firstSource.x + 40, y: firstSource.y });
+    await touchPage.waitForTimeout(80);
+    assert.equal(
+      await touchPage.evaluate(() => window.levixelFixture.results.length),
+      0,
+      'moving beyond the touch activation tolerance must not open a source',
+    );
+
+    await tapCenter(touchPage, '.source[data-index="0"]');
+    await touchPage.waitForFunction(() => window.levixelFixture.results.length === 1);
+
+    await dragTouch(touchPage, { x: 195, y: 350 }, { x: 195, y: 650 });
+    await touchPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+    await tapCenter(touchPage, '.source[data-index="1"]');
+    await touchPage.waitForFunction(() => window.levixelFixture.results.length === 2);
+    await touchPage.waitForTimeout(80);
+    assert.equal(
+      await touchPage.evaluate(() => window.levixelFixture.results.length),
+      2,
+      'the compatibility click following direct touch activation must be deduplicated',
+    );
+    assert.equal(await touchPage.locator('[data-levixel-web-root]').count(), 1);
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await touchPage.close();
+  }
+}
+
+async function verifyKeyboardFocusRestore(targetBrowser, fixtureURL) {
+  const keyboardPage = await targetBrowser.newPage({ viewport: { width: 390, height: 844 } });
+  const errors = [];
+  keyboardPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await keyboardPage.goto(fixtureURL);
+    await keyboardPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+    await keyboardPage.keyboard.press('Tab');
+    const initialFocus = await keyboardPage.evaluate(() => ({
+      focusVisible: document.activeElement?.matches(':focus-visible') === true,
+      index: document.activeElement?.getAttribute('data-index'),
+    }));
+    assert.deepEqual(initialFocus, { focusVisible: true, index: '0' });
+
+    await keyboardPage.keyboard.press('Enter');
+    await keyboardPage.waitForFunction(() => window.levixelFixture.results.length === 1);
+    await keyboardPage.keyboard.press('Escape');
+    await keyboardPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+    assert.equal(
+      await keyboardPage.evaluate(() => document.activeElement?.getAttribute('data-index')),
+      '0',
+      'keyboard dismissal must restore focus to the invoking source',
+    );
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await keyboardPage.close();
+  }
+}
+
+async function tapCenter(targetPage, selector) {
+  const point = await centerOf(targetPage, selector);
+  await targetPage.touchscreen.tap(point.x, point.y);
+}
+
+async function centerOf(targetPage, selector) {
+  const source = targetPage.locator(selector);
+  await source.scrollIntoViewIfNeeded();
+  const box = await source.boundingBox();
+  assert.ok(box, `touch target must have geometry: ${selector}`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+async function dragTouch(targetPage, from, to) {
+  const session = await targetPage.context().newCDPSession(targetPage);
+  const touchPoint = (x, y) => ({ x, y, id: 1, radiusX: 1, radiusY: 1, force: 1 });
+  try {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [touchPoint(from.x, from.y)],
+    });
+    for (let step = 1; step <= 8; step += 1) {
+      const progress = step / 8;
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [touchPoint(
+          from.x + (to.x - from.x) * progress,
+          from.y + (to.y - from.y) * progress,
+        )],
+      });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  finally {
+    await session.detach();
+  }
+}
 
 async function inspect(targetPage) {
   return await targetPage.evaluate(() => {

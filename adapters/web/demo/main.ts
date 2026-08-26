@@ -1,5 +1,6 @@
 import {
   onLevixelEvent,
+  onLevixelSourceActivate,
   openLevixelFromSelector,
   warmupLevixelItem,
   type LevixelMediaItem,
@@ -55,7 +56,7 @@ items.forEach((item, index) => {
     badge.textContent = '▶ VIDEO';
     card.append(badge);
   }
-  card.addEventListener('click', async () => {
+  const openCard = async (): Promise<void> => {
     status.textContent = `Opening ${item.alt ?? item.id}…`;
     try {
       const result = await openLevixelFromSelector({
@@ -69,7 +70,8 @@ items.forEach((item, index) => {
     catch (error) {
       status.textContent = error instanceof Error ? error.message : 'Unable to open Levixel';
     }
-  });
+  };
+  onLevixelSourceActivate(card, () => { void openCard(); });
   gallery.append(card);
 });
 

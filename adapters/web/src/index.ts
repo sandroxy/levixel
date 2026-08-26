@@ -14,6 +14,7 @@ import {
   rememberImage,
   transitionURL,
 } from './media-cache.js';
+import { onLevixelSourceActivate } from './source-activation.js';
 import { LevixelWebViewer } from './viewer.js';
 import type {
   ImageInfo,
@@ -49,6 +50,10 @@ export type {
   LevixelTheme,
 } from './types.js';
 export { LevixelContractError } from './contract.js';
+export {
+  onLevixelSourceActivate,
+  type LevixelSourceActivationListener,
+} from './source-activation.js';
 
 const eventListeners = new Set<(event: LevixelEvent) => void>();
 let eventChannelStarted = false;
@@ -283,6 +288,7 @@ const levixel = {
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,
   openFromSelector: openLevixelFromSelector,
+  onSourceActivate: onLevixelSourceActivate,
 };
 
 export default levixel;

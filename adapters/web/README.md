@@ -38,6 +38,7 @@ The Web package preserves the canonical Levixel JavaScript protocol:
 import {
   closeLevixel,
   onLevixelEvent,
+  onLevixelSourceActivate,
   openLevixel,
   openLevixelFromSelector,
   prepareLevixelItem,
@@ -60,13 +61,22 @@ const items = [
   },
 ];
 
-await openLevixelFromSelector({
-  items,
-  index: 0,
-  sourceSelector: '.gallery-source',
-  sourceStyles: [{ objectFit: 'cover', cornerRadius: 12 }],
-});
+const sourceStyles = items.map(() => ({ objectFit: 'cover', cornerRadius: 12 }));
+const disposers = [...document.querySelectorAll<HTMLElement>('.gallery-source')].map(
+  (source, index) => onLevixelSourceActivate(source, () => {
+    void openLevixelFromSelector({
+      items,
+      index,
+      sourceSelector: '.gallery-source',
+      sourceStyles,
+    });
+  }),
+);
+
+const disposeGalleryActivation = () => disposers.forEach(dispose => dispose());
 ```
+
+`onLevixelSourceActivate` preserves native click activation for mouse, keyboard, and assistive input. On touch devices it recognizes a primary, movement-bounded tap from Pointer Events, so a source remains immediately responsive after vertical drag dismissal even when the browser suppresses the follow-up compatibility `click`. Scrolling or a cancelled pointer does not activate the source.
 
 If the selector is omitted, does not match exactly one element per item, or the selected source has no usable geometry, Levixel opens with its native-style fade/loading fallback rather than guessing the wrong source rectangle.
 

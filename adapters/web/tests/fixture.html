@@ -18,6 +18,7 @@
       import {
         closeLevixel,
         onLevixelEvent,
+        onLevixelSourceActivate,
         openLevixel,
         openLevixelFromSelector,
       } from '../dist/index.js';
@@ -51,7 +52,7 @@
         image.src = item.thumbnailUrl;
         image.alt = item.alt;
         button.append(image);
-        button.addEventListener('click', () => void open(index));
+        onLevixelSourceActivate(button, () => void open(index));
         sources.append(button);
       });
       window.levixelFixture = { events, results, closeLevixel, openLevixel, open, items };
