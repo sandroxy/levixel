@@ -98,7 +98,7 @@ verify_safe_zip() {
     end
   ' "${listing_path}"
 
-  if rg -q '(^|/)(__MACOSX|\.DS_Store)(/|$)' "${listing_path}"; then
+  if grep -Eq '(^|/)(__MACOSX|\.DS_Store)(/|$)' "${listing_path}"; then
     echo "Release ZIP contains macOS metadata: ${archive_path}" >&2
     exit 1
   fi
@@ -177,12 +177,15 @@ verify_android_runtime() {
 
   unzip -p "${runtime_aar}" classes.jar > "${classes_jar}"
   jar tf "${classes_jar}" > "${classes_listing}"
-  if ! rg -q '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${classes_listing}"; then
+  if ! grep -q '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${classes_listing}"; then
     echo "Android shared runtime facade is missing." >&2
     exit 1
   fi
-  if rg -q '^io/dcloud/.+\.class$|^com/sandrox/levixel/(?!uniapp/runtime/).+\.class$' \
-    "${classes_listing}" --pcre2; then
+  if awk '
+    /^io\/dcloud\/.+\.class$/ { found = 1 }
+    /^com\/sandrox\/levixel\/.+\.class$/ && $0 !~ /^com\/sandrox\/levixel\/uniapp\/runtime\// { found = 1 }
+    END { exit(found ? 0 : 1) }
+  ' "${classes_listing}"; then
     echo "Android shared runtime contains DCloud or copied core classes." >&2
     exit 1
   fi
@@ -200,13 +203,13 @@ verify_uts() {
   fi
   verify_checksum_sidecar "${uts_artifact}" "${uts_checksum}" "${uts_accepted_sha256}" "${artifact_name}"
   verify_safe_zip "${uts_artifact}" "${listing_path}"
-  if ! rg -q '^package\.json$' "${listing_path}" \
-    || ! rg -q '^utssdk/' "${listing_path}" \
-    || rg -q '^Sandrox-Levixel/' "${listing_path}"; then
+  if ! grep -q '^package\.json$' "${listing_path}" \
+    || ! grep -q '^utssdk/' "${listing_path}" \
+    || grep -q '^Sandrox-Levixel/' "${listing_path}"; then
     echo "UTS ZIP must expose package.json and utssdk directly at its root." >&2
     exit 1
   fi
-  if rg -qi '(^|/)(nativeplugins|uniapp-v8-release|DCUni\.framework|DCloud[^/]*\.framework|libWeex)(/|$)' "${listing_path}"; then
+  if grep -Eiq '(^|/)(nativeplugins|uniapp-v8-release|DCUni\.framework|DCloud[^/]*\.framework|libWeex)(/|$)' "${listing_path}"; then
     echo "UTS ZIP contains an unexpected legacy or DCloud SDK payload." >&2
     exit 1
   fi
@@ -282,13 +285,13 @@ verify_uts() {
   diff -qr "${accepted_ios_framework}" "${package_root}/utssdk/app-ios/Frameworks/Levixel.framework"
 
   local runtime_binary="${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/LevixelUniRuntime"
-  if ! file "${runtime_binary}" | rg -q 'current ar archive'; then
+  if ! file "${runtime_binary}" | grep -qF 'current ar archive'; then
     echo "UTS iOS runtime must be a static framework." >&2
     exit 1
   fi
-  if ! rg -q 'openWithJSON:.*rootView:.*viewController:.*completion:' \
+  if ! grep -Eq 'openWithJSON:.*rootView:.*viewController:.*completion:' \
     "${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/Headers/LevixelUniRuntime-Swift.h" \
-    || ! rg -q 'setJSONEventHandler:' \
+    || ! grep -q 'setJSONEventHandler:' \
     "${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/Headers/LevixelUniRuntime-Swift.h"; then
     echo "UTS iOS runtime entry points are incomplete." >&2
     exit 1
@@ -314,11 +317,11 @@ verify_legacy() {
   fi
   verify_checksum_sidecar "${legacy_artifact}" "${legacy_checksum}" "${legacy_accepted_sha256}" "${artifact_name}"
   verify_safe_zip "${legacy_artifact}" "${listing_path}"
-  if rg -q -v '^Sandrox-Levixel(/|$)' "${listing_path}"; then
+  if grep -Evq '^Sandrox-Levixel(/|$)' "${listing_path}"; then
     echo "Legacy ZIP must contain only the Sandrox-Levixel plugin root." >&2
     exit 1
   fi
-  if rg -qi '(^|/)(uniapp-v8-release|DCUni\.framework|DCloud[^/]*\.framework|libWeex)(/|$)' "${listing_path}"; then
+  if grep -Eiq '(^|/)(uniapp-v8-release|DCUni\.framework|DCloud[^/]*\.framework|libWeex)(/|$)' "${listing_path}"; then
     echo "Legacy ZIP must not redistribute the DCloud SDK." >&2
     exit 1
   fi
@@ -369,8 +372,8 @@ verify_legacy() {
 
   unzip -p "${package_root}/android/LevixelUniApp-release.aar" classes.jar > "${work_dir}/legacy-bridge-classes.jar"
   jar tf "${work_dir}/legacy-bridge-classes.jar" > "${work_dir}/legacy-bridge-classes.txt"
-  if ! rg -q '^com/sandrox/levixel/uniapp/LevixelUniModule.class$' "${work_dir}/legacy-bridge-classes.txt" \
-    || rg -q '^io/dcloud/.+\.class$|^com/sandrox/levixel/uniapp/runtime/.+\.class$' "${work_dir}/legacy-bridge-classes.txt"; then
+  if ! grep -q '^com/sandrox/levixel/uniapp/LevixelUniModule.class$' "${work_dir}/legacy-bridge-classes.txt" \
+    || grep -Eq '^io/dcloud/.+\.class$|^com/sandrox/levixel/uniapp/runtime/.+\.class$' "${work_dir}/legacy-bridge-classes.txt"; then
     echo "Legacy Android bridge classes are incomplete or contain copied dependencies." >&2
     exit 1
   fi
@@ -382,8 +385,8 @@ verify_legacy() {
   cmp "${android_artifact}" "${package_root}/android/Levixel-${version}.aar"
   diff -qr "${accepted_ios_framework}" "${package_root}/ios/Levixel.framework"
 
-  if ! file "${package_root}/ios/LevixelUniApp.framework/LevixelUniApp" | rg -q 'current ar archive' \
-    || ! file "${package_root}/ios/LevixelUniRuntime.framework/LevixelUniRuntime" | rg -q 'current ar archive'; then
+  if ! file "${package_root}/ios/LevixelUniApp.framework/LevixelUniApp" | grep -qF 'current ar archive' \
+    || ! file "${package_root}/ios/LevixelUniRuntime.framework/LevixelUniRuntime" | grep -qF 'current ar archive'; then
     echo "Legacy iOS bridge and runtime must be static frameworks." >&2
     exit 1
   fi
