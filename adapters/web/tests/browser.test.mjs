@@ -61,6 +61,15 @@ page.on('pageerror', error => pageErrors.push(error.message));
 try {
   await page.goto(`http://127.0.0.1:${address.port}/tests/fixture.html`);
   await page.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+  const sourceRects = await page.locator('.source').evaluateAll(elements => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }));
+  assert.equal(
+    sourceRects.every(rect => Math.abs(rect.width - rect.height) < 0.01),
+    true,
+    'browser coverage must exercise uniformly cropped square thumbnails',
+  );
 
   const openingHandoff = await page.evaluate(async () => {
     const samples = [];

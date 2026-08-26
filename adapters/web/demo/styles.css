@@ -73,6 +73,7 @@ h1 {
 .card {
   position: relative;
   min-width: 0;
+  aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
   color: #fff;
@@ -82,16 +83,6 @@ h1 {
   box-shadow: 0 8px 28px rgb(20 50 84 / 10%);
   cursor: zoom-in;
   appearance: none;
-}
-
-.card:nth-child(4n + 1),
-.card:nth-child(4n + 4) {
-  aspect-ratio: 2 / 3;
-}
-
-.card:nth-child(4n + 2),
-.card:nth-child(4n + 3) {
-  aspect-ratio: 3 / 2;
 }
 
 .card:focus-visible {
@@ -145,17 +136,5 @@ h1 {
 @media (min-width: 760px) {
   .gallery {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .card:nth-child(6n + 1),
-  .card:nth-child(6n + 5) {
-    aspect-ratio: 2 / 3;
-  }
-
-  .card:nth-child(6n + 2),
-  .card:nth-child(6n + 3),
-  .card:nth-child(6n + 4),
-  .card:nth-child(6n + 6) {
-    aspect-ratio: 3 / 2;
   }
 }
