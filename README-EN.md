@@ -118,13 +118,13 @@ The Swift Package references a checksum-pinned XCFramework. Xcode verifies the d
 
 ## HarmonyOS
 
-Install after OHPM approval:
+Install from OHPM:
 
 ```sh
 ohpm install @sandrox/levixel@1.1.1
 ```
 
-OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.1.1.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the approved OHPM artifact.
+OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.1.1.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the published OHPM artifact.
 
 ## React Native / Expo
 

@@ -118,7 +118,7 @@ Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容
 
 ## HarmonyOS
 
-OHPM 审核通过后安装：
+通过 OHPM 安装：
 
 ```sh
 ohpm install @sandrox/levixel@1.1.1

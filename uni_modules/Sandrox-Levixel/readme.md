@@ -10,7 +10,7 @@ Levixel 为经典 uni-app 的 App 端提供原生图片/视频查看体验，包
 - iOS 13.0 及以上，arm64 真机。
 - 不支持 nvue、Web、小程序、HarmonyOS 或 uni-app x。
 
-高层共享转场依赖 `uni.createSelectorQuery()` 测量 WebView DOM 节点。uni-app x 没有这套 DOM source selector 协议，因此本版没有虚假声明支持；未来若支持，应增加独立的原生节点几何协议。
+1.1.1 尚未完成 uni-app x 下的 SDK 编译、文件路径、坐标换算和双端真机验证，因此不声明支持。
 
 插件携带原生 AAR/framework。调试和打包时请使用包含本插件的自定义调试基座、云打包或离线打包；普通基座不包含这些原生制品。
 

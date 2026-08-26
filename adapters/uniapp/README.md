@@ -24,7 +24,7 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-第一版只支持经典 uni-app Vue 2 / Vue 3 的 Android/iOS App Vue 页面。高层共享转场依赖 WebView DOM selector，因此不声明 nvue 或 uni-app x 支持。
+1.1.1 只支持经典 uni-app Vue 2 / Vue 3 的 Android/iOS App Vue 页面。1.1.1 尚未完成 uni-app x 下的 SDK 编译、文件路径、坐标换算和双端真机验证，因此不声明支持；nvue 也不在本版支持范围内。
 
 每个渲染源元素必须与 `items` 使用相同的选择器和顺序。为获得确定的共享转场，应先准备每个媒体项，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。批量准备应限制并发；示例宿主使用三个 worker，并传入 `priority: true`。
 

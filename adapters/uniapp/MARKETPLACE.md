@@ -30,7 +30,7 @@
 - iOS：13.0 及以上，仅 arm64 真机
 - 不支持：nvue、Web、小程序、HarmonyOS、uni-app x
 
-不声明 uni-app x 的原因：高层共享转场依赖 WebView DOM selector 获取源节点几何；uni-app x 需要另一套原生节点几何协议。
+1.1.1 尚未完成 uni-app x 下的 SDK 编译、文件路径、坐标换算和双端真机验证，因此不声明支持。
 
 ## 隐私与权限
 
