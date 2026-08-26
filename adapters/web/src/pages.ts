@@ -12,6 +12,7 @@ import {
   type ZoomedViewportState,
 } from './geometry.js';
 import { loadImage, transitionURL } from './media-cache.js';
+import { commitOnNextRenderingUpdate, waitForDecodedImage } from './render-readiness.js';
 import type { ImageInfo, LevixelMediaItem, LevixelSize } from './types.js';
 
 export interface ViewerPageDelegate {
@@ -154,7 +155,9 @@ abstract class BasePage implements ViewerPage {
 }
 
 export class ImagePage extends BasePage {
-  private readonly image: HTMLImageElement;
+  private image: HTMLImageElement;
+  private incomingImage: HTMLImageElement | undefined;
+  private handoffController: AbortController | undefined;
   private imageInfo?: ImageInfo;
   private layout?: ImageLayout;
   private zoom = 1;
@@ -170,11 +173,7 @@ export class ImagePage extends BasePage {
     initialPreview?: ImageInfo,
   ) {
     super(index, item, delegate);
-    this.image = document.createElement('img');
-    this.image.className = 'image';
-    this.image.alt = item.alt ?? '';
-    this.image.draggable = false;
-    this.image.decoding = 'async';
+    this.image = this.createImage(false);
     this.mediaShell.append(this.image);
     if (initialPreview)
       this.applyImage(initialPreview, false);
@@ -204,7 +203,7 @@ export class ImagePage extends BasePage {
         return;
       this.fullImageReady = true;
       this.clearLoading();
-      this.applyImage(info, true);
+      void this.handoffToImage(info, generation);
     }, () => {
       if (this.loadGeneration !== generation)
         return;
@@ -317,24 +316,80 @@ export class ImagePage extends BasePage {
 
   override destroy(): void {
     super.destroy();
+    this.cancelImageHandoff();
     this.clearLoading();
+  }
+
+  private createImage(incoming: boolean): HTMLImageElement {
+    const image = document.createElement('img');
+    image.className = 'image';
+    image.alt = incoming ? '' : (this.item.alt ?? '');
+    image.draggable = false;
+    image.decoding = 'async';
+    image.dataset.levixelImageLayer = incoming ? 'incoming' : 'current';
+    if (incoming)
+      image.setAttribute('aria-hidden', 'true');
+    return image;
   }
 
   private applyImage(info: ImageInfo, preserveViewport: boolean): void {
     const state = preserveViewport ? this.captureViewportState() : null;
     this.imageInfo = info;
-    this.image.src = info.src;
+    if ((this.image.currentSrc || this.image.src) !== info.src)
+      this.image.src = info.src;
     this.relayout(state);
+  }
+
+  private async handoffToImage(info: ImageInfo, generation: number): Promise<void> {
+    if (this.loadGeneration !== generation)
+      return;
+    const currentSource = this.image.currentSrc || this.image.src;
+    if (!currentSource || currentSource === info.src) {
+      this.applyImage(info, true);
+      return;
+    }
+
+    this.cancelImageHandoff();
+    const controller = new AbortController();
+    const incoming = this.createImage(true);
+    this.handoffController = controller;
+    this.incomingImage = incoming;
+    this.mediaShell.insertBefore(incoming, this.image);
+    this.syncImageLayers(false);
+    incoming.src = info.src;
+
+    const decoded = await waitForDecodedImage(incoming, controller.signal);
+    if (!decoded || controller.signal.aborted || this.loadGeneration !== generation) {
+      this.discardIncomingImage(incoming, controller);
+      return;
+    }
+
+    const committed = await commitOnNextRenderingUpdate(() => {
+      if (controller.signal.aborted
+        || this.loadGeneration !== generation
+        || this.incomingImage !== incoming) {
+        return;
+      }
+      const state = this.captureViewportState();
+      const previous = this.image;
+      this.image = incoming;
+      this.incomingImage = undefined;
+      this.handoffController = undefined;
+      incoming.dataset.levixelImageLayer = 'current';
+      incoming.alt = this.item.alt ?? '';
+      incoming.removeAttribute('aria-hidden');
+      this.imageInfo = info;
+      this.relayout(state);
+      previous.remove();
+    }, controller.signal);
+    if (!committed)
+      this.discardIncomingImage(incoming, controller);
   }
 
   private relayout(state: ZoomedViewportState | null): void {
     if (!this.imageInfo || this.viewport.width <= 0 || this.viewport.height <= 0)
       return;
     this.layout = imageLayout(this.imageInfo, this.viewport);
-    this.image.style.left = `${(this.viewport.width - this.layout.width) / 2}px`;
-    this.image.style.top = `${(this.viewport.height - this.layout.height) / 2}px`;
-    this.image.style.width = `${this.layout.width}px`;
-    this.image.style.height = `${this.layout.height}px`;
     if (state) {
       const restored = restoreZoomedViewport(state, this.layout, this.viewport);
       this.zoom = restored.zoom;
@@ -344,7 +399,7 @@ export class ImagePage extends BasePage {
       this.zoom = 1;
       this.pan = { x: 0, y: 0 };
     }
-    this.applyTransform(false);
+    this.syncImageLayers(false);
   }
 
   private captureViewportState(): ZoomedViewportState | null {
@@ -354,10 +409,55 @@ export class ImagePage extends BasePage {
   }
 
   private applyTransform(animated: boolean): void {
-    this.image.style.transition = animated
+    const transition = animated
       ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)'
       : 'none';
-    this.image.style.transform = `translate3d(${this.pan.x}px, ${this.pan.y}px, 0) scale(${this.zoom})`;
+    const transform = `translate3d(${this.pan.x}px, ${this.pan.y}px, 0) scale(${this.zoom})`;
+    for (const image of this.imageLayers()) {
+      image.style.transition = transition;
+      image.style.transform = transform;
+    }
+  }
+
+  private syncImageLayers(animated: boolean): void {
+    if (!this.layout)
+      return;
+    const left = `${(this.viewport.width - this.layout.width) / 2}px`;
+    const top = `${(this.viewport.height - this.layout.height) / 2}px`;
+    const width = `${this.layout.width}px`;
+    const height = `${this.layout.height}px`;
+    for (const image of this.imageLayers()) {
+      image.style.left = left;
+      image.style.top = top;
+      image.style.width = width;
+      image.style.height = height;
+    }
+    this.applyTransform(animated);
+  }
+
+  private imageLayers(): HTMLImageElement[] {
+    return this.incomingImage ? [this.image, this.incomingImage] : [this.image];
+  }
+
+  private cancelImageHandoff(): void {
+    const incoming = this.incomingImage;
+    const controller = this.handoffController;
+    this.incomingImage = undefined;
+    this.handoffController = undefined;
+    controller?.abort();
+    incoming?.remove();
+  }
+
+  private discardIncomingImage(
+    incoming: HTMLImageElement,
+    controller: AbortController,
+  ): void {
+    if (this.incomingImage === incoming)
+      this.incomingImage = undefined;
+    if (this.handoffController === controller)
+      this.handoffController = undefined;
+    controller.abort();
+    incoming.remove();
   }
 
   private clearLoading(): void {

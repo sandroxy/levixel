@@ -21,8 +21,13 @@ if (!executablePath)
 
 const server = createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://127.0.0.1').pathname);
-  if (pathname === '/tests/delayed.svg' || pathname === '/tests/delayed-full.svg') {
+  if (
+    pathname === '/tests/delayed.svg'
+    || pathname === '/tests/delayed-full.svg'
+    || pathname === '/tests/racing-full.svg'
+  ) {
     const isFullImage = pathname.endsWith('delayed-full.svg');
+    const isRacingFullImage = pathname.endsWith('racing-full.svg');
     setTimeout(() => {
       response.writeHead(200, {
         'Content-Type': 'image/svg+xml; charset=utf-8',
@@ -30,8 +35,10 @@ const server = createServer((request, response) => {
       });
       response.end(isFullImage
         ? '<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600"><rect width="2400" height="1600" fill="#678"/></svg>'
-        : '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#345"/></svg>');
-    }, isFullImage ? 900 : 250);
+        : (isRacingFullImage
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1800"><rect width="1200" height="1800" fill="#567"/></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#345"/></svg>'));
+    }, isRacingFullImage ? 40 : (isFullImage ? 900 : 250));
     return;
   }
   const relative = pathname === '/' ? 'tests/fixture.html' : pathname.replace(/^\/+/, '');
@@ -400,6 +407,7 @@ try {
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   assert.deepEqual(pageErrors, []);
 }
@@ -447,10 +455,191 @@ async function verifySingleTouchReopen(targetBrowser, fixtureURL) {
       'the compatibility click following direct touch activation must be deduplicated',
     );
     assert.equal(await touchPage.locator('[data-levixel-web-root]').count(), 1);
+
+    for (const [selector, expectedResults] of [
+      ['.source[data-index="0"]', 3],
+      ['.source[data-index="1"]', 4],
+    ]) {
+      await dragTouch(touchPage, { x: 195, y: 350 }, { x: 195, y: 650 });
+      await touchPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+      await tapCenter(touchPage, selector);
+      await touchPage.waitForFunction(expected => (
+        window.levixelFixture.results.length === expected
+      ), expectedResults);
+      assert.equal(await touchPage.locator('[data-levixel-web-root]').count(), 1);
+    }
     assert.deepEqual(errors, []);
   }
   finally {
     await touchPage.close();
+  }
+}
+
+async function verifyAtomicImageHandoff(targetBrowser, fixtureURL) {
+  const handoffPage = await targetBrowser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const errors = [];
+  handoffPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await handoffPage.goto(fixtureURL);
+    await handoffPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+    await handoffPage.evaluate(() => {
+      const nativeDecode = HTMLImageElement.prototype.decode;
+      const gate = { calls: 0, waiters: [] };
+      HTMLImageElement.prototype.decode = function decodeWithLevixelTestGate() {
+        const decoded = typeof nativeDecode === 'function'
+          ? nativeDecode.call(this)
+          : Promise.resolve();
+        if (this.dataset.levixelImageLayer !== 'incoming')
+          return decoded;
+        gate.calls += 1;
+        window.levixelFixture.lastIncomingImage = this;
+        return Promise.all([
+          decoded,
+          new Promise(resolve => gate.waiters.push(resolve)),
+        ]).then(() => undefined);
+      };
+      window.levixelFixture.releaseDecode = () => {
+        const waiters = gate.waiters.splice(0);
+        waiters.forEach(resolve => resolve());
+      };
+      window.levixelFixture.decodeGateCalls = () => gate.calls;
+      const fullURL = `${location.origin}/tests/racing-full.svg?handoff=${Date.now()}`;
+      const previewURL = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="360"><rect width="240" height="360" fill="#345"/></svg>')}`;
+      window.levixelFixture.atomicHandoffOpen = 'pending';
+      void window.levixelFixture.openLevixel({
+        items: [{
+          id: 'atomic-handoff',
+          type: 'image',
+          url: fullURL,
+          thumbnailUrl: previewURL,
+          width: 1200,
+          height: 1800,
+        }],
+      }).then(
+        () => { window.levixelFixture.atomicHandoffOpen = 'opened'; },
+        error => { window.levixelFixture.atomicHandoffOpen = error.name; },
+      );
+    });
+
+    await handoffPage.waitForFunction(() => window.levixelFixture.decodeGateCalls() > 0);
+    await handoffPage.waitForFunction(() => window.levixelFixture.atomicHandoffOpen === 'opened');
+    const pendingState = await handoffPage.evaluate(() => {
+      const shadow = document.querySelector('[data-levixel-web-root]').shadowRoot;
+      const current = shadow.querySelector('[data-levixel-image-layer="current"]');
+      const incoming = shadow.querySelector('[data-levixel-image-layer="incoming"]');
+      return {
+        imageCount: shadow.querySelectorAll('.page .image').length,
+        currentIsPreview: current?.src.startsWith('data:image/svg+xml'),
+        incomingIsFull: incoming?.src.includes('/tests/racing-full.svg'),
+        incomingBehindCurrent: incoming?.nextElementSibling === current,
+        currentTransform: current?.style.transform,
+        incomingTransform: incoming?.style.transform,
+      };
+    });
+    assert.deepEqual({
+      imageCount: pendingState.imageCount,
+      currentIsPreview: pendingState.currentIsPreview,
+      incomingIsFull: pendingState.incomingIsFull,
+      incomingBehindCurrent: pendingState.incomingBehindCurrent,
+    }, {
+      imageCount: 2,
+      currentIsPreview: true,
+      incomingIsFull: true,
+      incomingBehindCurrent: true,
+    }, 'the decoded full image must be prepared behind an uninterrupted fitted preview');
+    assert.equal(pendingState.currentTransform.includes('scale(1)'), true);
+    assert.equal(pendingState.incomingTransform, pendingState.currentTransform);
+
+    await pinchTouch(
+      handoffPage,
+      [{ x: 175, y: 422 }, { x: 215, y: 422 }],
+      [{ x: 105, y: 422 }, { x: 285, y: 422 }],
+    );
+    await handoffPage.waitForTimeout(80);
+    const pendingZoom = await handoffPage.evaluate(() => {
+      const shadow = document.querySelector('[data-levixel-web-root]').shadowRoot;
+      const current = shadow.querySelector('[data-levixel-image-layer="current"]');
+      const incoming = shadow.querySelector('[data-levixel-image-layer="incoming"]');
+      return {
+        current: current?.style.transform,
+        incoming: incoming?.style.transform,
+      };
+    });
+    assert.equal(pendingZoom.current.includes('scale(1)'), false);
+    assert.equal(
+      pendingZoom.incoming,
+      pendingZoom.current,
+      'pinch state must keep both temporary layers geometrically identical',
+    );
+
+    await handoffPage.evaluate(() => window.levixelFixture.releaseDecode());
+    await handoffPage.waitForFunction(() => {
+      const shadow = document.querySelector('[data-levixel-web-root]').shadowRoot;
+      const images = shadow.querySelectorAll('.page .image');
+      return images.length === 1 && images[0].src.includes('/tests/racing-full.svg');
+    });
+    const committedState = await handoffPage.evaluate(() => {
+      const shadow = document.querySelector('[data-levixel-web-root]').shadowRoot;
+      const current = shadow.querySelector('[data-levixel-image-layer="current"]');
+      return {
+        imageCount: shadow.querySelectorAll('.page .image').length,
+        incomingCount: shadow.querySelectorAll('[data-levixel-image-layer="incoming"]').length,
+        transform: current?.style.transform,
+        naturalSize: { width: current?.naturalWidth, height: current?.naturalHeight },
+      };
+    });
+    assert.deepEqual(committedState, {
+      imageCount: 1,
+      incomingCount: 0,
+      transform: pendingZoom.current,
+      naturalSize: { width: 1200, height: 1800 },
+    });
+
+    await handoffPage.evaluate(() => window.levixelFixture.closeLevixel());
+    await handoffPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+
+    const previousDecodeCalls = await handoffPage.evaluate(
+      () => window.levixelFixture.decodeGateCalls(),
+    );
+    await handoffPage.evaluate(() => {
+      const fullURL = `${location.origin}/tests/racing-full.svg?cancel=${Date.now()}`;
+      const previewURL = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="360"><rect width="240" height="360" fill="#456"/></svg>')}`;
+      window.levixelFixture.cancelHandoffOpen = 'pending';
+      void window.levixelFixture.openLevixel({
+        items: [{
+          id: 'cancel-handoff',
+          type: 'image',
+          url: fullURL,
+          thumbnailUrl: previewURL,
+          width: 1200,
+          height: 1800,
+        }],
+      }).then(
+        () => { window.levixelFixture.cancelHandoffOpen = 'opened'; },
+        error => { window.levixelFixture.cancelHandoffOpen = error.name; },
+      );
+    });
+    await handoffPage.waitForFunction(expected => (
+      window.levixelFixture.decodeGateCalls() > expected
+    ), previousDecodeCalls);
+    await handoffPage.waitForFunction(() => window.levixelFixture.cancelHandoffOpen === 'opened');
+    await handoffPage.evaluate(() => window.levixelFixture.closeLevixel());
+    await handoffPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+    assert.equal(
+      await handoffPage.evaluate(() => window.levixelFixture.lastIncomingImage.isConnected),
+      false,
+      'destroying a viewer must detach an in-flight incoming image layer',
+    );
+    await handoffPage.evaluate(() => window.levixelFixture.releaseDecode());
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await handoffPage.close();
   }
 }
 
@@ -513,6 +702,38 @@ async function dragTouch(targetPage, from, to) {
           from.x + (to.x - from.x) * progress,
           from.y + (to.y - from.y) * progress,
         )],
+      });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  finally {
+    await session.detach();
+  }
+}
+
+async function pinchTouch(targetPage, from, to) {
+  const session = await targetPage.context().newCDPSession(targetPage);
+  const touchPoint = (point, id) => ({
+    x: point.x,
+    y: point.y,
+    id,
+    radiusX: 1,
+    radiusY: 1,
+    force: 1,
+  });
+  try {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: from.map((point, index) => touchPoint(point, index + 1)),
+    });
+    for (let step = 1; step <= 6; step += 1) {
+      const points = from.map((point, index) => ({
+        x: point.x + (to[index].x - point.x) * step / 6,
+        y: point.y + (to[index].y - point.y) * step / 6,
+      }));
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: points.map((point, index) => touchPoint(point, index + 1)),
       });
     }
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });

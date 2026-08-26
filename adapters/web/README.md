@@ -85,7 +85,7 @@ If the selector is omitted, does not match exactly one element per item, or the 
 ## Product behavior
 
 - Images start aspect-fitted. Pinch/trackpad zoom, zoomed panning, double-tap zoom, horizontal paging, tap dismissal, and vertical drag dismissal follow the accepted native behavior.
-- The thumbnail and full-resolution image share one `<img>` rendering layer. Full-image handoff preserves relative zoom and normalized visual center.
+- Thumbnail-to-full handoff keeps the preview visible while a synchronized full-resolution layer decodes, then atomically returns to one `<img>` on the next rendering update. Relative zoom and normalized visual center are preserved throughout.
 - Images show no counter, toolbar, or always-visible close button. `counter: true` and `closeButton: true` fail contract validation instead of silently inventing UI.
 - Video starts from its poster, primes the first frame, and exposes the matching close/play/timeline chrome after a video tap.
 - `Escape` closes and the left/right arrow keys page while the current image is fitted. Levixel does not modify browser history or a host router.
