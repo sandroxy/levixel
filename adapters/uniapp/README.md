@@ -3,8 +3,8 @@
 Levixel 的 UniApp 交付包含两条薄桥，但只有一套平台 runtime 和一套 canonical JavaScript SDK：
 
 - `levixel-uniapp-runtime` 与 `LevixelUniRuntime.framework` 持有已经验收的 UniApp 平台行为。
-- legacy `UniModule` / ObjC 模块继续服务已有项目与离线集成。
-- UTS Android/iOS 只负责上下文、JSON 字符串和回调转换，服务 DCloud 插件市场与新项目。
+- legacy `UniModule` / ObjC 模块作为可选交付形式，服务选择 App 原生插件工作流的新老项目与离线集成。
+- UTS Android/iOS 只负责上下文、JSON 字符串和回调转换，是 DCloud 插件市场与新项目的默认推荐方案。
 - 两条桥都调用正式 Levixel AAR/framework；UTS 不实现转场、加载、手势或 `sourceHints` 语义。
 
 正式 UTS 插件源目录是 `uni_modules/Sandrox-Levixel`；本目录保存共享 Android/iOS runtime、legacy bridge、唯一人工维护的 canonical JavaScript SDK 及其测试。`plugin.yaml` 的 `sourceRoot` 指向正式插件目录，不代表 runtime 被复制进 UTS 源码。
@@ -82,9 +82,13 @@ iOS UTS 不再另存一份事件回调，而是把回调交给 `LevixelUniRuntim
 
 正式版本还可以把同一份已验收 ZIP 及其 SHA-256 文件附加到对应 GitHub Release，作为无需登录的直接下载镜像。该镜像必须复用上传 DCloud 的原文件，不能从 `master` 或 release tag 重新构建。DCloud 市场仍是新项目的首选安装渠道。
 
-## 既有 App 原生插件
+## App 原生插件版（可选）
 
-已有项目仍可使用 `nativeplugins/Sandrox-Levixel` 和原来的 SDK 路径。其候选包单独生成，不是插件市场上传物：
+不希望采用 UTS、而选择 App 原生插件工作流的经典 uni-app Android/iOS 项目，无论是新接入还是已有项目，都可从对应 [GitHub Release](https://github.com/sandroxy/levixel/releases) 下载 `levixel-uniapp-legacy-<version>.zip`。该包不是旧查看器：它使用与 UTS 包同版本的平台 runtime、canonical JavaScript SDK 和原生核心，只是桥接与集成形式不同。
+
+解压后应得到 `nativeplugins/Sandrox-Levixel/`，并使用包内原有的 SDK 路径。该交付需要自定义调试基座或离线打包，不支持 uni-app x，也不能作为当前 DCloud 插件市场的 UTS 包上传。UTS 仍是新项目的默认推荐方案，但不是唯一可用方案。
+
+维护者需要重新生成候选包时，使用：
 
 ```sh
 DCLOUD_ANDROID_UNIAPP_AAR=/absolute/path/to/uniapp-v8-release.aar \
@@ -92,7 +96,5 @@ DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
   ./scripts/package-uniapp-legacy.sh
 ./scripts/verify-uniapp-legacy.sh
 ```
-
-解压后应得到 `nativeplugins/Sandrox-Levixel/`。该兼容包仅面向已有 classic uni-app App 原生插件项目、自定义基座和离线打包，不支持 uni-app x，也不能上传到当前 DCloud 插件市场。新项目应使用 UTS 包。
 
 只有精确的 legacy ZIP 分别通过 Android/iOS 离线宿主烟测后，才可把 ZIP 与 SHA-256 文件附加到对应 GitHub Release。公开包不得包含构建 bridge 时使用的 DCloud Android AAR 或 iOS SDK；消费者仍应通过自己的 HBuilderX/离线 SDK 环境完成集成。

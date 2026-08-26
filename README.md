@@ -14,7 +14,7 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.1` |
 | React Native / Expo | npm `@sandrox/levixel` | `1.1.1` |
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
-| UniApp | [Sandrox-Levixel UTS 插件包](https://ext.dcloud.net.cn/plugin?id=29394) | `1.1.1` |
+| UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
 
 ## 源码结构
 
@@ -137,9 +137,11 @@ npx expo prebuild
 
 ## UniApp
 
-UniApp 适配器面向经典 uni-app Android/iOS 提供正式 UTS API 薄桥，同时保留已有 App 原生插件桥。两条桥复用同一套平台 runtime、canonical JavaScript SDK 与已发布原生核心；`sourceVisibility` 默认保持 `visible`。本版不声明 uni-app x 支持，完整接入与打包说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
+UniApp 适配器面向经典 uni-app Android/iOS 提供正式 UTS API 薄桥，同时保留经过验收的 App 原生插件桥，供选择该工作流的项目使用。两条桥复用同一套平台 runtime、canonical JavaScript SDK 与已发布原生核心；`sourceVisibility` 默认保持 `visible`。本版不声明 uni-app x 支持，完整接入与打包说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
 
-[DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394)是新项目的首选渠道。匹配版本的 [GitHub Release](https://github.com/sandroxy/levixel/releases) 另行提供 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。经过单独验收的 `levixel-uniapp-legacy-<version>.zip` 仅服务已有 App 原生插件项目与离线打包，不是 UTS 市场包，也不应作为新项目默认入口。
+[DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394)是新项目的默认推荐渠道。匹配版本的 [GitHub Release](https://github.com/sandroxy/levixel/releases) 也提供同一份 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。
+
+不希望使用 UTS、而选择 App 原生插件工作流的经典 uni-app Android/iOS 项目（无论新接入或已有项目），可下载经过双端验收的 `levixel-uniapp-legacy-<version>.zip`。它不是旧查看器，而是使用同版本 runtime、canonical JavaScript SDK 和原生核心的另一种桥接交付形式；解压到 `nativeplugins/Sandrox-Levixel/` 后需使用自定义基座或离线打包。该包不是 UTS 市场包，也不支持 uni-app x。
 
 ## 开发与发布
 
