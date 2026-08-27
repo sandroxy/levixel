@@ -2,13 +2,21 @@
 
 Framework-independent Web runtime for Levixel's shared-transition image and video viewer.
 
-This directory is currently a source candidate, not a published npm release. Its package is deliberately marked `private` and uses the development-only version `0.0.0-development` until browser hand verification is complete and the coordinated Levixel release version is chosen.
+Levixel Web 1.2.0 is packaged as an ESM-only npm library with type declarations. The exact release tarball is built and verified before publication; npm and the matching GitHub Release publish those accepted bytes without rebuilding them.
+
+## Installation
+
+```sh
+npm install @sandrox/levixel-web@1.2.0
+```
+
+The package has no runtime dependencies. Importing it during server-side rendering is safe, while viewer and preload calls require a live browser document.
 
 ## Validation demo
 
 ```sh
 cd adapters/web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -101,4 +109,6 @@ Backgrounding a page pauses active video without clearing subscriptions or closi
 
 ## Browser boundary
 
-Importing the module is SSR-safe, but viewer and preload functions require a live browser document. The implementation relies on Pointer Events, the Web Animations API, Shadow DOM, and modern media elements. Automated coverage runs in real Chrome; Safari/iPhone and additional desktop/mobile hand verification remain release gates before support claims or npm publication.
+The 1.2.0 interaction matrix has been accepted on macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Automated interaction coverage runs in a real Chrome/Chromium process and artifact verification reruns that suite against the installed npm tarball rather than workspace imports.
+
+The implementation relies on Pointer Events, the Web Animations API, Shadow DOM, and modern media elements. Browsers outside the accepted matrix, embedded WebViews, and compatibility bundles for legacy browsers are not claimed by 1.2.0. No UMD, IIFE, or separately maintained browser implementation is shipped.

@@ -20,6 +20,7 @@ properties:
     type: string
     minLength: 1
   version:
+    description: Canonical version inherited by targets that do not declare their own version.
     type: string
     pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
   summary:
@@ -90,6 +91,10 @@ $defs:
     properties:
       id:
         $ref: '#/$defs/identifier'
+      version:
+        description: Optional target product version. Defaults to the manifest version when omitted.
+        type: string
+        pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
       kind:
         enum:
           - native

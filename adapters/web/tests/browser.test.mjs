@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright-core';
 
-const adapterRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+const adapterRoot = resolve(join(fileURLToPath(new URL('.', import.meta.url)), '..'));
+const packageDistRoot = resolve(process.env.LEVIXEL_WEB_DIST_ROOT ?? join(adapterRoot, 'dist'));
 const chromeCandidates = [
   process.env.LEVIXEL_CHROME_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -41,9 +42,17 @@ const server = createServer((request, response) => {
     }, isRacingFullImage ? 40 : (isFullImage ? 900 : 250));
     return;
   }
-  const relative = pathname === '/' ? 'tests/fixture.html' : pathname.replace(/^\/+/, '');
-  const resolved = normalize(join(adapterRoot, relative));
-  if (!resolved.startsWith(adapterRoot) || !existsSync(resolved) || !statSync(resolved).isFile()) {
+  const servesPackagedDist = pathname.startsWith('/dist/');
+  const root = servesPackagedDist ? packageDistRoot : adapterRoot;
+  const relative = pathname === '/'
+    ? 'tests/fixture.html'
+    : (servesPackagedDist ? pathname.slice('/dist/'.length) : pathname.replace(/^\/+/, ''));
+  const resolved = resolve(root, relative);
+  if (
+    (resolved !== root && !resolved.startsWith(`${root}${sep}`))
+    || !existsSync(resolved)
+    || !statSync(resolved).isFile()
+  ) {
     response.writeHead(404).end('Not found');
     return;
   }

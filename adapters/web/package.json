@@ -1,8 +1,7 @@
 {
   "name": "@sandrox/levixel-web",
-  "version": "0.0.0-development",
+  "version": "1.2.0",
   "description": "Framework-independent Levixel shared-transition image and video viewer for Web.",
-  "private": true,
   "type": "module",
   "license": "MIT",
   "author": "sandrox",
@@ -14,6 +13,10 @@
   },
   "bugs": {
     "url": "https://github.com/sandroxy/levixel/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
     "gallery",
@@ -35,6 +38,7 @@
     "dist",
     "CHANGELOG.md",
     "LICENSE",
+    "PROVENANCE.md",
     "README.md",
     "THIRD_PARTY_NOTICES.md"
   ],

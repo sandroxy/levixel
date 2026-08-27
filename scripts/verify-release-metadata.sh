@@ -4,6 +4,12 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+web_version="$(ruby -ryaml -e '
+  manifest = YAML.load_file(ARGV.fetch(0))
+  target = manifest.fetch("targets").find { |entry| entry.fetch("id") == "web" }
+  abort("Web target is missing from plugin.yaml") unless target
+  print target.fetch("version", manifest.fetch("version"))
+' "${plugin_dir}/plugin.yaml")"
 react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${plugin_dir}/adapters/react-native/package.json")"
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
 uniapp_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json")"
@@ -11,11 +17,24 @@ harmony_app_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))
 
 node -e '
   const packageJson = require(process.argv[1])
+  const expectedVersion = process.argv[2]
   if (packageJson.name !== "@sandrox/levixel-web")
     throw new Error(`Unexpected Web package name: ${packageJson.name}`)
-  if (packageJson.version !== "0.0.0-development" || packageJson.private !== true)
-    throw new Error("Unaccepted Web source must remain private at 0.0.0-development")
-' "${plugin_dir}/adapters/web/package.json"
+  if (packageJson.version !== expectedVersion)
+    throw new Error(`Web package version ${packageJson.version} does not match ${expectedVersion}`)
+  if (packageJson.private === true)
+    throw new Error("The accepted Web package must not remain private")
+  if (packageJson.publishConfig?.access !== "public")
+    throw new Error("The Web package must publish publicly")
+  if (packageJson.publishConfig?.registry !== "https://registry.npmjs.org/")
+    throw new Error("The Web package must use the public npm registry")
+  if (Object.keys(packageJson.dependencies ?? {}).length !== 0)
+    throw new Error("The Web package must not add runtime dependencies")
+  const lifecycle = Object.keys(packageJson.scripts ?? {}).filter(name =>
+    /^(preinstall|install|postinstall|prepublish|prepare)$/.test(name))
+  if (lifecycle.length !== 0)
+    throw new Error(`Unexpected Web lifecycle scripts: ${lifecycle.join(", ")}`)
+' "${plugin_dir}/adapters/web/package.json" "${web_version}"
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 
@@ -89,17 +108,29 @@ fi
 
 if ! ruby -ryaml -e '
   manifest = YAML.load_file(ARGV.fetch(0))
-  version = manifest.fetch("version")
+  default_version = manifest.fetch("version")
   targets = manifest.fetch("targets")
-  outputs = targets.flat_map { |target| target.fetch("artifacts") }.map { |artifact| artifact.fetch("output") }
-  missing = outputs.reject { |output| output.include?(version) }
-  abort("Artifact paths missing version #{version}: #{missing.join(", ")}") unless missing.empty?
+  missing = targets.flat_map do |target|
+    target_version = target.fetch("version", default_version)
+    target.fetch("artifacts").map do |artifact|
+      output = artifact.fetch("output")
+      "#{target.fetch("id")}:#{output}" unless output.include?(target_version)
+    end.compact
+  end
+  abort("Artifact paths missing their target version: #{missing.join(", ")}") unless missing.empty?
   uniapp = targets.find { |target| target.fetch("id") == "uniapp" }
   abort("UniApp target is missing") unless uniapp
   expected_source_root = "uni_modules/Sandrox-Levixel"
   actual_source_root = uniapp.fetch("sourceRoot")
   abort("UniApp sourceRoot must be #{expected_source_root}, got #{actual_source_root}") unless actual_source_root == expected_source_root
   abort("UniApp sourceRoot does not exist: #{actual_source_root}") unless File.directory?(File.join(ARGV.fetch(1), actual_source_root))
+  web = targets.find { |target| target.fetch("id") == "web" }
+  abort("Web target is missing") unless web
+  abort("Web target must explicitly declare its independently staged version") unless web.key?("version")
+  expected_web_source_root = "adapters/web"
+  actual_web_source_root = web.fetch("sourceRoot")
+  abort("Web sourceRoot must be #{expected_web_source_root}, got #{actual_web_source_root}") unless actual_web_source_root == expected_web_source_root
+  abort("Web sourceRoot does not exist: #{actual_web_source_root}") unless File.directory?(File.join(ARGV.fetch(1), actual_web_source_root))
 ' "${plugin_dir}/plugin.yaml" "${plugin_dir}"; then
   exit 1
 fi
@@ -114,6 +145,8 @@ cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/THIRD_PARTY_NOTICES.md"
 cmp "${plugin_dir}/LICENSE" \
   "${plugin_dir}/adapters/web/LICENSE"
+cmp "${plugin_dir}/PROVENANCE.md" \
+  "${plugin_dir}/adapters/web/PROVENANCE.md"
 cmp "${plugin_dir}/THIRD_PARTY_NOTICES.md" \
   "${plugin_dir}/adapters/web/THIRD_PARTY_NOTICES.md"
 
@@ -165,4 +198,4 @@ node --input-type=module --check < \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/canonical.js"
 
 plutil -lint "${plugin_dir}/native/ios/Levixel/PrivacyInfo.xcprivacy" >/dev/null
-printf '%s\n' "Levixel ${version} release metadata is consistent."
+printf '%s\n' "Levixel ${version} release metadata is consistent (Web candidate ${web_version})."

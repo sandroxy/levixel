@@ -2,7 +2,7 @@
 
 ## Artifact Graph
 
-Levixel uses one canonical version with ecosystem-specific products:
+Levixel records every ecosystem product and its immutable artifact. Targets normally inherit the canonical manifest version; an independently staged target may explicitly declare its product version without relabeling already published artifacts on other platforms.
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
@@ -11,8 +11,11 @@ Levixel uses one canonical version with ecosystem-specific products:
 | HarmonyOS | `@sandrox/levixel` | OHPM HAR |
 | React Native | `@sandrox/levixel` | npm tarball containing thin Expo Modules bridges and the accepted Android/iOS native artifacts |
 | UniApp | `Sandrox-Levixel` | DCloud UTS-plugin ZIP containing thin Android/iOS bridges, shared UniApp runtimes, accepted native artifacts, and the canonical JavaScript SDK |
+| Web | `@sandrox/levixel-web` | ESM npm tarball containing the framework-independent browser runtime and public type declarations |
 
 The raw Android AAR and HarmonyOS HAR are available for offline integration. Maven Central and OHPM remain the preferred channels because they carry package identity and version metadata.
+
+Product publication workflows are intentionally manual. Publishing a GitHub Release must not cause unrelated products that remain on an earlier target version to rebuild, mirror, or publish automatically.
 
 ## Immutable Candidate Rule
 
@@ -220,18 +223,38 @@ The separately generated `levixel-uniapp-legacy-<version>.zip` remains available
 
 The legacy compatibility ZIP may be attached to the same GitHub Release only after that exact archive passes Android and iOS offline-consumer smoke tests. Upload its existing sidecar alongside it, then rerun `Verify UniApp Release Assets` with `include_legacy` enabled and the independently recorded legacy SHA-256. Label it as an existing-project/offline-packaging compatibility artifact; do not present it as a Marketplace package, a uni-app x package, or the recommended path for new projects. The ZIP must not redistribute the DCloud SDK used to build its bridge.
 
-## Web candidate gate
+## Web / npm
 
-Web source remains `private: true` at `0.0.0-development` while interaction acceptance is in progress. This state is intentionally absent from `plugin.yaml` and the public product table.
+The selected first Web product version is `1.2.0`. It is staged independently in `plugin.yaml`; the root manifest version and the published Android, iOS, HarmonyOS, React Native, and UniApp products remain `1.1.1` until a later coordinated release decision explicitly changes them.
 
-After desktop/mobile browser hand verification is accepted, promote Web through the normal coordinated release rather than publishing an ad-hoc package:
+The Web package is ESM-only, has no runtime dependencies, and publishes as `@sandrox/levixel-web`. Its accepted interaction matrix is macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Browsers outside that matrix, embedded WebViews, legacy bundles, UMD, and IIFE delivery are not claimed by 1.2.0.
 
-1. Choose the next canonical Levixel version and update the repository version metadata once.
-2. Remove the private development guard, set the Web package to that canonical version, and add the Web target, packaging script, immutable artifact path, and release verification.
-3. Pack once, install that exact tarball in artifact-only browser consumers, and complete the declared Chrome/Safari desktop/mobile matrix.
-4. Publish and mirror only the accepted tarball and checksum under the shared canonical tag.
+1. From the clean release commit, build and verify the candidate once:
 
-Do not label the development tarball as `1.1.1`, because Web was not part of the already published 1.1.1 product set.
+   ```sh
+   ./scripts/package-web.sh
+   ./scripts/verify-web-package.sh
+   ```
+
+2. Install `dist/web/levixel-web-1.2.0.tgz` in artifact-only consumers. Complete the declared desktop/mobile matrix without importing `adapters/web/src` or rebuilding the tarball.
+3. Record the accepted SHA-256 from `dist/web/levixel-web-1.2.0.tgz.sha256`.
+4. Create the canonical `1.2.0` tag and GitHub Release only when the coordinated 1.2.0 scope is approved. Attach these exact files without repacking:
+
+   - `dist/web/levixel-web-1.2.0.tgz`
+   - `dist/web/levixel-web-1.2.0.tgz.sha256`
+
+5. Run `Verify Web Release Assets` with version `1.2.0` and the accepted SHA-256. The workflow checks the public assets against the canonical tag, independently rebuilds only for source comparison, installs the accepted tarball, and reruns real-Chrome interaction coverage. It never modifies or republishes a rebuilt package.
+6. Configure npm Trusted Publishing for:
+
+   - Provider: GitHub Actions
+   - Organization or user: `sandroxy`
+   - Repository: `levixel`
+   - Workflow filename: `publish-web-npm.yml`
+   - Allowed action: `npm publish`
+
+7. Run `Publish Web npm` with the same version and SHA-256. The workflow downloads, verifies, and publishes the exact GitHub Release tarball through OIDC. It fails if that npm version already exists.
+
+The local `--allow-dirty` packaging option is only a pipeline rehearsal. A dirty-worktree artifact is not publishable until the identical bytes pass clean-commit verification. A differing candidate must use `--replace` explicitly and repeat all artifact-only acceptance; never rename or silently overwrite an accepted tarball.
 
 ## Provenance
 

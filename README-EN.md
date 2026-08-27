@@ -4,7 +4,7 @@
 
 Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
 
-This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores, the React Native and UniApp adapters, and the Web source candidate are maintained here. Every release version maps to one verified, immutable artifact set.
+This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores and the React Native, UniApp, and Web adapters are maintained here. Every public product version maps to a verified, immutable artifact.
 
 ## Published Packages
 
@@ -16,14 +16,14 @@ This repository is the canonical source, public contract, packaging toolkit, and
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
 | UniApp | [UTS Marketplace plugin](https://ext.dcloud.net.cn/plugin?id=29394) / [App native-plugin ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
 
-The Web runtime is undergoing pre-release interaction validation under `adapters/web`. It has not been published and is therefore not part of the 1.1.1 product table above.
+Web 1.2.0 has completed pre-release interaction acceptance on macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Its immutable npm artifact is being finalized, but it has not been published and therefore is not listed in the published-product table above.
 
 ## Source Layout
 
 ```text
 levixel/
 ├── native/          # Android, iOS, and HarmonyOS native cores
-├── adapters/        # React Native and UniApp adapters, plus the Web source candidate
+├── adapters/        # React Native, UniApp, and Web adapters
 ├── uni_modules/     # DCloud Marketplace UTS plugin source
 ├── contract/        # Cross-platform public contract
 ├── packaging/       # Platform artifact templates
@@ -144,6 +144,12 @@ The UniApp adapter provides a formal UTS API bridge for classic uni-app on Andro
 The [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) is the recommended default channel for new projects. The matching [GitHub Release](https://github.com/sandroxy/levixel/releases) also provides the same `levixel-uniapp-<version>.zip` and its SHA-256 file for direct downloads, offline archives, and manual installation under `uni_modules/Sandrox-Levixel/`.
 
 Classic uni-app Android/iOS projects that deliberately choose the App native-plugin workflow instead of UTS—whether newly integrated or existing—can download the separately accepted `levixel-uniapp-legacy-<version>.zip`. It is not an older viewer: it is an alternative bridge delivery that uses the same-version runtime, canonical JavaScript SDK, and native cores. Extract it under `nativeplugins/Sandrox-Levixel/` and use a custom debugging base or offline packaging. This ZIP is not the UTS Marketplace package and does not support uni-app x.
+
+## Web
+
+The Web adapter lives under `adapters/web`. It preserves Levixel's public media, source-geometry, event, and visibility protocols while using native browser DOM, Pointer Events, the Web Animations API, and media elements for shared transitions, paging, zoom, pan, drag dismissal, and video controls. Web defaults to `sourceVisibility: hidden`; the accepted classic UniApp `visible` default is unchanged.
+
+The first public candidate is npm `@sandrox/levixel-web@1.2.0`. After publication, npm is the default installation channel and the matching GitHub Release mirrors the exact `levixel-web-1.2.0.tgz` and SHA-256 file. See the [Web adapter guide](adapters/web/README.md) for the API, browser boundary, and local verification workflow.
 
 ## Development And Releases
 

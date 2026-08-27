@@ -5,7 +5,13 @@ on:
     paths:
       - 'adapters/web/**'
       - 'contract/**'
+      - 'plugin.yaml'
+      - 'schema/plugin-manifest.schema.yaml'
+      - 'scripts/verify-release-metadata.sh'
+      - 'scripts/package-web.sh'
+      - 'scripts/verify-web-package.sh'
       - 'scripts/verify-web.sh'
+      - '.github/scripts/verify-web-package.sh'
       - '.github/workflows/verify-web.yml'
   push:
     branches:
@@ -13,7 +19,13 @@ on:
     paths:
       - 'adapters/web/**'
       - 'contract/**'
+      - 'plugin.yaml'
+      - 'schema/plugin-manifest.schema.yaml'
+      - 'scripts/verify-release-metadata.sh'
+      - 'scripts/package-web.sh'
+      - 'scripts/verify-web-package.sh'
       - 'scripts/verify-web.sh'
+      - '.github/scripts/verify-web-package.sh'
       - '.github/workflows/verify-web.yml'
   workflow_dispatch:
 
@@ -39,5 +51,5 @@ jobs:
         working-directory: adapters/web
         run: npm ci
 
-      - name: Verify Web source candidate
-        run: ./scripts/verify-web.sh
+      - name: Build and verify the exact Web release candidate
+        run: ./scripts/package-web.sh

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 - Unreleased
+
+- Added the first framework-independent Levixel Web package while preserving the accepted native interaction model and canonical JavaScript protocol.
+- Added shared source transitions, image and video paging, fit/zoom/pan behavior, vertical dismissal, lifecycle restoration, accessibility, and reduced-motion handling for modern browsers.
+- Added atomic preview-to-full-resolution image handoff and bounded touch source activation to prevent rapid-switch flashes and missed immediate reopens.
+- Completed pre-release interaction acceptance on macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
+- Added deterministic npm packaging, SHA-256 sidecars, artifact-only browser verification, GitHub Release asset verification, and npm Trusted Publishing preparation.
+
 ## 1.1.1 - 2026-08-25
 
 - Added the first DCloud Marketplace-ready UTS package for classic uni-app on Android and iOS while keeping the accepted legacy bridges and shared platform runtimes.

@@ -4,7 +4,7 @@
 
 Levixel 是一套强调原生手感的图片与视频查看器，提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放能力。
 
-本仓库是 Levixel 的规范源码、公共契约、打包工具与公开发布入口。Android、iOS、HarmonyOS 原生核心以及 React Native、UniApp 适配器都在这里维护；每个发布版本对应一组经过校验且不可变的制品。
+本仓库是 Levixel 的规范源码、公共契约、打包工具与公开发布入口。Android、iOS、HarmonyOS 原生核心以及 React Native、UniApp、Web 适配器都在这里维护；每个公开产品版本都对应经过校验且不可变的制品。
 
 ## 当前发布
 
@@ -16,14 +16,14 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 | HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
 | UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
 
-Web 运行时正在 `adapters/web` 中进行发布前手感验证，尚未作为公开制品发布，因此不列入上表的 1.1.1 产品集合。
+Web 1.2.0 已完成 macOS Chrome、macOS Safari、Android Chrome 与 iOS Safari 的发布前手感验收，当前处于不可变 npm 制品收口阶段。它尚未公开发布，因此不列入上表的已发布产品集合。
 
 ## 源码结构
 
 ```text
 levixel/
 ├── native/          # Android、iOS、HarmonyOS 原生核心
-├── adapters/        # React Native、UniApp 适配层与 Web 候选运行时
+├── adapters/        # React Native、UniApp 与 Web 适配层
 ├── uni_modules/     # DCloud 市场 UTS 插件源目录
 ├── contract/        # 跨平台公共契约
 ├── packaging/       # 平台制品模板
@@ -144,6 +144,12 @@ UniApp 适配器面向经典 uni-app Android/iOS 提供正式 UTS API 薄桥，�
 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394)是新项目的默认推荐渠道。匹配版本的 [GitHub Release](https://github.com/sandroxy/levixel/releases) 也提供同一份 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。
 
 不希望使用 UTS、而选择 App 原生插件工作流的经典 uni-app Android/iOS 项目（无论新接入或已有项目），可下载经过双端验收的 `levixel-uniapp-legacy-<version>.zip`。它不是旧查看器，而是使用同版本 runtime、canonical JavaScript SDK 和原生核心的另一种桥接交付形式；解压到 `nativeplugins/Sandrox-Levixel/` 后需使用自定义基座或离线打包。该包不是 UTS 市场包，也不支持 uni-app x。
+
+## Web
+
+Web 适配器位于 `adapters/web`，保持 Levixel 公共媒体、源图几何、事件与可见性协议，并使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制。Web 默认 `sourceVisibility: hidden`；经典 UniApp 已验收的 `visible` 默认值不受影响。
+
+首个公开候选版本为 npm `@sandrox/levixel-web@1.2.0`。正式发布后，npm 是默认安装渠道，匹配的 GitHub Release 同时提供精确的 `levixel-web-1.2.0.tgz` 与 SHA-256 文件。当前 API、浏览器边界和本地验证方式见 [Web 适配器文档](adapters/web/README.md)。
 
 ## 开发与发布
 

@@ -70,7 +70,7 @@ DCLOUD_IOS_SDK_ROOT=/absolute/path/to/DCloud-iOS-SDK \
 
 The legacy ZIP is a compatibility artifact, not a second UniApp implementation. It may be attached to a GitHub Release only after that exact ZIP has passed Android and iOS artifact-only smoke tests. The package must not embed or redistribute the DCloud Android/iOS SDK used to compile the bridge.
 
-## Web candidate
+## Web
 
 The framework-independent browser runtime is developed under `adapters/web`. It preserves the canonical JavaScript fields and event JSON but owns only browser-specific DOM geometry, media elements, input handling, accessibility, and lifecycle restoration. The accepted Android/iOS/UniApp implementations remain the product authority; the earlier H5 proof of concept is not a source dependency.
 
@@ -83,9 +83,18 @@ npm run dev
 npm run verify
 ```
 
-The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates legal-file bytes and performs an npm pack dry run.
+The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates the 1.2.0 package metadata, legal-file bytes, and npm payload allowlist. Manual interaction acceptance covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
 
-Until browser hand verification is accepted, the package must remain private at `0.0.0-development`, must not appear as a released target in `plugin.yaml`, and must not be described as a current public product. This guard separates source work from the immutable release-candidate flow.
+Build and verify the exact npm candidate from a clean release commit:
+
+```sh
+./scripts/package-web.sh
+./scripts/verify-web-package.sh
+```
+
+The package command writes `dist/web/levixel-web-<version>.tgz` and its SHA-256 sidecar, then installs that exact tarball in a temporary consumer for SSR import, public type, and real-Chrome interaction verification. It refuses to overwrite different candidate bytes silently. Use `--allow-dirty` only for a local pipeline rehearsal and `--replace` only after deliberately rejecting the previous local candidate.
+
+Web uses an explicit target version in `plugin.yaml` while it is staged independently from the already published 1.1.1 products. Other targets continue to inherit the manifest version and their existing build behavior is unchanged.
 
 ## Release Metadata
 

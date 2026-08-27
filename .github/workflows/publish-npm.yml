@@ -1,8 +1,6 @@
 name: Publish npm
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -16,21 +14,14 @@ permissions:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve release version
+      - name: Validate release version
         id: release
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${EVENT_NAME}" == "release" ]]; then
-            version="${RELEASE_TAG}"
-          else
-            version="${INPUT_VERSION}"
-          fi
+          version="${INPUT_VERSION}"
           if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Only stable semantic versions are publishable: ${version}" >&2
             exit 1
