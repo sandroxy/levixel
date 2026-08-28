@@ -9,11 +9,11 @@ Levixel 的 UniApp 交付包含两条薄桥，但只有一套平台 runtime 和�
 
 正式 UTS 插件源目录是 `uni_modules/Sandrox-Levixel`；本目录保存共享 Android/iOS runtime、legacy bridge、唯一人工维护的 canonical JavaScript SDK 及其测试。`plugin.yaml` 的 `sourceRoot` 指向正式插件目录，不代表 runtime 被复制进 UTS 源码。
 
-## uni-app x 候选状态
+## uni-app x 支持范围
 
-**仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** 候选范围只有 App-Android（Android 6 / API 23+）和 App-iOS（iOS 15+ 真机）；不支持 nvue、HarmonyOS、Web 或小程序。经典 uni-app Vue 2 / Vue 3 的既有 App Vue 支持仍保留 Android API 21+ 与 iOS 13+ 边界。
+**仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** 正式范围只有 App-Android（Android 6 / API 23+）和 App-iOS（iOS 15+ 真机）；不支持 nvue、HarmonyOS、Web 或小程序。经典 uni-app Vue 2 / Vue 3 的既有 App Vue 支持仍保留 Android API 21+ 与 iOS 13+ 边界。
 
-UniApp UTS 产品已独立选择 1.2.0 作为待双端真机验收的候选版本，但不得提前发布或提交 DCloud 市场。它通过 `native-release-version: 1.1.1` 严格复用已发布的 Android/iOS 原生核心；根版本、legacy 与其他原生产品继续保持 1.1.1。x 的编译、官方 SDK typecheck、ZIP staging 和自动化契约可以在本地验证；共享转场手感、坐标、快速开关、视频与返回源图仍必须通过真实 Android/iOS 设备收口，并使用候选 SHA-256 锁定的同一 ZIP。
+1.2.0 已完成 classic 与 x 的 Android/iOS 真机验收，并与原生、React Native、HarmonyOS、Web 和 legacy 交付统一版本。它通过 `native-release-version: 1.2.0` 绑定协调发布的 Android/iOS 原生核心；x 的编译、官方 SDK typecheck、ZIP staging、共享转场、坐标、快速开关、视频与返回源图均纳入正式验收矩阵。后续版本仍必须使用同一候选 SHA-256 完成制品与真机闭环。
 
 ## UTS 安装与公共 SDK
 
@@ -54,7 +54,7 @@ await openLevixelFromSelector({
 
 在 uni-app x App Vapor 中，可见源元素应使用与上例数值一致的 `border-radius: 6px`。当前 Vapor 的 `border-radius` 不支持 `rpx`；使用 `rpx` 会让源视图在转场期间失去圆角，而 native hint 仍按数值插值，形成短暂的直角闪变。经典 uni-app 的 CSS 处理不受此限制。
 
-`sourceVisibility` 默认值必须保持 `visible`。经典 UniApp 已验收的 WebView 交接策略会让 HTML 源图留在原生转场下方，以避免关闭末帧出现纹理闪烁；x Vapor 沿用相同公共语义，但其原生渲染源仍待双端真机逐帧验收。只有页面完整处理 `sourceVisibilityChange` 且在实际宿主重新验收后，才应显式传 `hidden`。
+`sourceVisibility` 默认值必须保持 `visible`。经典 UniApp 已验收的 WebView 交接策略会让 HTML 源图留在原生转场下方，以避免关闭末帧出现纹理闪烁；x Vapor 沿用相同公共语义，并已完成双端真机逐帧验收。只有页面完整处理 `sourceVisibilityChange` 且在实际宿主重新验收后，才应显式传 `hidden`。
 
 ## iOS 事件订阅生命周期
 
@@ -86,7 +86,7 @@ iOS UTS 不再另存一份事件回调，而是把回调交给 `LevixelUniRuntim
 - `dist/uniapp/levixel-uniapp-<version>.zip.sha256`
 - `dist/uniapp/levixel-uniapp-<version>-marketplace.md`
 
-市场 ZIP 的根目录就是插件根目录，直接包含 `package.json` 和 `utssdk/`，以符合 DCloud Web 发布器的格式校验。手动安装候选包时，应将 ZIP 内容解压到宿主工程的 `uni_modules/Sandrox-Levixel/`，不能在 ZIP 内或安装目录中额外套一层同名目录。随后用包含插件的自定义基座、云打包或离线包完成 Android/iOS 真机矩阵。当前 ZIP 只用于候选验证；版本号和双端验收未收口前不得上传市场或附加到公开 Release。
+市场 ZIP 的根目录就是插件根目录，直接包含 `package.json` 和 `utssdk/`，以符合 DCloud Web 发布器的格式校验。手动安装候选包时，应将 ZIP 内容解压到宿主工程的 `uni_modules/Sandrox-Levixel/`，不能在 ZIP 内或安装目录中额外套一层同名目录。随后用包含插件的自定义基座、云打包或离线包完成 Android/iOS 真机矩阵。只有从干净 release commit 生成、完成制品校验且保持验收 SHA-256 不变的 ZIP 才能上传市场或附加到公开 Release。
 
 正式版本还可以把同一份已验收 ZIP 及其 SHA-256 文件附加到对应 GitHub Release，作为无需登录的直接下载镜像。该镜像必须复用上传 DCloud 的原文件，不能从 `master` 或 release tag 重新构建。DCloud 市场仍是新项目的首选安装渠道。
 

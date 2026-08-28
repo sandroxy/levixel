@@ -17,6 +17,7 @@ react_native_version="$(node -e 'process.stdout.write(require(process.argv[1]).v
 harmony_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/native/harmonyos/levixel/oh-package.json5")"
 uniapp_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("version")' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json")"
 harmony_app_version="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("app").fetch("versionName")' "${plugin_dir}/native/harmonyos/AppScope/app.json5")"
+harmony_app_version_code="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV.fetch(0))).fetch("app").fetch("versionCode")' "${plugin_dir}/native/harmonyos/AppScope/app.json5")"
 
 node -e '
   const packageJson = require(process.argv[1])
@@ -73,6 +74,18 @@ fi
 
 if [[ "${harmony_app_version}" != "${version}" ]]; then
   echo "HarmonyOS app version ${harmony_app_version} does not match ${version}." >&2
+  exit 1
+fi
+
+expected_harmony_app_version_code="$(ruby -e '
+  match = ARGV.fetch(0).match(/\A(\d+)\.(\d+)\.(\d+)/)
+  abort("Cannot derive HarmonyOS versionCode from #{ARGV.fetch(0)}") unless match
+  major, minor, patch = match.captures.map(&:to_i)
+  abort("HarmonyOS versionCode supports minor and patch values below 100") unless minor < 100 && patch < 100
+  print major * 10_000 + minor * 100 + patch
+' "${version}")"
+if [[ "${harmony_app_version_code}" != "${expected_harmony_app_version_code}" ]]; then
+  echo "HarmonyOS app versionCode ${harmony_app_version_code} does not match ${version} (${expected_harmony_app_version_code})." >&2
   exit 1
 fi
 
@@ -222,4 +235,4 @@ node --input-type=module --check < \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/canonical.js"
 
 plutil -lint "${plugin_dir}/native/ios/Levixel/PrivacyInfo.xcprivacy" >/dev/null
-printf '%s\n' "Levixel root ${version} metadata is consistent (Web ${web_version}; UniApp UTS ${uniapp_target_version} uses native ${uniapp_native_version} and remains an unreleased candidate)."
+printf '%s\n' "Levixel ${version} coordinated release metadata is consistent (Web ${web_version}; UniApp UTS ${uniapp_target_version} uses native ${uniapp_native_version})."

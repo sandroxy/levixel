@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.sandrox.levixel",
     "vendor": "SandroX",
-    "versionCode": 10101,
-    "versionName": "1.1.1",
+    "versionCode": 10200,
+    "versionName": "1.2.0",
     "buildVersion": "1",
     "icon": "$media:app_icon",
     "label": "$string:app_name"

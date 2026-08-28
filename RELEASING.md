@@ -179,9 +179,9 @@ The workflow downloads and verifies the accepted GitHub Release assets and publi
 
 ## UniApp / DCloud UTS Plugin
 
-The Marketplace product supports classic uni-app Vue pages on Android/iOS. A not-yet-released candidate also targets Android/iOS uni-app x Vapor with HBuilderX 5.24+, Android API 23+, and iOS 15+. **Only uni-app x Vapor is in scope; VDOM, nvue, HarmonyOS, mini apps, and Web are unsupported.** It embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
+The Marketplace product supports classic uni-app Vue pages and uni-app x Vapor on Android/iOS. Uni-app x requires HBuilderX 5.24+, Android API 23+, and iOS 15+. **Only uni-app x Vapor is in scope; VDOM, nvue, HarmonyOS, mini apps, and Web are unsupported.** It embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
 
-The UniApp UTS product version is independently fixed at `1.2.0`; its x support matrix remains a candidate declaration until Android and iOS real-device acceptance is complete. The target pins `native-release-version: 1.1.1`, and packaging must verify and embed the exact AAR/XCFramework recorded by that native release manifest. Do not relabel those core files as 1.2.0, overwrite the published 1.1.1 Marketplace version, rebuild after device acceptance, or publish any other native product.
+The coordinated product version is `1.2.0`. The UniApp target pins `native-release-version: 1.2.0`, and packaging must verify and embed the exact AAR/XCFramework recorded by that native release manifest. The earlier UTS candidate that embedded 1.1.1 native bytes is superseded by this coordinated release and must not be published. Build and accept one new final 1.2.0 ZIP after the native release manifest exists; never rebuild it after device acceptance or overwrite the published 1.1.1 Marketplace version.
 
 The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and the legacy bridges remain in `adapters/uniapp`. `uni_modules/Sandrox-Levixel/js_sdk/canonical.js` is a checked-in generated mirror of `adapters/uniapp/js_sdk/index.js`. Regenerate it with `./scripts/sync-uniapp-canonical-js.sh` whenever the canonical SDK changes, then review the diff. Never hand-edit the generated mirror or rely on packaging to repair drift.
 
@@ -206,8 +206,8 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
 4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
 5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the final version was explicitly chosen, both classic/x applicable matrices passed, and the ZIP checksum still matches the accepted candidate.
 6. Import the public Marketplace version into a clean classic uni-app consumer and rerun the production build. DCloud may add a `name` field equal to `displayName` and reformat `package.json`; all other JSON values and every other payload file must still match the accepted ZIP.
-7. Attach the exact accepted UTS ZIP and its existing SHA-256 sidecar to the repository-level 1.2.0 GitHub Release without rebuilding or re-zipping it. The same tag may represent the Web and UniApp products at 1.2.0; release notes must state that Android, iOS, HarmonyOS, React Native, and UniApp legacy remain 1.1.1. DCloud remains the primary UniApp installation channel; the GitHub asset is the anonymous direct-download and offline mirror.
-8. Run `Verify UniApp Release Assets` with UTS version 1.2.0 and the SHA-256 recorded during device acceptance. The workflow derives native version 1.1.1 from the release-source target constraint, downloads those native assets from the immutable 1.1.1 Release, and checks the public ZIP against both product provenance lines. It never rebuilds or alters the candidate.
+7. Attach the exact accepted UTS ZIP and its existing SHA-256 sidecar to the repository-level 1.2.0 GitHub Release without rebuilding or re-zipping it. The canonical 1.2.0 tag represents Android, iOS, HarmonyOS, React Native, UniApp, and Web together. DCloud remains the primary UniApp installation channel; the GitHub asset is the anonymous direct-download and offline mirror.
+8. Run `Verify UniApp Release Assets` with UTS version 1.2.0 and the SHA-256 recorded during device acceptance. The workflow derives native version 1.2.0 from the release-source target constraint, downloads those native assets from the immutable 1.2.0 Release, and checks the public ZIP against both product provenance lines. It never rebuilds or alters the candidate.
 
 For a user-managed upload of the already accepted UTS bytes:
 
@@ -223,13 +223,13 @@ gh release upload "${LEVIXEL_UNIAPP_VERSION}" \
 
 GitHub Actions cannot receive a local file through `workflow_dispatch`, and the DCloud Marketplace requires an authenticated download and may normalize `package.json`. Therefore the release workflow verifies an already uploaded immutable candidate instead of silently rebuilding it or persisting a DCloud session.
 
-The separately generated `levixel-uniapp-legacy-1.1.1.zip` remains available from the 1.1.1 Release for existing App native-plugin/offline consumers. It is not rebuilt, renamed, or reattached for the UTS 1.2.0 release, and must never replace the Marketplace ZIP.
+The separately generated `levixel-uniapp-legacy-1.2.0.zip` is the coordinated compatibility artifact for App native-plugin/offline consumers. Build it from the same 1.2.0 native cores and canonical JavaScript SDK, pass Android/iOS artifact-only smoke tests, and attach it to the 1.2.0 Release. Historical `levixel-uniapp-legacy-1.1.1.zip` bytes remain immutable on the 1.1.1 Release; neither legacy ZIP may replace the Marketplace ZIP.
 
-Audit the legacy ZIP independently by running `Verify UniApp Release Assets` against the 1.1.1 release source with `include_legacy`; the 1.2.0 run deliberately rejects cross-version legacy verification. Do not present the legacy artifact as a Marketplace package, a uni-app x package, or the recommended path for new projects.
+Audit the 1.2.0 legacy ZIP independently by running `Verify UniApp Release Assets` with `include_legacy` against the same 1.2.0 release source. Do not present the legacy artifact as a Marketplace package, a uni-app x package, or the recommended path for new projects.
 
 ## Web / npm
 
-The selected Web product version is `1.2.0`. It is staged independently in `plugin.yaml`; the UniApp UTS target is also independently 1.2.0, while the root manifest, Android, iOS, HarmonyOS, React Native, and UniApp legacy products remain 1.1.1.
+The Web product participates in the coordinated `1.2.0` release. Its explicit target version in `plugin.yaml` must match the root, native, React Native, UniApp, and HarmonyOS release identity.
 
 The Web package is ESM-only, has no runtime dependencies, and publishes as `@sandrox/levixel-web`. Its accepted interaction matrix is macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Browsers outside that matrix, embedded WebViews, legacy bundles, UMD, and IIFE delivery are not claimed by 1.2.0.
 

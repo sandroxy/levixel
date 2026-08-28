@@ -10,13 +10,12 @@ Levixel 是一套强调原生手感的图片与视频查看器，提供共享转
 
 | 平台 | 公开制品 | 当前版本 |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.1.1` |
-| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.1.1` |
-| React Native / Expo | npm `@sandrox/levixel` | `1.1.1` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.1.1` |
-| UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.1.1` |
-
-Web 1.2.0 已完成 macOS Chrome、macOS Safari、Android Chrome 与 iOS Safari 的发布前手感验收，当前处于不可变 npm 制品收口阶段。它尚未公开发布，因此不列入上表的已发布产品集合。
+| Android | Maven Central `io.gitee.sandrox:levixel` | `1.2.0` |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.2.0` |
+| React Native / Expo | npm `@sandrox/levixel` | `1.2.0` |
+| HarmonyOS | OHPM `@sandrox/levixel` | `1.2.0` |
+| UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.2.0` |
+| Web | npm `@sandrox/levixel-web` | `1.2.0` |
 
 ## 源码结构
 
@@ -52,11 +51,11 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.1.1")
+    implementation("io.gitee.sandrox:levixel:1.2.0")
 }
 ```
 
-Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.1.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
+Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.2.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
 
 当前 Android 核心保留了完整验收的 `PhotoView 2.3.0`，因此消费者暂时需要保留 JitPack 仓库。
 
@@ -97,7 +96,7 @@ rootView.addView(viewer);
 https://github.com/sandroxy/levixel.git
 ```
 
-选择 `1.1.1` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
+选择 `1.2.0` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
 
 ```swift
 import Levixel
@@ -123,10 +122,10 @@ Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容
 通过 OHPM 安装：
 
 ```sh
-ohpm install @sandrox/levixel@1.1.1
+ohpm install @sandrox/levixel@1.2.0
 ```
 
-OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.1.1.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
+OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.2.0.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
 
 ## React Native / Expo
 
@@ -139,7 +138,7 @@ npx expo prebuild
 
 ## UniApp
 
-UniApp 市场当前公开的 1.1.1 面向经典 uni-app Android/iOS；独立的 UTS 1.2.0 候选正在增加 uni-app x 支持。**仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** x 宿主最低为 Android 6/API 23 与 iOS 15；两条渲染路径复用同一套平台 runtime、canonical JavaScript SDK 与已发布的 1.1.1 原生核心，`sourceVisibility` 默认保持 `visible`。1.2.0 尚待双端真机验收，不可发布；完整边界与验证说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
+UniApp 1.2.0 同时支持经典 uni-app 与 uni-app x 的 Android/iOS App。**uni-app x 仅支持 Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** x 宿主最低为 Android 6/API 23 与 iOS 15；两条渲染路径复用同一套平台 runtime、canonical JavaScript SDK 与 1.2.0 原生核心，`sourceVisibility` 默认保持 `visible`。classic 与 x 均已完成 Android/iOS 真机验收；完整边界与验证说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
 
 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394)是新项目的默认推荐渠道。匹配版本的 [GitHub Release](https://github.com/sandroxy/levixel/releases) 也提供同一份 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。
 
@@ -149,7 +148,7 @@ UniApp 市场当前公开的 1.1.1 面向经典 uni-app Android/iOS；独立的 
 
 Web 适配器位于 `adapters/web`，保持 Levixel 公共媒体、源图几何、事件与可见性协议，并使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制。Web 默认 `sourceVisibility: hidden`；经典 UniApp 已验收的 `visible` 默认值不受影响。
 
-首个公开候选版本为 npm `@sandrox/levixel-web@1.2.0`。正式发布后，npm 是默认安装渠道，匹配的 GitHub Release 同时提供精确的 `levixel-web-1.2.0.tgz` 与 SHA-256 文件。当前 API、浏览器边界和本地验证方式见 [Web 适配器文档](adapters/web/README.md)。
+首个公开版本为 npm `@sandrox/levixel-web@1.2.0`。npm 是默认安装渠道，匹配的 GitHub Release 同时提供精确的 `levixel-web-1.2.0.tgz` 与 SHA-256 文件。当前 API、浏览器边界和本地验证方式见 [Web 适配器文档](adapters/web/README.md)。
 
 ## 开发与发布
 

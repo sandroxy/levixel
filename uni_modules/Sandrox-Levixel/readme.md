@@ -1,6 +1,6 @@
 # Levixel 共享转场图片视频查看器（UTS）
 
-Levixel 已为经典 uni-app 的 App 端提供原生图片/视频查看体验；当前候选把同一能力扩展到 uni-app x Vapor，包括共享转场、左右分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 代码只是桥接层；Android/iOS 均调用与 legacy UniApp 插件相同的平台 runtime，不在 UTS 中重写查看器、手势、加载或坐标语义。
+Levixel 1.2.0 同时支持经典 uni-app 与 uni-app x Vapor 的 Android/iOS App，包括共享转场、左右分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 代码只是桥接层；Android/iOS 均调用与 legacy UniApp 插件相同的平台 runtime，不在 UTS 中重写查看器、手势、加载或坐标语义。
 
 ## 支持范围
 
@@ -11,7 +11,7 @@ Levixel 已为经典 uni-app 的 App 端提供原生图片/视频查看体验；
 - uni-app x Android 6（API 23）及以上；uni-app x iOS 15 及以上，arm64 真机。
 - 不支持 nvue、Web、小程序或 HarmonyOS。
 
-1.2.0 是待双端真机验收的 UTS 候选版本，不得提前发布或提交市场。它严格复用已发布的 1.1.1 Android AAR 与 iOS XCFramework；原生 core、legacy 包和其他原生产品没有随 UTS 产品虚假升版。插件携带原生 AAR/framework，普通基座不包含这些原生制品。经典项目可使用匹配的自定义基座、云打包或离线打包；x Vapor 必须使用 HBuilderX 标准运行、自定义基座或云打包。DCloud 尚未提供 Android/iOS Vapor 离线 SDK，不能把官方 x SDK typecheck 当作离线 App 验证。
+1.2.0 已完成 classic 与 x 的 Android/iOS 真机验收，并嵌入协调发布的 1.2.0 Android AAR 与 iOS XCFramework。插件携带原生 AAR/framework，普通基座不包含这些原生制品。经典项目可使用匹配的自定义基座、云打包或离线打包；x Vapor 必须使用 HBuilderX 标准运行、自定义基座或云打包。DCloud 尚未提供 Android/iOS Vapor 离线 SDK，不能把官方 x SDK typecheck 当作离线 App 验证。
 
 经典分支继续使用既有保存与路径行为。x 分支通过 `uni.getFileSystemManager()` 保存和清理自有预览；保存失败时只保留可靠宽高，不缓存、传递或清理 `getImageInfo` 返回的非自有临时路径，查看器继续按正式媒体 URL 原生加载。进入 UTS 前会收集并去重媒体项的 `url`、`thumbnailUrl`、`posterUrl` 本地路径，通过一次批量桥接完成转换；HTTP(S)、`data:` 与已有 `file:` URL 保持不变。Android 代码包中的 `static/` 和 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其他本地路径使用 `convert2AbsFullPath`；单项转换异常原样回退，native `open` 仍只调用一次。
 
@@ -212,7 +212,7 @@ UTS 会把具名类型中未填写的可选属性具体化为 `null`。插件包
 
 ## UniApp 专属源图策略
 
-`sourceVisibility` 默认且建议保持 `visible`。经典 UniApp 已在 Android/iOS 真机逐帧验收该 WebView 交接策略，用来避免关闭转场最后阶段出现源图纹理闪烁；x Vapor 候选沿用同一默认值，仍需在双端真机验证。只有业务页面完整处理 `sourceVisibilityChange`，并在实际宿主中重新验收后，才应显式改为 `hidden`。
+`sourceVisibility` 默认且建议保持 `visible`。经典 UniApp 与 x Vapor 均已在 Android/iOS 真机逐帧验收该源图交接策略，用来避免关闭转场最后阶段出现源图纹理闪烁。只有业务页面完整处理 `sourceVisibilityChange`，并在实际宿主中重新验收后，才应显式改为 `hidden`。
 
 ## 事件与直接控制
 

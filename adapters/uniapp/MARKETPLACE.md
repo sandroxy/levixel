@@ -1,6 +1,6 @@
 # DCloud 插件市场表单材料
 
-以下内容对应 `Sandrox-Levixel` @VERSION@ 的不可变候选制品。**当前禁止提交：uni-app x 双端真机验收尚未完成。** 验收必须使用下方 SHA-256 对应的同一 ZIP；通过后不得重新打包，只需核对联系人和真机记录。预览截图可选，不要扩大平台声明。
+以下内容对应 `Sandrox-Levixel` @VERSION@ 的不可变待发布制品。classic 与 uni-app x Vapor 的 Android/iOS 真机验收已经完成；上传前只需确认下方 SHA-256、联系人和真机记录仍与最终候选一致。预览截图可选，不要扩大平台声明。
 
 ## 基本信息
 
@@ -17,7 +17,7 @@
 
 一句话简介：
 
-> 为经典 uni-app Android/iOS 提供原生共享转场，并候选扩展至 uni-app x Vapor Android/iOS。
+> 为经典 uni-app 与 uni-app x Vapor Android/iOS 提供原生共享转场。
 
 完整简介：
 
@@ -34,7 +34,7 @@
 - uni-app x iOS：iOS 15 及以上，仅 arm64 真机
 - 不支持：nvue、Web、小程序、HarmonyOS、uni-app x VDOM
 
-uni-app x 当前为候选声明：本地编译与 SDK typecheck 完成后仍需双端真机验收，未完成前不可发布。
+uni-app x 已完成本地编译、官方 SDK typecheck 与 Android/iOS 双端真机验收。
 
 ## 隐私与权限
 
@@ -47,7 +47,7 @@ uni-app x 当前为候选声明：本地编译与 SDK typecheck 完成后仍需�
 
 ## 更新日志
 
-> 新增 uni-app x Vapor Android/iOS 候选支持；两端继续复用既有 UniApp runtime 与 Levixel 原生核心；x 分支增加 FileSystemManager 管理的预览保存/清理、失败时的非自有临时路径隔离，以及一次调用完成的 UTS 批量本地路径解析；canonical JS SDK、公开 API 与 `sourceVisibility: 'visible'` 默认策略保持不变。不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
+> 新增 uni-app x Vapor Android/iOS 正式支持；两端继续复用既有 UniApp runtime 与 Levixel 原生核心；x 分支增加 FileSystemManager 管理的预览保存/清理、失败时的非自有临时路径隔离，以及一次调用完成的 UTS 批量本地路径解析；修正 Vapor 源图圆角单位与 native hint 对齐；canonical JS SDK、公开 API 与 `sourceVisibility: 'visible'` 默认策略保持不变。不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
 
 ## 上传文件
 

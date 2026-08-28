@@ -63,7 +63,7 @@ The package command requires a clean worktree for a formal candidate. It builds 
 
 The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification requires HBuilderX 5.24+ and generates classic/x Kotlin and Swift, then typechecks the x output against the extracted official SDKs; set `HBUILDERX_CONTENTS` when HBuilderX is installed elsewhere. No SDK absolute path is committed.
 
-The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only uni-app x Vapor on Android/iOS is a candidate; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported.** The UTS product version is fixed at 1.2.0; do not publish until both x device runs accept the exact candidate SHA-256.
+The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only uni-app x Vapor on Android/iOS is supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported.** Every release candidate must pass both classic/x Android/iOS device matrices against its recorded SHA-256 before publication.
 
 The accepted App native-plugin bridge remains available for existing and offline consumers. It is built separately because it requires the DCloud legacy SDK and is not a Marketplace upload candidate:
 
@@ -100,7 +100,7 @@ Build and verify the exact npm candidate from a clean release commit:
 
 The package command writes `dist/web/levixel-web-<version>.tgz` and its SHA-256 sidecar, then installs that exact tarball in a temporary consumer for SSR import, public type, and real-Chrome interaction verification. It refuses to overwrite different candidate bytes silently. Use `--allow-dirty` only for a local pipeline rehearsal and `--replace` only after deliberately rejecting the previous local candidate.
 
-Web and UniApp UTS use explicit 1.2.0 target versions in `plugin.yaml`. UniApp additionally pins `native-release-version: 1.1.1`, so its packaging reuses the exact published Android/iOS core without relabeling it. Native Android/iOS/HarmonyOS, React Native, and the UniApp legacy target continue to inherit the 1.1.1 manifest version.
+The coordinated release version is 1.2.0. Web and UniApp UTS retain explicit target versions in `plugin.yaml`, while native Android/iOS/HarmonyOS, React Native, and the UniApp legacy target inherit the same root version. UniApp pins `native-release-version: 1.2.0`, so packaging must embed the exact AAR/XCFramework recorded by the coordinated native release manifest.
 
 ## Release Metadata
 

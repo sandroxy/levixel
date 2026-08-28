@@ -1,13 +1,14 @@
 # Changelog
 
-## 1.2.0（待真机验收）
+## 1.2.0
 
-- 候选支持 HBuilderX 5.24+ 的 App-Android 与 App-iOS，仅限 Vapor；x 宿主最低 Android 6 / API 23 与 iOS 15，不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
+- 正式支持 HBuilderX 5.24+ 的 App-Android 与 App-iOS uni-app x，仅限 Vapor；x 宿主最低 Android 6 / API 23 与 iOS 15，不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
 - 继续复用 canonical JavaScript SDK 与既有 Android/iOS UniApp runtime；仅新增 FileSystemManager 预览所有权管理和一次调用完成的 UTS 批量本地路径薄桥。
 - 预览保存失败时不再缓存可能被 runtime 复用的非自有临时路径，避免不同媒体错误共享同一缩略图。
 - 在 UTS JavaScript 边界移除具名类型为未填写可选属性生成的 `null`；必填字段、未知字段与空字符串仍按 canonical 协议拒绝。
-- 版本独立升级为 1.2.0，同时继续嵌入并校验已发布的 1.1.1 Android/iOS 原生核心；legacy 包和其他原生产品仍为 1.1.1。
-- 已加入 classic/x 编译、官方 uni-app x SDK typecheck 与独立 ZIP 消费宿主；双端真机验收完成前仍不可发布。
+- 与 Android/iOS 原生核心及可选 legacy 包统一升级为 1.2.0；原生查看器行为保持已验收的 1.1.1 手感。
+- 修正 Vapor 可见源图圆角与 native hint 的单位和值，避免 iOS 开关场期间缩略图短暂闪为直角。
+- 已通过 classic/x 编译、官方 uni-app x SDK typecheck、独立 ZIP 消费宿主以及 Android/iOS 双端真机验收。
 
 ## 1.1.1
 

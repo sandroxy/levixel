@@ -3,7 +3,7 @@
 schemaVersion: 1
 id: levixel
 displayName: Levixel
-version: 1.1.1
+version: 1.2.0
 summary: Shared-transition image and video viewer for native, React Native, UniApp, and Web applications.
 
 contract:
@@ -41,13 +41,13 @@ targets:
     artifacts:
       - id: maven-repository
         format: maven-repository-zip
-        output: dist/native-android/levixel-1.1.1-maven.zip
+        output: dist/native-android/levixel-1.2.0-maven.zip
         distribution:
           channel: maven-central
           packageId: io.gitee.sandrox:levixel
       - id: aar
         format: aar
-        output: dist/native-android/levixel-1.1.1.aar
+        output: dist/native-android/levixel-1.2.0.aar
     constraints:
       - name: minimum-sdk
         value: 21
@@ -71,13 +71,13 @@ targets:
     artifacts:
       - id: xcframework
         format: xcframework-zip
-        output: dist/native-ios/levixel-1.1.1.xcframework.zip
+        output: dist/native-ios/levixel-1.2.0.xcframework.zip
         distribution:
           channel: swift-package
           packageId: Levixel
       - id: swift-package
         format: swift-package-zip
-        output: dist/native-ios/levixel-1.1.1-swift-package.zip
+        output: dist/native-ios/levixel-1.2.0-swift-package.zip
     constraints:
       - name: minimum-ios
         value: '13.0'
@@ -99,7 +99,7 @@ targets:
     artifacts:
       - id: har
         format: har
-        output: dist/native-harmonyos/levixel-1.1.1.har
+        output: dist/native-harmonyos/levixel-1.2.0.har
         distribution:
           channel: ohpm
           packageId: '@sandrox/levixel'
@@ -129,7 +129,7 @@ targets:
     artifacts:
       - id: npm-package
         format: npm-tarball
-        output: dist/react-native/levixel-react-native-1.1.1.tgz
+        output: dist/react-native/levixel-react-native-1.2.0.tgz
         distribution:
           channel: npm
           packageId: '@sandrox/levixel'
@@ -169,7 +169,7 @@ targets:
           packageId: Sandrox-Levixel
     constraints:
       - name: native-release-version
-        value: '1.1.1'
+        value: '1.2.0'
       - name: minimum-hbuilderx
         value: '5.24'
       - name: uniapp-runtime
@@ -209,7 +209,7 @@ targets:
     artifacts:
       - id: app-native-plugin
         format: app-native-plugin-zip
-        output: dist/uniapp/levixel-uniapp-legacy-1.1.1.zip
+        output: dist/uniapp/levixel-uniapp-legacy-1.2.0.zip
         distribution:
           channel: github-release
           packageId: Sandrox-Levixel
