@@ -205,7 +205,7 @@ for required_notice in \
   fi
 done
 
-if rg -n -i 'galeria|nandorojo|com\.chris' \
+if grep -R -n -i -E 'galeria|nandorojo|com\.chris' \
   "${plugin_dir}/native/android/levixel/src" \
   "${plugin_dir}/native/ios/Levixel/Viewer" \
   "${plugin_dir}/native/harmonyos/levixel/src" \
@@ -224,7 +224,7 @@ if rg -n -i 'galeria|nandorojo|com\.chris' \
   exit 1
 fi
 
-if ! rg -q "from './canonical.js'" \
+if ! grep -Fq "from './canonical.js'" \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/index.js"; then
   echo "UniApp UTS JavaScript wrapper is not linked to its checked-in canonical module." >&2
   exit 1
