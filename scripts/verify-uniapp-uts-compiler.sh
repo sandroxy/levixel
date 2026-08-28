@@ -125,10 +125,10 @@ verify_android_output() {
     echo "HBuilderX did not generate the ${runtime} Android UTS bridge" >&2
     exit 1
   fi
-  if ! rg -q 'UTSAndroid\.getResourcePath' "${kotlin_source}" || \
-    ! rg -q 'UTSAndroid\.convert2AbsFullPath' "${kotlin_source}" || \
-    ! rg -q 'uni_modules/' "${kotlin_source}" || \
-    ! rg -q 'resolveLevixelNativePaths' "${kotlin_source}"; then
+  if ! grep -Eq 'UTSAndroid\.getResourcePath' "${kotlin_source}" || \
+    ! grep -Eq 'UTSAndroid\.convert2AbsFullPath' "${kotlin_source}" || \
+    ! grep -Eq 'uni_modules/' "${kotlin_source}" || \
+    ! grep -Eq 'resolveLevixelNativePaths' "${kotlin_source}"; then
     echo "The generated ${runtime} Android bridge is missing local path conversion" >&2
     exit 1
   fi
@@ -192,27 +192,27 @@ verify_android_output() {
 verify_ios_source_contract() {
   local runtime="$1"
   local swift_source="$2"
-  if rg -q 'getCurrentViewController' "${swift_source}"; then
+  if grep -Eq 'getCurrentViewController' "${swift_source}"; then
     echo "The generated ${runtime} iOS UTS bridge must use the shared runtime context fallback" >&2
     exit 1
   fi
-  if ! rg -q 'openJSON\(optionsJson, rootView: nil, viewController: nil' "${swift_source}"; then
+  if ! grep -Eq 'openJSON\(optionsJson, rootView: nil, viewController: nil' "${swift_source}"; then
     echo "The generated ${runtime} iOS bridge is not using the shared runtime context fallback" >&2
     exit 1
   fi
-  if rg -q 'retainedEventCallback' "${swift_source}"; then
+  if grep -Eq 'retainedEventCallback' "${swift_source}"; then
     echo "The generated ${runtime} iOS bridge must not retain a second event callback slot" >&2
     exit 1
   fi
-  if [[ "$(rg -c 'LevixelUniPresenter\.shared\.setJSONEventHandler' "${swift_source}")" != "1" ]]; then
+  if [[ "$(awk '/LevixelUniPresenter\.shared\.setJSONEventHandler/ { count++ } END { print count + 0 }' "${swift_source}")" != "1" ]]; then
     echo "The generated ${runtime} iOS bridge must install exactly one replaceable native event handler" >&2
     exit 1
   fi
-  if ! rg -q 'UTSiOS\.convert2AbsFullPath' "${swift_source}"; then
+  if ! grep -Eq 'UTSiOS\.convert2AbsFullPath' "${swift_source}"; then
     echo "The generated ${runtime} iOS bridge is missing local path conversion" >&2
     exit 1
   fi
-  if ! rg -q 'resolveLevixelNativePaths' "${swift_source}"; then
+  if ! grep -Eq 'resolveLevixelNativePaths' "${swift_source}"; then
     echo "The generated ${runtime} iOS bridge is missing batch local path conversion" >&2
     exit 1
   fi

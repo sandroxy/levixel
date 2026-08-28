@@ -37,18 +37,18 @@ if [[ "${actual_checksum}" != "${expected_checksum}" ]]; then
   exit 1
 fi
 
-if rg -q '@VERSION@|@NATIVE_VERSION@|@CHECKSUM@' "${marketplace_path}" || \
-   ! rg -q "${actual_checksum}" "${marketplace_path}" || \
-   ! rg -q "native release manifest.*${native_version}|${native_version}.*native release manifest" "${marketplace_path}"; then
+if grep -Eq '@VERSION@|@NATIVE_VERSION@|@CHECKSUM@' "${marketplace_path}" || \
+   ! grep -Eq "${actual_checksum}" "${marketplace_path}" || \
+   ! grep -Eq "native release manifest.*${native_version}|${native_version}.*native release manifest" "${marketplace_path}"; then
   echo "UniApp marketplace material does not match the candidate" >&2
   exit 1
 fi
 
-if unzip -Z1 "${archive_path}" | rg -q '(^|/)(__MACOSX|\.DS_Store)(/|$)'; then
+if unzip -Z1 "${archive_path}" | grep -E '(^|/)(__MACOSX|\.DS_Store)(/|$)' >/dev/null; then
   echo "UniApp UTS artifact contains macOS metadata" >&2
   exit 1
 fi
-if unzip -Z1 "${archive_path}" | rg -q "^${package_id}/"; then
+if unzip -Z1 "${archive_path}" | grep -E "^${package_id}/" >/dev/null; then
   echo "UniApp Marketplace ZIP must expose package.json and utssdk at the archive root, not under ${package_id}/" >&2
   exit 1
 fi
@@ -157,62 +157,66 @@ diff -qr \
 runtime_aar="${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${native_version}.aar"
 unzip -p "${runtime_aar}" classes.jar > "${work_dir}/runtime-classes.jar"
 jar tf "${work_dir}/runtime-classes.jar" > "${work_dir}/runtime-classes.txt"
-if ! rg -q '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${work_dir}/runtime-classes.txt"; then
+if ! grep -Eq '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${work_dir}/runtime-classes.txt"; then
   echo "Android shared runtime facade is missing" >&2
   exit 1
 fi
-if rg -q '^io/dcloud/.+\.class$|^com/sandrox/levixel/(?!uniapp/runtime/).+\.class$' "${work_dir}/runtime-classes.txt" --pcre2; then
+if awk '
+  /^io\/dcloud\/.+\.class$/ { found = 1 }
+  /^com\/sandrox\/levixel\/.+\.class$/ && $0 !~ /^com\/sandrox\/levixel\/uniapp\/runtime\// { found = 1 }
+  END { exit(found ? 0 : 1) }
+' "${work_dir}/runtime-classes.txt"; then
   echo "Android shared runtime contains DCloud or copied core classes" >&2
   exit 1
 fi
 
 runtime_binary="${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/LevixelUniRuntime"
 core_binary="${package_root}/utssdk/app-ios/Frameworks/Levixel.framework/Levixel"
-if ! file "${runtime_binary}" | rg -q 'current ar archive'; then
+if ! file "${runtime_binary}" | grep -E 'current ar archive' >/dev/null; then
   echo "LevixelUniRuntime.framework must be a static runtime framework" >&2
   exit 1
 fi
-if ! file "${core_binary}" | rg -q 'Mach-O 64-bit dynamically linked shared library arm64'; then
+if ! file "${core_binary}" | grep -E 'Mach-O 64-bit dynamically linked shared library arm64' >/dev/null; then
   echo "Levixel.framework must be an arm64 dynamic framework" >&2
   exit 1
 fi
-if ! rg -q 'openWithJSON:.*rootView:.*viewController:.*completion:' \
+if ! grep -Eq 'openWithJSON:.*rootView:.*viewController:.*completion:' \
   "${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/Headers/LevixelUniRuntime-Swift.h"; then
   echo "iOS shared runtime JSON entry point is missing" >&2
   exit 1
 fi
-if ! rg -q 'setJSONEventHandler:' \
+if ! grep -Eq 'setJSONEventHandler:' \
   "${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/Headers/LevixelUniRuntime-Swift.h"; then
   echo "iOS shared runtime event replacement entry point is missing" >&2
   exit 1
 fi
 
-if ! rg -q '__setLevixelNativeTransport' "${package_root}/js_sdk/canonical.js"; then
+if ! grep -Eq '__setLevixelNativeTransport' "${package_root}/js_sdk/canonical.js"; then
   echo "Canonical JS transport injection point is missing" >&2
   exit 1
 fi
-if ! rg -q "from '@/uni_modules/Sandrox-Levixel'" "${package_root}/js_sdk/index.js"; then
+if ! grep -Fq "from '@/uni_modules/Sandrox-Levixel'" "${package_root}/js_sdk/index.js"; then
   echo "UTS JS transport wrapper is not wired to the plugin root" >&2
   exit 1
 fi
-if ! rg -q 'getFileSystemManager' "${package_root}/js_sdk/canonical.js"; then
+if ! grep -Eq 'getFileSystemManager' "${package_root}/js_sdk/canonical.js"; then
   echo "Canonical JS does not contain the uni-app x FileSystemManager path" >&2
   exit 1
 fi
-if ! rg -q 'resolveLevixelNativePaths' "${package_root}/js_sdk/index.js" \
-  || ! rg -q 'resolvePaths\(paths\)' "${package_root}/js_sdk/index.js" \
-  || ! rg -q 'ResolveLevixelNativePaths' "${package_root}/utssdk/interface.uts"; then
+if ! grep -Eq 'resolveLevixelNativePaths' "${package_root}/js_sdk/index.js" \
+  || ! grep -Eq 'resolvePaths\(paths\)' "${package_root}/js_sdk/index.js" \
+  || ! grep -Eq 'ResolveLevixelNativePaths' "${package_root}/utssdk/interface.uts"; then
   echo "UTS JS transport batch path resolver is incomplete" >&2
   exit 1
 fi
-if ! rg -q 'UTSAndroid\.getResourcePath' "${package_root}/utssdk/app-android/index.uts" \
-  || ! rg -q 'UTSAndroid\.convert2AbsFullPath' "${package_root}/utssdk/app-android/index.uts" \
-  || ! rg -q "'uni_modules/'" "${package_root}/utssdk/app-android/index.uts" \
-  || ! rg -q "'/static/'" "${package_root}/utssdk/app-android/index.uts"; then
+if ! grep -Eq 'UTSAndroid\.getResourcePath' "${package_root}/utssdk/app-android/index.uts" \
+  || ! grep -Eq 'UTSAndroid\.convert2AbsFullPath' "${package_root}/utssdk/app-android/index.uts" \
+  || ! grep -Fq "'uni_modules/'" "${package_root}/utssdk/app-android/index.uts" \
+  || ! grep -Fq "'/static/'" "${package_root}/utssdk/app-android/index.uts"; then
   echo "Android UTS local path conversion is missing" >&2
   exit 1
 fi
-if ! rg -q 'UTSiOS\.convert2AbsFullPath' "${package_root}/utssdk/app-ios/index.uts"; then
+if ! grep -Eq 'UTSiOS\.convert2AbsFullPath' "${package_root}/utssdk/app-ios/index.uts"; then
   echo "iOS UTS local path conversion is missing" >&2
   exit 1
 fi

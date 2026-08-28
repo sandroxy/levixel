@@ -137,7 +137,7 @@ ruby -rjson -e '
 ' "${package_root}/package.json" "${version}"
 
 unexpected_project_urls="$(
-  rg --no-filename -o '(git\+)?https://github\.com/sandroxy/[A-Za-z0-9_.-]+' "${package_root}" \
+  grep -R -I -h -o -E '(git\+)?https://github\.com/sandroxy/[A-Za-z0-9_.-]+' "${package_root}" \
     | sort -u \
     | grep -Ev '^(git\+)?https://github\.com/sandroxy/levixel(\.git)?$' \
     || true
@@ -160,8 +160,8 @@ mkdir -p "${temporary_dir}/native-ios"
 unzip -q "${ios_artifact}" 'Levixel.xcframework/*' -d "${temporary_dir}/native-ios"
 diff -qr "${temporary_dir}/native-ios/Levixel.xcframework" "${packaged_xcframework}"
 
-if tar -tzf "${artifact_path}" | rg -q \
-  '(^|/)(native|Viewer|native-harmonyos)(/|$)|LevixelViewer(OverlayView|Controller|PageView)\.(java|kt|swift)$'; then
+if tar -tzf "${artifact_path}" | grep -E \
+  '(^|/)(native|Viewer|native-harmonyos)(/|$)|LevixelViewer(OverlayView|Controller|PageView)\.(java|kt|swift)$' >/dev/null; then
   echo "Native viewer source was duplicated into the npm package." >&2
   exit 1
 fi

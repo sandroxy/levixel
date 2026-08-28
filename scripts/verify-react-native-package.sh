@@ -118,7 +118,7 @@ for relative_path in LICENSE PROVENANCE.md THIRD_PARTY_NOTICES.md; do
 done
 
 for changelog in "${plugin_dir}/CHANGELOG.md" "${package_root}/CHANGELOG.md"; do
-  if ! rg -q "^## ${version}( |$)" "${changelog}"; then
+  if ! grep -Eq "^## ${version}( |$)" "${changelog}"; then
     echo "CHANGELOG.md does not contain a ${version} release entry: ${changelog}" >&2
     exit 1
   fi
@@ -140,8 +140,8 @@ mkdir -p "${temporary_dir}/native-ios"
 unzip -q "${ios_artifact}" 'Levixel.xcframework/*' -d "${temporary_dir}/native-ios"
 diff -qr "${temporary_dir}/native-ios/Levixel.xcframework" "${packaged_xcframework}"
 
-if tar -tzf "${artifact_path}" | rg -q \
-  '(^|/)(native|Viewer|native-harmonyos)(/|$)|LevixelViewer(OverlayView|Controller|PageView)\.(java|kt|swift)$'; then
+if tar -tzf "${artifact_path}" | grep -E \
+  '(^|/)(native|Viewer|native-harmonyos)(/|$)|LevixelViewer(OverlayView|Controller|PageView)\.(java|kt|swift)$' >/dev/null; then
   echo "Native viewer source was duplicated into the React Native package." >&2
   exit 1
 fi

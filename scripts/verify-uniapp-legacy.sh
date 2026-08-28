@@ -63,7 +63,7 @@ ruby -rjson -e '
   abort "Levixel.framework must be embedded" unless ios.fetch("embedFrameworks") == ["Levixel.framework"]
 ' "${package_root}/package.json" "${version}"
 
-if rg -n "Galeria|ChrisUniPlugin|com\.chris|galleryId|sourceRectScale" \
+if grep -R -n -E "Galeria|ChrisUniPlugin|com\.chris|galleryId|sourceRectScale" \
   "${package_root}/package.json" "${package_root}/js_sdk"; then
   echo "UniApp artifact contains a superseded contract or package identity" >&2
   exit 1
@@ -71,27 +71,33 @@ fi
 
 unzip -p "${package_root}/android/LevixelUniApp-release.aar" classes.jar > "${work_dir}/bridge-classes.jar"
 jar tf "${work_dir}/bridge-classes.jar" > "${work_dir}/bridge-classes.txt"
-if rg '^com/sandrox/levixel/(?!uniapp/).+\.class$' "${work_dir}/bridge-classes.txt" --pcre2; then
+if awk '
+  /^com\/sandrox\/levixel\/.+\.class$/ && $0 !~ /^com\/sandrox\/levixel\/uniapp\// { found = 1 }
+  END { exit(found ? 0 : 1) }
+' "${work_dir}/bridge-classes.txt"; then
   echo "UniApp Android bridge copied native core classes" >&2
   exit 1
 fi
-if ! rg -q '^com/sandrox/levixel/uniapp/LevixelUniModule.class$' "${work_dir}/bridge-classes.txt"; then
+if ! grep -Eq '^com/sandrox/levixel/uniapp/LevixelUniModule.class$' "${work_dir}/bridge-classes.txt"; then
   echo "UniApp Android module class is missing" >&2
   exit 1
 fi
-if rg -q '^com/sandrox/levixel/uniapp/runtime/.+\.class$' "${work_dir}/bridge-classes.txt"; then
+if grep -Eq '^com/sandrox/levixel/uniapp/runtime/.+\.class$' "${work_dir}/bridge-classes.txt"; then
   echo "UniApp Android bridge copied shared runtime classes" >&2
   exit 1
 fi
 
 unzip -p "${package_root}/android/LevixelUniRuntime-${version}.aar" classes.jar > "${work_dir}/runtime-classes.jar"
 jar tf "${work_dir}/runtime-classes.jar" > "${work_dir}/runtime-classes.txt"
-if ! rg -q '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${work_dir}/runtime-classes.txt"; then
+if ! grep -Eq '^com/sandrox/levixel/uniapp/runtime/LevixelUniRuntime.class$' "${work_dir}/runtime-classes.txt"; then
   echo "UniApp Android shared runtime facade is missing" >&2
   exit 1
 fi
-if rg -q '^io/dcloud/.+\.class$|^com/sandrox/levixel/(?!uniapp/runtime/).+\.class$' \
-  "${work_dir}/runtime-classes.txt" --pcre2; then
+if awk '
+  /^io\/dcloud\/.+\.class$/ { found = 1 }
+  /^com\/sandrox\/levixel\/.+\.class$/ && $0 !~ /^com\/sandrox\/levixel\/uniapp\/runtime\// { found = 1 }
+  END { exit(found ? 0 : 1) }
+' "${work_dir}/runtime-classes.txt"; then
   echo "UniApp Android shared runtime contains DCloud or copied core classes" >&2
   exit 1
 fi
@@ -99,15 +105,15 @@ fi
 bridge_binary="${package_root}/ios/LevixelUniApp.framework/LevixelUniApp"
 runtime_binary="${package_root}/ios/LevixelUniRuntime.framework/LevixelUniRuntime"
 core_binary="${package_root}/ios/Levixel.framework/Levixel"
-if ! file "${bridge_binary}" | rg -q 'current ar archive'; then
+if ! file "${bridge_binary}" | grep -E 'current ar archive' >/dev/null; then
   echo "LevixelUniApp.framework must be a static bridge framework" >&2
   exit 1
 fi
-if ! file "${runtime_binary}" | rg -q 'current ar archive'; then
+if ! file "${runtime_binary}" | grep -E 'current ar archive' >/dev/null; then
   echo "LevixelUniRuntime.framework must be a static runtime framework" >&2
   exit 1
 fi
-if ! file "${core_binary}" | rg -q 'Mach-O 64-bit dynamically linked shared library arm64'; then
+if ! file "${core_binary}" | grep -E 'Mach-O 64-bit dynamically linked shared library arm64' >/dev/null; then
   echo "Levixel.framework must be an arm64 dynamic framework" >&2
   exit 1
 fi

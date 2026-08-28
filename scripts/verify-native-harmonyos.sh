@@ -38,7 +38,7 @@ if [[ ! -f "${package_dir}/Index.d.ets" || ! -f "${package_dir}/ets/modules.abc"
   echo "Packaged HAR does not contain the Levixel public API and bytecode." >&2
   exit 1
 fi
-if ! rg -q '"name":"@sandrox/levixel"' "${package_dir}/oh-package.json5"; then
+if ! grep -Eq '"name":"@sandrox/levixel"' "${package_dir}/oh-package.json5"; then
   echo "Packaged HAR has unexpected package metadata." >&2
   exit 1
 fi
@@ -69,14 +69,14 @@ for required_file in README.md CHANGELOG.md LICENSE; do
     exit 1
   fi
 done
-if ! rg -q 'Copyright \(c\) 2025 Fernando Rojo' "${package_dir}/LICENSE" ||
-   ! rg -q 'Copyright \(c\) 2013 Michael Henry Pantaleon' "${package_dir}/LICENSE"; then
+if ! grep -Eq 'Copyright \(c\) 2025 Fernando Rojo' "${package_dir}/LICENSE" ||
+   ! grep -Eq 'Copyright \(c\) 2013 Michael Henry Pantaleon' "${package_dir}/LICENSE"; then
   echo "Packaged HarmonyOS LICENSE is missing required third-party notices." >&2
   exit 1
 fi
 
 while IFS= read -r -d '' packaged_file; do
-  if rg -a -n 'Galeria|galeria|com\.chris' "${packaged_file}"; then
+  if grep -a -n -E 'Galeria|galeria|com\.chris' "${packaged_file}"; then
     echo "Legacy Galeria identifiers found in packaged HarmonyOS runtime content." >&2
     exit 1
   fi

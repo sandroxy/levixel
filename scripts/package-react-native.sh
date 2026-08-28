@@ -57,11 +57,11 @@ if [[ "${packed_path}" != "${artifact_path}" ]]; then
   mv "${packed_path}" "${artifact_path}"
 fi
 
-if ! tar -tzf "${artifact_path}" | rg -q 'package/android/libs/levixel-core\.aar$'; then
+if ! tar -tzf "${artifact_path}" | grep -E 'package/android/libs/levixel-core\.aar$' >/dev/null; then
   echo "React Native package is missing the Android AAR" >&2
   exit 1
 fi
-if ! tar -tzf "${artifact_path}" | rg -q 'package/ios/Frameworks/Levixel\.xcframework/Info\.plist$'; then
+if ! tar -tzf "${artifact_path}" | grep -E 'package/ios/Frameworks/Levixel\.xcframework/Info\.plist$' >/dev/null; then
   echo "React Native package is missing the iOS XCFramework" >&2
   exit 1
 fi

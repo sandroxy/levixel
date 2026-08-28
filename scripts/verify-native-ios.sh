@@ -95,7 +95,7 @@ for legal_file in LICENSE THIRD_PARTY_NOTICES.md README.md; do
 done
 
 while IFS= read -r -d '' packaged_file; do
-  if rg -a -n 'Galeria|galeria|com\.chris' "${packaged_file}"; then
+  if grep -a -n -E 'Galeria|galeria|com\.chris' "${packaged_file}"; then
     echo "Legacy Galeria identifiers found in packaged iOS runtime content" >&2
     exit 1
   fi
