@@ -6,6 +6,10 @@ Levixel is a native-feeling image and video viewer built around shared transitio
 
 A shared transition starts from the visible source media's on-screen position, size, and corner radius, expands that content continuously into the full-screen viewer, and returns it to the corresponding source when dismissed. Even when the implementation hands off between a thumbnail, loading state, and original media, the user continues to perceive and manipulate one coherent piece of content.
 
+<p align="center">
+  <img src="docs/assets/levixel-demo.gif" width="400" alt="Levixel shared transition, paging, and return animation">
+</p>
+
 The interaction direction draws inspiration from the media-centered direct manipulation found in Google Photos and Apple's Photos app on iPhone. Those products are interaction references only; Levixel is not affiliated with, endorsed by, or based on their code. Levixel's own open-source lineage is documented under [License and provenance](#license-and-provenance).
 
 ## Capabilities
