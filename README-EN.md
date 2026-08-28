@@ -2,36 +2,33 @@
 
 [中文](README.md)
 
-Levixel is a native-feeling image and video viewer with shared transitions, horizontal paging, pinch-to-zoom, panning while zoomed, drag-to-dismiss, and video playback.
+Levixel is a native-feeling image and video viewer built around shared transitions, horizontal paging, pinch-to-zoom, zoomed panning, drag-to-dismiss, and video playback.
 
-This repository is the canonical source, public contract, packaging toolkit, and release home for Levixel. The Android, iOS, and HarmonyOS native cores and the React Native, UniApp, and Web adapters are maintained here. Every public product version maps to a verified, immutable artifact.
+A shared transition starts from the visible source media's on-screen position, size, and corner radius, expands that content continuously into the full-screen viewer, and returns it to the corresponding source when dismissed. Even when the implementation hands off between a thumbnail, loading state, and original media, the user continues to perceive and manipulate one coherent piece of content.
 
-## Published Packages
+The interaction direction draws inspiration from the media-centered direct manipulation found in Google Photos and Apple's Photos app on iPhone. Levixel is independently implemented and is not affiliated with or endorsed by either product.
 
-| Platform | Public artifact | Current version |
+## Capabilities
+
+- Mixed image and video paging
+- Source-anchored shared transitions for both opening and return
+- Pinch zoom, zoomed panning, and double-tap reset
+- Drag dismissal while fitted, tap dismissal, and system back handling
+- Continuous handoff across thumbnails, loading states, original images, and video frames
+- First-class delivery for Android, iOS, HarmonyOS, React Native, UniApp, and modern Web browsers
+
+## Platforms and distribution
+
+| Platform | Recommended channel | Integration |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.2.0` |
-| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.2.0` |
-| React Native / Expo | npm `@sandrox/levixel` | `1.2.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.2.0` |
-| UniApp | [UTS Marketplace plugin](https://ext.dcloud.net.cn/plugin?id=29394) / [App native-plugin ZIP](https://github.com/sandroxy/levixel/releases) | `1.2.0` |
-| Web | npm `@sandrox/levixel-web` | `1.2.0` |
+| Android | [Maven Central `io.gitee.sandrox:levixel`](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) | Native AAR with an offline mirror on GitHub Releases |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | Checksum-pinned binary XCFramework |
+| HarmonyOS | OHPM `@sandrox/levixel` | Native HAR with an offline mirror on GitHub Releases |
+| React Native / Expo | [npm `@sandrox/levixel`](https://www.npmjs.com/package/@sandrox/levixel) | React Native components plus accepted Android/iOS native artifacts |
+| UniApp | [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) | Classic uni-app and uni-app x Vapor Android/iOS Apps |
+| Web | [npm `@sandrox/levixel-web`](https://www.npmjs.com/package/@sandrox/levixel-web) | Framework-independent ESM browser runtime |
 
-## Source Layout
-
-```text
-levixel/
-├── native/          # Android, iOS, and HarmonyOS native cores
-├── adapters/        # React Native, UniApp, and Web adapters
-├── uni_modules/     # DCloud Marketplace UTS plugin source
-├── contract/        # Cross-platform public contract
-├── packaging/       # Platform artifact templates
-├── scripts/         # Build, artifact inspection, and release tools
-├── schema/          # Plugin manifest schema
-└── plugin.yaml      # Version, capability, and delivery manifest
-```
-
-Artifact-only consumer hosts install the final AAR, XCFramework, HAR, npm tarball, or UniApp ZIP. They never compile this source tree directly. The bytes accepted during hand verification are the same bytes released publicly.
+See [GitHub Releases](https://github.com/sandroxy/levixel/releases) and [CHANGELOG.md](CHANGELOG.md) for version history, checksums, and offline artifacts. Each package registry is the source of truth for the versions currently available through that channel; consult each platform guide for its exact capabilities and host requirements.
 
 ## Android
 
@@ -47,17 +44,15 @@ dependencyResolutionManagement {
 }
 ```
 
-Add the dependency:
+Use the latest stable version shown by Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.2.0")
+    implementation("io.gitee.sandrox:levixel:<version>")
 }
 ```
 
-Maven Central is the canonical Android dependency channel. The matching GitHub Release also provides `levixel-1.2.0.aar` and its SHA-256 file for offline or manual integration. The AAR is byte-identical to the Maven Central artifact.
-
-The Android core currently retains the fully validated `PhotoView 2.3.0` integration, so consumers must keep JitPack available for now.
+The Android core currently retains its fully gesture-tested PhotoView dependency, so consumers must keep JitPack available.
 
 Minimal viewer setup:
 
@@ -96,7 +91,7 @@ In Xcode, choose **File > Add Package Dependencies** and enter:
 https://github.com/sandroxy/levixel.git
 ```
 
-Select `1.2.0` or a compatible `1.x` version, then link the `Levixel` product.
+Select the latest compatible `1.x` release, then link the `Levixel` product.
 
 ```swift
 import Levixel
@@ -115,17 +110,17 @@ imageView.setupLevixelViewer(
 )
 ```
 
-The Swift Package references a checksum-pinned XCFramework. Xcode verifies the downloaded binary against the checksum in `Package.swift`.
+The Swift Package verifies the downloaded XCFramework against the checksum recorded in `Package.swift`.
 
 ## HarmonyOS
 
-Install from OHPM:
+Install the currently published package from OHPM:
 
 ```sh
-ohpm install @sandrox/levixel@1.2.0
+ohpm install @sandrox/levixel
 ```
 
-OHPM is the canonical HarmonyOS dependency channel. The matching GitHub Release also provides `levixel-1.2.0.har` and its SHA-256 file for offline or manual integration. The HAR is byte-identical to the published OHPM artifact.
+The matching GitHub Release also provides the HAR and its SHA-256 file for offline or manual integration. The public mirror must remain byte-identical to the OHPM artifact.
 
 ## React Native / Expo
 
@@ -134,26 +129,42 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-The npm package contains thin bridges and the verified Android/iOS native artifacts. It does not copy or rebuild the viewer core in the consuming application. See the [React Native adapter guide](adapters/react-native/README.md) for the component API.
+The package contains the React Native integration and verified Android/iOS native artifacts. It does not copy or rebuild the viewer core in the consuming application. See the [React Native adapter guide](adapters/react-native/README.md) for the component API and host requirements.
 
 ## UniApp
 
-UniApp 1.2.0 supports both classic uni-app and uni-app x Android/iOS Apps. Uni-app x support is **Vapor only**, requiring HBuilderX 5.24+, Android API 23+, and iOS 15+; VDOM is not supported. Classic and Vapor reuse one platform runtime, the canonical JavaScript SDK, and the 1.2.0 native cores, while `sourceVisibility` remains `visible` by default. Both renderers have completed Android and iOS real-device acceptance. See the [UniApp adapter guide](adapters/uniapp/README.md) for the full boundary and packaging workflow.
+Install from the [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) for the default path. The UTS plugin supports classic uni-app Vue 2 / Vue 3 App pages and uni-app x Vapor Android/iOS Apps; x VDOM is not supported. Both paths share one public JavaScript API and the same platform runtimes. `sourceVisibility` remains `visible` by default to preserve the accepted source-handoff behavior.
 
-The [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) is the recommended default channel for new projects. The matching [GitHub Release](https://github.com/sandroxy/levixel/releases) also provides the same `levixel-uniapp-<version>.zip` and its SHA-256 file for direct downloads, offline archives, and manual installation under `uni_modules/Sandrox-Levixel/`.
+See the [UniApp guide](uni_modules/Sandrox-Levixel/readme.md) for the complete compatibility boundary, loading-state integration, and examples. Matching GitHub Releases also provide the UTS ZIP and checksum for direct downloads and offline archives.
 
-Classic uni-app Android/iOS projects that deliberately choose the App native-plugin workflow instead of UTS—whether newly integrated or existing—can download the separately accepted `levixel-uniapp-legacy-<version>.zip`. It is not an older viewer: it is an alternative bridge delivery that uses the same-version runtime, canonical JavaScript SDK, and native cores. Extract it under `nativeplugins/Sandrox-Levixel/` and use a custom debugging base or offline packaging. This ZIP is not the UTS Marketplace package and does not support uni-app x.
+Classic uni-app Android/iOS projects that choose the App native-plugin workflow can use the separately published `levixel-uniapp-legacy-<version>.zip`. It uses the same-version public SDK, platform runtimes, and native cores, but it is not the DCloud UTS Marketplace package and does not support uni-app x.
 
 ## Web
 
-The Web adapter lives under `adapters/web`. It preserves Levixel's public media, source-geometry, event, and visibility protocols while using native browser DOM, Pointer Events, the Web Animations API, and media elements for shared transitions, paging, zoom, pan, drag dismissal, and video controls. Web defaults to `sourceVisibility: hidden`; the accepted classic UniApp `visible` default is unchanged.
+```sh
+pnpm add @sandrox/levixel-web
+```
 
-The first public version is npm `@sandrox/levixel-web@1.2.0`. npm is the default installation channel and the matching GitHub Release mirrors the exact `levixel-web-1.2.0.tgz` and SHA-256 file. See the [Web adapter guide](adapters/web/README.md) for the API, browser boundary, and local verification workflow.
+The Web package uses the browser DOM, Pointer Events, the Web Animations API, and native media elements for shared transitions, paging, zoom, pan, drag dismissal, and video controls. It defaults to `sourceVisibility: hidden` without changing UniApp's platform-specific `visible` default.
 
-## Development And Releases
+The public interaction boundary covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. See the [Web guide](adapters/web/README.md) for the API, browser boundary, and accessibility behavior.
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for local builds, artifact checks, and SDK prerequisites. See [RELEASING.md](RELEASING.md) for immutable artifact and publication rules.
+## Source and releases
 
-## License And Provenance
+```text
+levixel/
+├── native/          # Android, iOS, and HarmonyOS native cores
+├── adapters/        # React Native, UniApp, and Web adapters
+├── uni_modules/     # DCloud Marketplace UTS plugin source
+├── contract/        # Cross-platform public contract
+├── packaging/       # Platform artifact templates
+├── scripts/         # Build, artifact inspection, and release tools
+├── schema/          # Plugin manifest schema
+└── plugin.yaml      # Machine-readable version, capability, and delivery manifest
+```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for local builds, tests, and SDK prerequisites. See [RELEASING.md](RELEASING.md) for immutable-candidate, signing, and channel-publication rules.
+
+## License and provenance
 
 Levixel is released under the MIT License. The implementation has been substantially rewritten and polished across platforms while retaining traceable MIT-licensed derivative lineage. See [PROVENANCE.md](PROVENANCE.md), [LICENSE](LICENSE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

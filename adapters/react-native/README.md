@@ -3,9 +3,11 @@
 React Native and Expo adapter for the Levixel shared-transition image and video
 viewer.
 
-The package contains thin Expo Modules bridges plus checksum-verified Levixel
-native artifacts. It does not compile or copy the native viewer source into the
-consuming application.
+Visible source media expands from its on-screen position, size, and corner
+radius into the full-screen viewer, then returns to the corresponding source
+when dismissed. The package integrates checksum-verified Levixel native
+artifacts through Expo Modules; it does not compile or copy the native viewer
+source into the consuming application.
 
 ## Install
 
@@ -48,8 +50,8 @@ const items: LevixelMediaItem[] = [
 ```
 
 `Levixel.Source` must wrap the visible source image. This lets the native bridge
-register its real platform view and preserve the shared pickup and return
-transition.
+register its real platform view and preserve the source-anchored shared
+transition when opening and returning.
 
 ## Requirements
 
@@ -60,7 +62,8 @@ transition.
 
 Android hosts must remain edge-to-edge for uninterrupted system-bar
 transitions. Pure React Native hosts must also make Maven Central and JitPack
-available because the validated Android core currently retains PhotoView 2.3.0.
+available because the validated Android core currently retains its PhotoView
+dependency.
 
 ## Distribution
 

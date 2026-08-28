@@ -1,21 +1,34 @@
-# Levixel 共享转场图片视频查看器（UTS）
+# Levixel 共享转场图片视频查看器
 
-Levixel 1.2.0 同时支持经典 uni-app 与 uni-app x Vapor 的 Android/iOS App，包括共享转场、左右分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 代码只是桥接层；Android/iOS 均调用与 legacy UniApp 插件相同的平台 runtime，不在 UTS 中重写查看器、手势、加载或坐标语义。
+Levixel 以列表中源媒体当前可见的位置、尺寸和圆角为转场起点，将同一内容连续展开到原生全屏查看器；关闭时再沿对应路径回到源位置。缩略图、加载态与原始媒体之间的交接保持在同一段视觉关系中，让用户始终感知为同一份媒体在列表与全屏之间连续展开和归位。
 
-## 支持范围
+交互取向参考 Google Photos 与 iPhone 系统“照片”App 中以媒体为中心的直接操控方式。Levixel 是独立实现，与上述产品不存在隶属或授权关系。
 
-- HBuilderX 5.24 及以上。
-- 经典 uni-app Vue 2 / Vue 3 的 App Vue 页面。
-- 经典 Android 5.0（API 21）及以上；经典 iOS 13.0 及以上，arm64 真机。
-- **仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。**
-- uni-app x Android 6（API 23）及以上；uni-app x iOS 15 及以上，arm64 真机。
-- 不支持 nvue、Web、小程序或 HarmonyOS。
+## 核心能力
 
-1.2.0 已完成 classic 与 x 的 Android/iOS 真机验收，并嵌入协调发布的 1.2.0 Android AAR 与 iOS XCFramework。插件携带原生 AAR/framework，普通基座不包含这些原生制品。经典项目可使用匹配的自定义基座、云打包或离线打包；x Vapor 必须使用 HBuilderX 标准运行、自定义基座或云打包。DCloud 尚未提供 Android/iOS Vapor 离线 SDK，不能把官方 x SDK typecheck 当作离线 App 验证。
+- 图片与视频混合分页浏览
+- 以可见源为锚点的开场与回场共享转场
+- 双指缩放、缩放后平移与双击复位
+- 贴合状态竖拖关闭、点按关闭和系统返回
+- 缩略图未就绪时直接进入原生 loading，加载完成后连续交接
+- 经典 uni-app 与 uni-app x Vapor 使用同一套公共 JavaScript API
 
-经典分支继续使用既有保存与路径行为。x 分支通过 `uni.getFileSystemManager()` 保存和清理自有预览；保存失败时只保留可靠宽高，不缓存、传递或清理 `getImageInfo` 返回的非自有临时路径，查看器继续按正式媒体 URL 原生加载。进入 UTS 前会收集并去重媒体项的 `url`、`thumbnailUrl`、`posterUrl` 本地路径，通过一次批量桥接完成转换；HTTP(S)、`data:` 与已有 `file:` URL 保持不变。Android 代码包中的 `static/` 和 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其他本地路径使用 `convert2AbsFullPath`；单项转换异常原样回退，native `open` 仍只调用一次。
+## 兼容范围
 
-## 引入
+安装本插件请使用 HBuilderX 5.24 或更高版本。正式支持范围如下：
+
+| 宿主 | 页面类型 | Android | iOS |
+| --- | --- | --- | --- |
+| 经典 uni-app | Vue 2 / Vue 3 App Vue | API 21+ | iOS 13.0+，arm64 真机 |
+| uni-app x | 仅 Vapor | API 23+ | iOS 15.0+，arm64 真机 |
+
+uni-app x 不支持 VDOM。本 UniApp 交付也不覆盖 nvue、Web、小程序或 HarmonyOS；Web 与 HarmonyOS 可使用 Levixel 的[独立正式包](https://github.com/sandroxy/levixel#支持平台与分发)。
+
+## 安装与引入
+
+新项目推荐直接从 DCloud 插件市场导入。也可以从 [GitHub Releases](https://github.com/sandroxy/levixel/releases) 下载匹配版本的 `levixel-uniapp-<version>.zip`，将 ZIP 根目录内容放入项目的 `uni_modules/Sandrox-Levixel/`。
+
+业务代码只需要引入高层 SDK：
 
 ```js
 import {
@@ -28,7 +41,7 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-`utssdk` 暴露的 JSON 与路径接口只服务内部 transport，业务代码应使用上面的 canonical JS SDK。
+`utssdk` 下的 JSON、路径和回调接口属于内部 transport，不应由业务代码直接调用。
 
 ## 媒体数据
 
@@ -41,6 +54,7 @@ const items = [
     thumbnailUrl: 'https://example.com/photo-thumb.jpg',
     width: 1600,
     height: 1200,
+    alt: '海岸',
   },
   {
     id: 'video-1',
@@ -61,9 +75,15 @@ const items = [
 - `width`、`height`：媒体原始尺寸，可选但建议提供。
 - `alt`：媒体说明，可选。
 
-## 推荐接入
+## 接入原则
 
-源元素的选择器和 DOM 顺序必须与 `items` 一致。先用 `prepareLevixelItem` 得到稳定的本地预览地址并渲染它；图片完成解码时调用 `warmupLevixelItem`。列表较大时请限制为 2–3 个准备任务并发。
+1. 可见源元素的选择器和顺序必须与 `items` 一致。
+2. `prepareLevixelItem` 与 `warmupLevixelItem` 用于改善源图和加载交接，但**不是打开前置条件**。
+3. 即使缩略图尚未显示，点击后也应调用 `openLevixelFromSelector`；查看器会进入无共享源转场的原生 loading，不要在业务层因 `ready` 状态而拦截。
+4. 大列表准备预览时应限制为 2–3 个并发任务，避免集中占用 JS 与网络资源。
+5. 原图和视频由原生查看器在打开时按需加载；列表只需渲染缩略图或视频封面。
+
+## 经典 uni-app 示例
 
 ```vue
 <template>
@@ -72,7 +92,7 @@ const items = [
       v-for="(item, index) in items"
       :key="item.id"
       class="levixel-source"
-      :src="previewSources[item.id]"
+      :src="sourceFor(item)"
       mode="aspectFill"
       @load="handleLoad(item, $event)"
       @click="openViewer(index)"
@@ -90,14 +110,29 @@ import {
 export default {
   data() {
     return {
-      items: [],
+      items: [
+        {
+          id: 'photo-1',
+          type: 'image',
+          url: 'https://example.com/photo.jpg',
+          thumbnailUrl: 'https://example.com/photo-thumb.jpg',
+        },
+      ],
       previewSources: {},
-      readyItems: {},
     }
   },
+  onReady() {
+    this.items.forEach(item => this.preparePreview(item))
+  },
   methods: {
+    sourceFor(item) {
+      return this.previewSources[item.id]
+        || item.thumbnailUrl
+        || item.posterUrl
+        || item.url
+    },
     async preparePreview(item) {
-      const prepared = await prepareLevixelItem(item, { priority: true })
+      const prepared = await prepareLevixelItem(item)
       if (prepared) {
         this.previewSources = {
           ...this.previewSources,
@@ -106,14 +141,9 @@ export default {
       }
     },
     handleLoad(item, event) {
-      this.readyItems = { ...this.readyItems, [item.id]: true }
       warmupLevixelItem(item, event).catch(() => {})
     },
     async openViewer(index) {
-      const item = this.items[index]
-      if (!this.readyItems[item.id])
-        return
-
       await openLevixelFromSelector({
         items: this.items,
         index,
@@ -128,11 +158,19 @@ export default {
   },
 }
 </script>
+
+<style>
+.levixel-source {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 12rpx;
+}
+</style>
 ```
 
-## uni-app x Vapor / script setup 示例
+## uni-app x Vapor 示例
 
-Vapor 页面只能使用 Composition API / `script setup`。公共 SDK 与 classic 完全相同；不要直接调用 UTS 内部路径接口，也不要在业务层复制参数对象做平台特判。
+Vapor 页面使用 Composition API / `script setup`。公共 SDK 与经典 uni-app 相同，不需要在业务层复制协议或实现平台分支。
 
 ```vue
 <template>
@@ -176,7 +214,7 @@ const items = ref<DemoMediaItem[]>([
 const previewSources = ref<string[]>([''])
 
 async function preparePreview(item: DemoMediaItem, index: number) {
-  const prepared = await prepareLevixelItem(item, { priority: true })
+  const prepared = await prepareLevixelItem(item)
   if (prepared != null)
     previewSources.value[index] = prepared.src
 }
@@ -191,8 +229,10 @@ async function openViewer(index: number) {
     index,
     theme: 'dark',
     sourceSelector: '.levixel-source',
-    sourceStyles: items.value.map(() => ({ objectFit: 'cover', cornerRadius: 6 })),
-    sourceVisibility: 'visible',
+    sourceStyles: items.value.map(() => ({
+      objectFit: 'cover',
+      cornerRadius: 6,
+    })),
   })
 }
 
@@ -201,18 +241,20 @@ items.value.forEach((item, index) => preparePreview(item, index))
 
 <style>
 .levixel-source {
+  width: 100px;
+  height: 100px;
   border-radius: 6px;
 }
 </style>
 ```
 
-当前 App Vapor 的 `border-radius` 不支持 `rpx`。源元素圆角必须使用 `px`，并与 `sourceStyles.cornerRadius` 的数值保持一致；上例的可见源为 `6px`，因此传给 Levixel 的值也是 `6`。这能保证 `sourceVisibility: 'visible'` 时，Vapor 源图与原生转场快照在开关场期间使用相同轮廓。
+当前 App Vapor 的 `border-radius` 应使用 `px`，并与 `sourceStyles.cornerRadius` 的数值保持一致。上例可见源为 `6px`，因此传给 Levixel 的值也是 `6`；这样开关场期间源图与原生转场快照会使用相同轮廓。
 
-UTS 会把具名类型中未填写的可选属性具体化为 `null`。插件包装层会在进入 canonical SDK 前仅移除这些可选 `null` 字段；必填字段、未知字段和显式空字符串仍按同一公共协议拒绝。业务侧无需为图片补空 `posterUrl`，也无需为视频补空 `thumbnailUrl`。
+## 加载与源图交接
 
-## UniApp 专属源图策略
+`prepareLevixelItem` 会为共享转场准备稳定预览；`warmupLevixelItem` 在图片完成解码后记录可用的源图信息。准备失败或缩略图尚未加载时，查看器仍会按正式媒体 URL 打开并显示原生 loading。
 
-`sourceVisibility` 默认且建议保持 `visible`。经典 UniApp 与 x Vapor 均已在 Android/iOS 真机逐帧验收该源图交接策略，用来避免关闭转场最后阶段出现源图纹理闪烁。只有业务页面完整处理 `sourceVisibilityChange`，并在实际宿主中重新验收后，才应显式改为 `hidden`。
+`sourceVisibility` 默认且建议保持 `visible`。经典 uni-app 与 x Vapor 均使用该源图交接策略，避免关闭转场最后阶段出现源图纹理闪烁。只有页面完整处理 `sourceVisibilityChange`，并在实际宿主重新验收后，才应显式传入 `hidden`。
 
 ## 事件与直接控制
 
@@ -222,19 +264,25 @@ const remove = onLevixelEvent((event) => {
   console.log(event.type, event.payload)
 })
 
-await openLevixel({ items, index: 0, sourceVisibility: 'visible' })
+await openLevixel({ items, index: 0 })
 await closeLevixel()
 remove()
 ```
 
-通常优先使用 `openLevixelFromSelector`，让 SDK 测量 DOM 源图并生成 canonical `sourceHints`。
+通常优先使用 `openLevixelFromSelector`，让 SDK 测量当前可见源并生成共享转场所需的 `sourceHints`。只有宿主已经拥有可靠的源图几何时，才需要直接调用 `openLevixel` 并自行传入 `sourceHints`。
+
+## App 原生插件版
+
+选择 App 原生插件工作流的经典 uni-app Android/iOS 项目，可以从对应 [GitHub Release](https://github.com/sandroxy/levixel/releases) 下载 `levixel-uniapp-legacy-<version>.zip`。
+
+该包不是另一套查看器：它使用同版本的公共 SDK、UniApp 平台运行时和原生核心，只是桥接及打包形式不同。它需要自定义调试基座或离线打包，不属于 DCloud UTS 市场包，也不支持 uni-app x。
 
 ## 权限、隐私与许可
 
 - 插件不申请相机、相册、定位、麦克风等运行时权限。
 - 插件不包含广告、统计或推广 SDK。
 - 插件不向作者服务器上传数据；远程媒体请求只访问业务传入的 URL。
-- 本地预览缓存仅用于展示与共享转场，并按 LRU/下次启动清理策略管理。
+- 本地预览缓存仅用于展示与共享转场，并按 LRU 和下次启动清理策略管理。
 - 许可证为 MIT；`LICENSE`、`license.md` 与 `THIRD_PARTY_NOTICES.md` 随包提供。
 
-源码与问题反馈：https://github.com/sandroxy/levixel
+源码、版本历史与问题反馈：https://github.com/sandroxy/levixel

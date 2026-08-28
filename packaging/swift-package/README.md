@@ -2,6 +2,10 @@
 
 Binary Swift Package for the Levixel shared-transition image and video viewer.
 
+Visible source media expands from its on-screen position, size, and corner
+radius into the full-screen viewer, then returns to the corresponding source
+when dismissed.
+
 Add the published package repository in Xcode, select a compatible `1.x`
 version, link the `Levixel` product, and import the module:
 

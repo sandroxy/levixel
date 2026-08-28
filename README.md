@@ -2,36 +2,33 @@
 
 [English](README-EN.md)
 
-Levixel 是一套强调原生手感的图片与视频查看器，提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放能力。
+Levixel 是一套强调原生手感的共享转场图片与视频查看器，支持横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放。
 
-本仓库是 Levixel 的规范源码、公共契约、打包工具与公开发布入口。Android、iOS、HarmonyOS 原生核心以及 React Native、UniApp、Web 适配器都在这里维护；每个公开产品版本都对应经过校验且不可变的制品。
+共享转场以列表中源媒体当前可见的位置、尺寸和圆角为起点，将内容连续展开到全屏；关闭时再返回当前媒体对应的源位置。即使内部需要在缩略图、加载态与原始媒体之间交接，用户看到的仍是一份连续、可直接操控的内容。
 
-## 当前发布
+交互取向参考 Google Photos 与 iPhone 系统“照片”App 中以媒体为中心的直接操控方式。Levixel 是独立实现，与上述产品不存在隶属或授权关系。
 
-| 平台 | 公开制品 | 当前版本 |
+## 能力
+
+- 图片与视频混合分页浏览
+- 以可见源为锚点的开场与回场共享转场
+- 双指缩放、缩放后平移与双击复位
+- 贴合状态竖拖关闭、点按关闭和系统返回
+- 缩略图、加载态、原图与视频首帧之间的连续交接
+- Android、iOS、HarmonyOS、React Native、UniApp 与现代 Web 的正式交付
+
+## 支持平台与分发
+
+| 平台 | 推荐渠道 | 接入说明 |
 | --- | --- | --- |
-| Android | Maven Central `io.gitee.sandrox:levixel` | `1.2.0` |
-| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | `1.2.0` |
-| React Native / Expo | npm `@sandrox/levixel` | `1.2.0` |
-| HarmonyOS | OHPM `@sandrox/levixel` | `1.2.0` |
-| UniApp | [UTS 市场插件](https://ext.dcloud.net.cn/plugin?id=29394) / [App 原生插件 ZIP](https://github.com/sandroxy/levixel/releases) | `1.2.0` |
-| Web | npm `@sandrox/levixel-web` | `1.2.0` |
+| Android | [Maven Central `io.gitee.sandrox:levixel`](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) | 原生 AAR，同时在 GitHub Release 提供离线镜像 |
+| iOS | Swift Package `https://github.com/sandroxy/levixel.git` | 校验和固定的二进制 XCFramework |
+| HarmonyOS | OHPM `@sandrox/levixel` | 原生 HAR，同时在 GitHub Release 提供离线镜像 |
+| React Native / Expo | [npm `@sandrox/levixel`](https://www.npmjs.com/package/@sandrox/levixel) | React Native 组件与已验收的 Android/iOS 原生制品 |
+| UniApp | [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) | 经典 uni-app 与 uni-app x Vapor 的 Android/iOS App |
+| Web | [npm `@sandrox/levixel-web`](https://www.npmjs.com/package/@sandrox/levixel-web) | 无框架依赖的 ESM 浏览器运行时 |
 
-## 源码结构
-
-```text
-levixel/
-├── native/          # Android、iOS、HarmonyOS 原生核心
-├── adapters/        # React Native、UniApp 与 Web 适配层
-├── uni_modules/     # DCloud 市场 UTS 插件源目录
-├── contract/        # 跨平台公共契约
-├── packaging/       # 平台制品模板
-├── scripts/         # 构建、制品检查与发布工具
-├── schema/          # 插件清单 Schema
-└── plugin.yaml      # 版本、能力与交付目标清单
-```
-
-测试宿主只消费最终 AAR、XCFramework、HAR、npm tarball 或 UniApp ZIP，不直接编译本仓库源码。通过人工验收后发布的是同一份制品，不会重新构建一个未经验证的副本。
+版本历史、校验和与离线制品见 [GitHub Releases](https://github.com/sandroxy/levixel/releases) 和 [CHANGELOG.md](CHANGELOG.md)。各包管理器页面是对应公开渠道可用版本的准确信息源；不同平台的具体能力与宿主要求以对应平台文档为准。
 
 ## Android
 
@@ -47,17 +44,15 @@ dependencyResolutionManagement {
 }
 ```
 
-添加依赖：
+使用 Maven Central 页面显示的最新稳定版本：
 
 ```kotlin
 dependencies {
-    implementation("io.gitee.sandrox:levixel:1.2.0")
+    implementation("io.gitee.sandrox:levixel:<version>")
 }
 ```
 
-Maven Central 是 Android 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.2.0.aar` 及其 SHA-256 文件，仅用于离线或手动集成；该 AAR 与 Maven Central 制品字节级一致。
-
-当前 Android 核心保留了完整验收的 `PhotoView 2.3.0`，因此消费者暂时需要保留 JitPack 仓库。
+当前 Android 核心仍保留经过完整手势验收的 PhotoView 依赖，因此消费者需要保留 JitPack 仓库。
 
 最小打开方式：
 
@@ -96,7 +91,7 @@ rootView.addView(viewer);
 https://github.com/sandroxy/levixel.git
 ```
 
-选择 `1.2.0` 或兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
+选择最新兼容的 `1.x` 版本，然后链接 `Levixel` 产品。
 
 ```swift
 import Levixel
@@ -115,17 +110,17 @@ imageView.setupLevixelViewer(
 )
 ```
 
-Swift Package 使用校验和固定的 XCFramework；Xcode 会验证下载内容与 `Package.swift` 中的 checksum 一致。
+Swift Package 会验证下载的 XCFramework 与 `Package.swift` 中记录的 checksum 一致。
 
 ## HarmonyOS
 
-通过 OHPM 安装：
+通过 OHPM 安装当前公开版本：
 
 ```sh
-ohpm install @sandrox/levixel@1.2.0
+ohpm install @sandrox/levixel
 ```
 
-OHPM 是 HarmonyOS 的标准依赖渠道。对应 GitHub Release 同时提供 `levixel-1.2.0.har` 及其 SHA-256 文件，用于离线或手动集成；该 HAR 与 OHPM 上架制品字节级一致。
+对应 GitHub Release 同时提供 HAR 与 SHA-256 文件，供离线或手动集成。公开镜像与 OHPM 制品必须保持字节级一致。
 
 ## React Native / Expo
 
@@ -134,25 +129,41 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-该 npm 包只包含薄桥接层与校验过的 Android/iOS 原生制品，不在消费者项目中复制或重新编译查看器核心。完整组件接口见 [React Native 适配器文档](adapters/react-native/README.md)。
+该包包含 React Native 集成层与校验过的 Android/iOS 原生制品，不在消费者项目中复制或重新编译查看器核心。组件接口与宿主要求见 [React Native 适配器文档](adapters/react-native/README.md)。
 
 ## UniApp
 
-UniApp 1.2.0 同时支持经典 uni-app 与 uni-app x 的 Android/iOS App。**uni-app x 仅支持 Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** x 宿主最低为 Android 6/API 23 与 iOS 15；两条渲染路径复用同一套平台 runtime、canonical JavaScript SDK 与 1.2.0 原生核心，`sourceVisibility` 默认保持 `visible`。classic 与 x 均已完成 Android/iOS 真机验收；完整边界与验证说明见 [UniApp 适配器文档](adapters/uniapp/README.md)。
+推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时，`sourceVisibility` 默认保持 `visible`，以保留已经验收的源图交接手感。
 
-[DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394)是新项目的默认推荐渠道。匹配版本的 [GitHub Release](https://github.com/sandroxy/levixel/releases) 也提供同一份 `levixel-uniapp-<version>.zip` 与 SHA-256 文件，供直接下载、离线归档和手动复制到 `uni_modules/Sandrox-Levixel/`。
+完整兼容范围、加载态接入和示例见 [UniApp 使用说明](uni_modules/Sandrox-Levixel/readme.md)。匹配版本的 GitHub Release 也提供 UTS ZIP 与校验和，供直接下载和离线归档。
 
-不希望使用 UTS、而选择 App 原生插件工作流的经典 uni-app Android/iOS 项目（无论新接入或已有项目），可下载经过双端验收的 `levixel-uniapp-legacy-<version>.zip`。它不是旧查看器，而是使用同版本 runtime、canonical JavaScript SDK 和原生核心的另一种桥接交付形式；解压到 `nativeplugins/Sandrox-Levixel/` 后需使用自定义基座或离线打包。该包不是 UTS 市场包，也不支持 uni-app x。
+选择 App 原生插件工作流的经典 uni-app Android/iOS 项目，可使用 GitHub Release 中单独提供的 `levixel-uniapp-legacy-<version>.zip`。它使用同版本的公共 SDK、平台运行时和原生核心，但不属于 DCloud UTS 市场包，也不支持 uni-app x。
 
 ## Web
 
-Web 适配器位于 `adapters/web`，保持 Levixel 公共媒体、源图几何、事件与可见性协议，并使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制。Web 默认 `sourceVisibility: hidden`；经典 UniApp 已验收的 `visible` 默认值不受影响。
+```sh
+pnpm add @sandrox/levixel-web
+```
 
-首个公开版本为 npm `@sandrox/levixel-web@1.2.0`。npm 是默认安装渠道，匹配的 GitHub Release 同时提供精确的 `levixel-web-1.2.0.tgz` 与 SHA-256 文件。当前 API、浏览器边界和本地验证方式见 [Web 适配器文档](adapters/web/README.md)。
+Web 包使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制。它默认使用 `sourceVisibility: hidden`，不会改变 UniApp 专属的 `visible` 默认值。
 
-## 开发与发布
+公开交互范围覆盖 macOS Chrome、macOS Safari、Android Chrome 与 iOS Safari。API、浏览器边界和无障碍行为见 [Web 使用说明](adapters/web/README.md)。
 
-本地构建、制品自检与所需 SDK 见 [DEVELOPMENT.md](DEVELOPMENT.md)。不可变制品和版本发布流程见 [RELEASING.md](RELEASING.md)。
+## 源码与发布
+
+```text
+levixel/
+├── native/          # Android、iOS、HarmonyOS 原生核心
+├── adapters/        # React Native、UniApp 与 Web 适配层
+├── uni_modules/     # DCloud 市场 UTS 插件源目录
+├── contract/        # 跨平台公共契约
+├── packaging/       # 平台制品模板
+├── scripts/         # 构建、制品检查与发布工具
+├── schema/          # 插件清单 Schema
+└── plugin.yaml      # 版本、能力与交付目标的机器可读清单
+```
+
+本地构建、测试与 SDK 要求见 [DEVELOPMENT.md](DEVELOPMENT.md)。不可变候选、签名与渠道发布规则见 [RELEASING.md](RELEASING.md)。
 
 ## 许可证与来源
 

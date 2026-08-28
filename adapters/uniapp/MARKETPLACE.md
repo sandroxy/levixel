@@ -1,6 +1,6 @@
 # DCloud 插件市场表单材料
 
-以下内容对应 `Sandrox-Levixel` @VERSION@ 的不可变待发布制品。classic 与 uni-app x Vapor 的 Android/iOS 真机验收已经完成；上传前只需确认下方 SHA-256、联系人和真机记录仍与最终候选一致。预览截图可选，不要扩大平台声明。
+本文件是由打包脚本渲染的发布表单，不是用户使用说明。版本、原生 provenance、兼容范围、更新日志和 SHA-256 必须来自机器清单、插件元数据与对应 changelog，禁止在模板中手写当前发布值。
 
 ## 基本信息
 
@@ -8,7 +8,7 @@
 - 插件名称：Levixel 共享转场图片视频查看器
 - 插件类型：UTS API 插件
 - 版本：`@VERSION@`
-- 原生核心 provenance：`@NATIVE_VERSION@`（打包时按 native release manifest 校验原始 AAR/XCFramework 字节）
+- 原生核心 provenance：`@NATIVE_VERSION@`
 - 发行方式：免费，提供源码
 - 开源协议：MIT
 - 源码仓库：https://github.com/sandroxy/levixel
@@ -17,24 +17,24 @@
 
 一句话简介：
 
-> 为经典 uni-app 与 uni-app x Vapor Android/iOS 提供原生共享转场。
+> 为经典 uni-app 与 uni-app x Vapor Android/iOS App 提供原生共享转场图片与视频浏览。
 
 完整简介：
 
-> Levixel 提供共享转场、横向分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 仅承担上下文、JSON 数据和回调转换；Android/iOS 复用同一套已验收的 UniApp 平台 runtime 与正式原生核心，不在 UTS 中重写查看器逻辑。
+> Levixel 以列表中源媒体当前可见的位置、尺寸和圆角为起点，将内容连续展开到原生全屏查看器，并在关闭时返回对应源位置。支持图片与视频分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。
 
 ## 平台声明
 
-- HBuilderX：5.24 及以上
+- HBuilderX：`@HBUILDERX_MIN@` 及以上
 - 经典 uni-app：Vue 2、Vue 3 的 App Vue 页面
-- 经典 Android：API 21 及以上
-- 经典 iOS：13.0 及以上，仅 arm64 真机
-- uni-app x：**仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。**
-- uni-app x Android：Android 6 / API 23 及以上
-- uni-app x iOS：iOS 15 及以上，仅 arm64 真机
-- 不支持：nvue、Web、小程序、HarmonyOS、uni-app x VDOM
+- 经典 Android：API `@CLASSIC_ANDROID_MIN@` 及以上
+- 经典 iOS：`@CLASSIC_IOS_MIN@` 及以上，仅 arm64 真机
+- uni-app x：仅支持 Vapor，不支持 VDOM
+- uni-app x Android：API `@X_ANDROID_MIN@` 及以上
+- uni-app x iOS：`@X_IOS_MIN@` 及以上，仅 arm64 真机
+- 不支持：nvue、UniApp Web、小程序、HarmonyOS、uni-app x VDOM
 
-uni-app x 已完成本地编译、官方 SDK typecheck 与 Android/iOS 双端真机验收。
+发布前必须确认对应候选已经完成 classic/x 编译、官方 uni-app x SDK typecheck、独立 ZIP 消费宿主和适用平台的 Android/iOS 真机验收。
 
 ## 隐私与权限
 
@@ -47,7 +47,7 @@ uni-app x 已完成本地编译、官方 SDK typecheck 与 Android/iOS 双端真
 
 ## 更新日志
 
-> 新增 uni-app x Vapor Android/iOS 正式支持；两端继续复用既有 UniApp runtime 与 Levixel 原生核心；x 分支增加 FileSystemManager 管理的预览保存/清理、失败时的非自有临时路径隔离，以及一次调用完成的 UTS 批量本地路径解析；修正 Vapor 源图圆角单位与 native hint 对齐；canonical JS SDK、公开 API 与 `sourceVisibility: 'visible'` 默认策略保持不变。不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
+@CHANGELOG@
 
 ## 上传文件
 
@@ -61,8 +61,8 @@ uni-app x 已完成本地编译、官方 SDK typecheck 与 Android/iOS 双端真
 - 联系 QQ（可选，用于审核沟通）：`________________`
 - classic Android 真机型号 / 系统 / 验收日期：`________________`
 - classic iOS 真机型号 / 系统 / 验收日期：`________________`
-- x Vapor Android 6/API 23+ 真机型号 / 系统 / 验收日期：`________________`
-- x Vapor iOS 15+ 真机型号 / 系统 / 验收日期：`________________`
-- 可选预览截图：如提供，应使用不含 Probe、耗时等诊断面板的正式效果图，并满足市场当期尺寸与大小限制
+- x Vapor Android 真机型号 / 系统 / 验收日期：`________________`
+- x Vapor iOS 真机型号 / 系统 / 验收日期：`________________`
+- 可选预览截图：使用不含 Probe、耗时等诊断面板的真实正式效果图，并满足市场当期尺寸与大小限制
 
-真机验收矩阵：首次打开、重复打开、远程加载、失败重试、缓存重开、横向分页、缩放平移、竖拖关闭、点按关闭、系统返回、图片与视频切换、回到 WebView 后源图无末帧闪烁。
+真机验收矩阵：首次打开、重复打开、远程加载、失败重试、缓存重开、横向分页、缩放平移、竖拖关闭、点按关闭、系统返回、图片与视频切换、回到源位置以及源图末帧交接。

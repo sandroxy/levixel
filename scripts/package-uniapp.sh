@@ -57,6 +57,7 @@ if [[ ${allow_dirty} -ne 1 && -n "$(git -C "${plugin_dir}" status --porcelain --
 fi
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
+bash "${script_dir}/verify-documentation.sh"
 bash "${script_dir}/verify-uniapp-native-provenance.sh"
 
 if [[ ! -f "${core_android_aar}" || ! -f "${core_ios_zip}" ]]; then
@@ -128,11 +129,13 @@ else
   checksum="$(sha256sum "${candidate_archive_path}" | awk '{print $1}')"
 fi
 printf '%s  %s\n' "${checksum}" "${archive_name}" > "${candidate_checksum_path}"
-sed \
-  -e "s/@VERSION@/${version}/g" \
-  -e "s/@NATIVE_VERSION@/${native_version}/g" \
-  -e "s/@CHECKSUM@/${checksum}/g" \
-  "${marketplace_template}" > "${candidate_marketplace_path}"
+ruby "${script_dir}/render-uniapp-marketplace.rb" \
+  "${marketplace_template}" \
+  "${source_root}/package.json" \
+  "${source_root}/changelog.md" \
+  "${version}" \
+  "${native_version}" \
+  "${checksum}" > "${candidate_marketplace_path}"
 
 candidate_files=(
   "${candidate_archive_path}"

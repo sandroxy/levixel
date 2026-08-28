@@ -4,7 +4,7 @@ schemaVersion: 1
 id: levixel
 displayName: Levixel
 version: 1.2.0
-summary: Shared-transition image and video viewer for native, React Native, UniApp, and Web applications.
+summary: Native-feeling shared-transition image and video viewer for Android, iOS, HarmonyOS, React Native, UniApp, and Web.
 
 contract:
   version: 1

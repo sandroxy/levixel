@@ -89,7 +89,7 @@ npm run dev
 npm run verify
 ```
 
-The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates the 1.2.0 package metadata, legal-file bytes, and npm payload allowlist. Manual interaction acceptance covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
+The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates the declared target package metadata, legal-file bytes, and npm payload allowlist. Manual interaction acceptance covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
 
 Build and verify the exact npm candidate from a clean release commit:
 
@@ -100,13 +100,14 @@ Build and verify the exact npm candidate from a clean release commit:
 
 The package command writes `dist/web/levixel-web-<version>.tgz` and its SHA-256 sidecar, then installs that exact tarball in a temporary consumer for SSR import, public type, and real-Chrome interaction verification. It refuses to overwrite different candidate bytes silently. Use `--allow-dirty` only for a local pipeline rehearsal and `--replace` only after deliberately rejecting the previous local candidate.
 
-The coordinated release version is 1.2.0. Web and UniApp UTS retain explicit target versions in `plugin.yaml`, while native Android/iOS/HarmonyOS, React Native, and the UniApp legacy target inherit the same root version. UniApp pins `native-release-version: 1.2.0`, so packaging must embed the exact AAR/XCFramework recorded by the coordinated native release manifest.
+`plugin.yaml` is the only source of truth for the root version, independently staged target versions, artifact paths, and UniApp native provenance. Native Android/iOS/HarmonyOS, React Native, and the UniApp legacy target normally inherit the root version; Web and UniApp UTS may declare explicit target versions. UniApp packaging must resolve `native-release-version` from that manifest and embed the exact AAR/XCFramework recorded by the corresponding native release manifest. Do not copy a current release number into development prose.
 
 ## Release Metadata
 
 Validate versions, target declarations, notices, privacy metadata, and runtime identifiers:
 
 ```sh
+./scripts/verify-documentation.sh
 ./scripts/verify-release-metadata.sh
 ```
 

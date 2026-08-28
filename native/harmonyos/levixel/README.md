@@ -2,6 +2,10 @@
 
 Shared-transition image and video viewer for HarmonyOS.
 
+Visible source media expands from its on-screen position, size, and corner
+radius into the full-screen viewer, then returns to the corresponding source
+when dismissed.
+
 ## Installation
 
 ```shell

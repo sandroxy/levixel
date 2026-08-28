@@ -41,6 +41,7 @@ node -e '
 ' "${plugin_dir}/adapters/web/package.json" "${web_version}"
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
+bash "${script_dir}/verify-documentation.sh"
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid Levixel semantic version: ${version}" >&2

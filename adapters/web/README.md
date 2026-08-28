@@ -1,18 +1,18 @@
 # Levixel Web
 
-Framework-independent Web runtime for Levixel's shared-transition image and video viewer.
+Framework-independent Web runtime for Levixel's shared-transition image and video viewer. A source media element expands continuously from its visible position, size, and corner radius into the full-screen viewer, then returns to the corresponding source when dismissed.
 
-Levixel Web 1.2.0 is packaged as an ESM-only npm library with type declarations. The exact release tarball is built and verified before publication; npm and the matching GitHub Release publish those accepted bytes without rebuilding them.
+The package is ESM-only, includes public type declarations, and has no runtime dependencies.
 
 ## Installation
 
 ```sh
-npm install @sandrox/levixel-web@1.2.0
+npm install @sandrox/levixel-web
 ```
 
 The package has no runtime dependencies. Importing it during server-side rendering is safe, while viewer and preload calls require a live browser document.
 
-## Validation demo
+## Local development
 
 ```sh
 cd adapters/web
@@ -109,6 +109,6 @@ Backgrounding a page pauses active video without clearing subscriptions or closi
 
 ## Browser boundary
 
-The 1.2.0 interaction matrix has been accepted on macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Automated interaction coverage runs in a real Chrome/Chromium process and artifact verification reruns that suite against the installed npm tarball rather than workspace imports.
+The supported interaction matrix covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Automated interaction coverage runs in a real Chrome/Chromium process and artifact verification reruns that suite against the installed npm tarball rather than workspace imports.
 
-The implementation relies on Pointer Events, the Web Animations API, Shadow DOM, and modern media elements. Browsers outside the accepted matrix, embedded WebViews, and compatibility bundles for legacy browsers are not claimed by 1.2.0. No UMD, IIFE, or separately maintained browser implementation is shipped.
+The implementation relies on Pointer Events, the Web Animations API, Shadow DOM, and modern media elements. Browsers outside the supported matrix, embedded WebViews, and compatibility bundles for legacy browsers are not claimed. No UMD, IIFE, or separately maintained browser implementation is shipped.
