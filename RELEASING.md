@@ -1,5 +1,9 @@
 # Release Process
 
+This document is for Levixel maintainers. Package installation and application
+integration are documented in [README.md](README.md) and
+[README-EN.md](README-EN.md).
+
 ## Artifact Graph
 
 Levixel records every ecosystem product and its immutable artifact. Targets normally inherit the canonical manifest version; an independently staged target may explicitly declare its product version without relabeling already published artifacts on other platforms.
@@ -23,7 +27,7 @@ Product publication workflows are intentionally manual. Publishing a GitHub Rele
 2. Build each candidate once.
 3. Run the artifact self-checks in this repository.
 4. Install those exact files in artifact-only consumer hosts. Consumer hosts must not compile or copy Levixel source.
-5. Complete the required Android, iOS, HarmonyOS, React Native, and UniApp hand verification for the targets being released.
+5. Complete the required Android, iOS, HarmonyOS, React Native, UniApp, and Web interaction verification for the targets being released.
 6. Publish only the accepted files and their recorded checksums. Never rebuild after acceptance or reuse a public version for different bytes.
 
 Prepare the complete native candidate and release manifest with:
@@ -57,8 +61,8 @@ Post-release documentation corrections are normal commits on the default branch.
 
 Each coordinated Levixel release uses exactly one annotated Git tag named
 `<version>` and one matching GitHub Release. Android, iOS, HarmonyOS, React
-Native, and UniApp all refer to that shared release identity; do not create
-product-prefixed tags such as `levixel-v<version>` or
+Native, UniApp, and Web all refer to that shared release identity; do not
+create product-prefixed tags such as `levixel-v<version>` or
 `levixel-react-native-v<version>`.
 
 ```sh
@@ -192,7 +196,7 @@ The workflow downloads and verifies the accepted GitHub Release assets and publi
 
 ## UniApp / DCloud UTS Plugin
 
-The Marketplace product supports classic uni-app Vue pages and uni-app x Vapor on Android/iOS. Uni-app x requires HBuilderX 5.24+, Android API 23+, and iOS 15+. **Only uni-app x Vapor is in scope; VDOM, nvue, HarmonyOS, mini apps, and Web are unsupported.** It embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
+The Marketplace product supports classic uni-app Vue pages and uni-app x Vapor on Android/iOS. Exact HBuilderX and platform minimums come from `uni_modules/Sandrox-Levixel/package.json` and `plugin.yaml`; do not duplicate them in this guide. **Only uni-app x Vapor is in scope; VDOM, nvue, HarmonyOS, mini apps, and Web are unsupported.** The package embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
 
 Resolve the UniApp product version and `native-release-version` from `plugin.yaml`; do not duplicate either value in this guide. Packaging must verify and embed the exact AAR/XCFramework recorded by the resolved native release manifest. If an independently staged UniApp target intentionally uses a different product or native version, that relationship must be explicit in the manifest and release review. Build and accept one final ZIP only after its native release manifest exists, never rebuild it after device acceptance, and never reuse a published version for different bytes.
 
@@ -206,7 +210,7 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
 
    Packaging fails before building if the worktree is dirty or if the generated canonical SDK, target/native version split, native release hashes, or declared source root has drifted. It builds into temporary storage and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. `--allow-dirty` is only a local rehearsal; `--replace` is allowed only after deliberately rejecting the previous candidate and requires repeating all acceptance. The result is `dist/uniapp/levixel-uniapp-<version>.zip`; record its SHA-256 before any device run.
 
-2. Inspect the exact bytes and compile classic/x bridges with HBuilderX 5.24+, including official x SDK typechecks:
+2. Inspect the exact bytes and compile classic/x bridges with the declared HBuilderX minimum or newer, including official x SDK typechecks:
 
    ```sh
    ./scripts/verify-uniapp.sh

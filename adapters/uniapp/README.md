@@ -4,7 +4,7 @@
 
 Levixel 的 UniApp 交付包含两条薄桥，但只有一套平台 runtime 和一套 canonical JavaScript SDK：
 
-- `levixel-uniapp-runtime` 与 `LevixelUniRuntime.framework` 持有已经验收的 UniApp 平台行为。
+- `levixel-uniapp-runtime` 与 `LevixelUniRuntime.framework` 持有两条桥共用的 UniApp 平台行为。
 - legacy `UniModule` / ObjC 模块作为可选交付形式，服务选择 App 原生插件工作流的新老项目与离线集成。
 - UTS Android/iOS 只负责上下文、JSON 字符串和回调转换，是 DCloud 插件市场与新项目的默认推荐方案。
 - 两条桥都调用正式 Levixel AAR/framework；UTS 不实现转场、加载、手势或 `sourceHints` 语义。
@@ -13,7 +13,7 @@ Levixel 的 UniApp 交付包含两条薄桥，但只有一套平台 runtime 和�
 
 ## uni-app x 支持范围
 
-**仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。** 正式范围只有 App-Android（Android 6 / API 23+）和 App-iOS（iOS 15+ 真机）；不支持 nvue、HarmonyOS、Web 或小程序。经典 uni-app Vue 2 / Vue 3 的既有 App Vue 支持仍保留 Android API 21+ 与 iOS 13+ 边界。
+**uni-app x 仅支持 Vapor，不支持 VDOM。** 精确的 HBuilderX、经典 App 与 x App 平台下限由 `uni_modules/Sandrox-Levixel/package.json` 和 `plugin.yaml` 维护，并由用户文档与市场材料从元数据校验或生成。UniApp 交付只覆盖经典 Vue 2 / Vue 3 App Vue 和 uni-app x Vapor 的 Android/iOS；不支持 nvue、HarmonyOS、Web 或小程序。
 
 每个候选版本都必须从 `plugin.yaml` 解析自身版本及 `native-release-version`，并嵌入对应原生发布清单记录的精确 AAR/XCFramework。classic/x 编译、官方 SDK typecheck、ZIP staging、共享转场、坐标、快速开关、视频与返回源图都属于正式验收矩阵；发布时必须始终使用同一候选 SHA-256 完成制品与真机闭环。
 
@@ -56,7 +56,7 @@ await openLevixelFromSelector({
 
 在 uni-app x App Vapor 中，可见源元素应使用与上例数值一致的 `border-radius: 6px`。当前 Vapor 的 `border-radius` 不支持 `rpx`；使用 `rpx` 会让源视图在转场期间失去圆角，而 native hint 仍按数值插值，形成短暂的直角闪变。经典 uni-app 的 CSS 处理不受此限制。
 
-`sourceVisibility` 默认值必须保持 `visible`。经典 UniApp 已验收的 WebView 交接策略会让 HTML 源图留在原生转场下方，以避免关闭末帧出现纹理闪烁；x Vapor 沿用相同公共语义，并已完成双端真机逐帧验收。只有页面完整处理 `sourceVisibilityChange` 且在实际宿主重新验收后，才应显式传 `hidden`。
+`sourceVisibility` 默认值必须保持 `visible`。WebView/Vapor 交接策略会让页面源图留在原生转场下方，以避免关闭末帧出现纹理闪烁。显式改为 `hidden` 前，宿主必须完整处理 `sourceVisibilityChange`，并重新执行适用平台的开关场与回源回归。
 
 ## iOS 事件订阅生命周期
 
@@ -80,7 +80,7 @@ iOS UTS 不再另存一份事件回调，而是把回调交给 `LevixelUniRuntim
 ./scripts/verify-uniapp-uts-compiler.sh
 ```
 
-主打包脚本不依赖 DCloud legacy SDK，只构建共享 runtime 并装入正式原生核心。正式候选要求干净工作区，并拒绝静默覆盖同版本的不同 ZIP、SHA-256 或市场材料；`--allow-dirty` 只用于本地流水线演练，明确放弃旧候选后才可加 `--replace`，且替换后必须重新完成全部制品验收。第三条命令要求 HBuilderX 5.24+，分别以 classic 与 x 模式生成 Kotlin/Swift；classic 输出继续做原有编译检查，x 输出还必须对 DCloud 官方 Android/iOS uni-app x SDK typecheck。SDK 根目录通过 `DCLOUD_UNIAPP_X_ANDROID_SDK_ROOT` 与 `DCLOUD_UNIAPP_X_IOS_SDK_ROOT` 传入，仓库不保存机器绝对路径。
+主打包脚本不依赖 DCloud legacy SDK，只构建共享 runtime 并装入正式原生核心。正式候选要求干净工作区，并拒绝静默覆盖同版本的不同 ZIP、SHA-256 或市场材料；`--allow-dirty` 只用于本地流水线演练，明确放弃旧候选后才可加 `--replace`，且替换后必须重新完成全部制品验收。第三条命令要求使用插件元数据声明的 HBuilderX 最低版本或更高版本，分别以 classic 与 x 模式生成 Kotlin/Swift；classic 输出继续做原有编译检查，x 输出还必须对 DCloud 官方 Android/iOS uni-app x SDK typecheck。SDK 根目录通过 `DCLOUD_UNIAPP_X_ANDROID_SDK_ROOT` 与 `DCLOUD_UNIAPP_X_IOS_SDK_ROOT` 传入，仓库不保存机器绝对路径。
 
 输出包括：
 

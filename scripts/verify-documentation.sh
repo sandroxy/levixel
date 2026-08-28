@@ -23,14 +23,47 @@ version_neutral_docs=(
   "${marketplace_readme}"
 )
 
+public_facing_docs=(
+  "${plugin_dir}/CHANGELOG.md"
+  "${plugin_dir}/PROVENANCE.md"
+  "${plugin_dir}/README.md"
+  "${plugin_dir}/README-EN.md"
+  "${plugin_dir}/adapters/react-native/README.md"
+  "${plugin_dir}/adapters/web/CHANGELOG.md"
+  "${plugin_dir}/adapters/web/PROVENANCE.md"
+  "${plugin_dir}/adapters/web/README.md"
+  "${plugin_dir}/native/harmonyos/levixel/CHANGELOG.md"
+  "${plugin_dir}/native/harmonyos/levixel/README.md"
+  "${plugin_dir}/packaging/swift-package/README.md"
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/changelog.md"
+  "${marketplace_readme}"
+)
+
 ruby -e '
-  pattern = /(?<![0-9A-Za-z])\d+\.\d+\.\d+(?![0-9A-Za-z])/
+  pattern = /(?<![0-9A-Za-z])(?:\d+\.\d+\.\d+|\d+\.(?:x|X|\*))(?![0-9A-Za-z])/
   failures = ARGV.each_with_object([]) do |path, result|
     matches = File.read(path).scan(pattern).uniq
     result << "#{path}: #{matches.join(", ")}" unless matches.empty?
   end
-  abort("Stable documentation must not contain release literals:\n#{failures.join("\n")}") unless failures.empty?
+  abort("Stable documentation must not contain release literals or floating major aliases:\n#{failures.join("\n")}") unless failures.empty?
 ' "${version_neutral_docs[@]}"
+
+ruby -e '
+  forbidden = {
+    /已验收|验收\s*SHA-?256|字节级一致|正式候选|独立实现/ => "maintainer-only Chinese release or provenance wording",
+    /\b(?:accepted artifacts?|immutable candidate|canonical release pipeline|byte-identical|artifact-only|independently implemented)\b/i => "maintainer-only English release or provenance wording",
+    /SDK typecheck|native-release-version|proof of concept|product authority/i => "internal implementation or audit wording"
+  }
+  failures = []
+  ARGV.each do |path|
+    contents = File.read(path)
+    forbidden.each do |pattern, description|
+      match = contents.match(pattern)
+      failures << "#{path}: #{description}: #{match[0]}" if match
+    end
+  end
+  abort("Maintainer-only wording leaked into a public-facing document:\n#{failures.join("\n")}") unless failures.empty?
+' "${public_facing_docs[@]}"
 
 ruby -e '
   allowed = %w[1.0.0 1.1.0]
@@ -66,7 +99,7 @@ if ! grep -Fq "不是打开前置条件" "${marketplace_readme}"; then
   exit 1
 fi
 if ! grep -Fq 'sourceVisibility` 默认且建议保持 `visible' "${marketplace_readme}"; then
-  echo "UniApp user documentation must preserve the accepted sourceVisibility default." >&2
+  echo "UniApp user documentation must preserve the declared sourceVisibility default." >&2
   exit 1
 fi
 
@@ -124,6 +157,85 @@ for platform in Android iOS HarmonyOS "React Native / Expo" UniApp Web; do
     exit 1
   fi
 done
+
+ruby -e '
+  expected_channels = {
+    "Android" => "https://central.sonatype.com/artifact/io.gitee.sandrox/levixel",
+    "iOS" => "https://github.com/sandroxy/levixel",
+    "HarmonyOS" => "https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel",
+    "React Native / Expo" => "https://www.npmjs.com/package/@sandrox/levixel",
+    "UniApp" => "https://ext.dcloud.net.cn/plugin?id=29394",
+    "Web" => "https://www.npmjs.com/package/@sandrox/levixel-web"
+  }
+  failures = []
+  ARGV.each do |path|
+    lines = File.readlines(path, chomp: true)
+    expected_channels.each do |platform, url|
+      row = lines.find { |line| line.start_with?("| #{platform} |") }
+      failures << "#{path}: missing #{platform} row" unless row
+      failures << "#{path}: #{platform} channel is not linked to #{url}" if row && !row.include?("](#{url})")
+    end
+  end
+  abort("Root README distribution links are incomplete:\n#{failures.join("\n")}") unless failures.empty?
+' "${plugin_dir}/README.md" "${plugin_dir}/README-EN.md"
+
+ruby -ryaml -e '
+  manifest = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
+  targets = manifest.fetch("targets").to_h { |target| [target.fetch("id"), target] }
+  constraint = lambda do |target_id, name|
+    entry = targets.fetch(target_id).fetch("constraints").find { |item| item.fetch("name") == name }
+    abort("Missing #{target_id} constraint #{name}") unless entry
+    entry.fetch("value").to_s
+  end
+
+  android = constraint.call("native-android", "minimum-sdk")
+  ios = constraint.call("native-ios", "minimum-ios")
+  harmony = constraint.call("native-harmonyos", "minimum-api")
+  checks = {
+    ARGV.fetch(1) => ["最低支持 Android API #{android}", "最低支持 iOS #{ios}", "最低支持 HarmonyOS API #{harmony}"],
+    ARGV.fetch(2) => ["minimum supported Android version is API #{android}", "minimum supported iOS version is #{ios}", "minimum supported HarmonyOS version is API #{harmony}"],
+    ARGV.fetch(3) => ["HarmonyOS API #{harmony} or newer"],
+    ARGV.fetch(4) => ["iOS #{ios} and newer"]
+  }
+  failures = []
+  checks.each do |path, phrases|
+    contents = File.read(path)
+    phrases.each { |phrase| failures << "#{path}: #{phrase}" unless contents.include?(phrase) }
+  end
+  abort("Native compatibility documentation drifted from plugin.yaml:\n#{failures.join("\n")}") unless failures.empty?
+' \
+  "${plugin_dir}/plugin.yaml" \
+  "${plugin_dir}/README.md" \
+  "${plugin_dir}/README-EN.md" \
+  "${plugin_dir}/native/harmonyos/levixel/README.md" \
+  "${plugin_dir}/packaging/swift-package/README.md"
+
+node -e '
+  const fs = require("fs")
+  const packageJson = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))
+  const podspec = fs.readFileSync(process.argv[2], "utf8")
+  const readme = fs.readFileSync(process.argv[3], "utf8")
+  const displayMinimum = (range) => {
+    const match = String(range).match(/\d+(?:\.\d+)*/)
+    if (!match) throw new Error(`Cannot resolve minimum from ${range}`)
+    const parts = match[0].split(".")
+    while (parts.length > 1 && parts[parts.length - 1] === "0") parts.pop()
+    return parts.join(".")
+  }
+  const podMinimum = podspec.match(/s\.platform\s*=\s*:ios,\s*["\x27]([^"\x27]+)["\x27]/)?.[1]
+  if (!podMinimum) throw new Error("Cannot resolve React Native iOS minimum from podspec")
+  const required = [
+    `Expo SDK ${displayMinimum(packageJson.peerDependencies.expo)} or newer`,
+    `React Native ${displayMinimum(packageJson.peerDependencies["react-native"])} or newer`,
+    `React ${displayMinimum(packageJson.peerDependencies.react)} or newer`,
+    `iOS ${podMinimum} or newer`,
+  ]
+  const missing = required.filter((phrase) => !readme.includes(phrase))
+  if (missing.length) throw new Error(`React Native requirements documentation drifted: ${missing.join(", ")}`)
+' \
+  "${plugin_dir}/adapters/react-native/package.json" \
+  "${plugin_dir}/adapters/react-native/SandroxLevixel.podspec" \
+  "${plugin_dir}/adapters/react-native/README.md"
 
 ruby -e '
   failures = []

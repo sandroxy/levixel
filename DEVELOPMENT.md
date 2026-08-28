@@ -1,5 +1,9 @@
 # Development
 
+This document is for Levixel maintainers and contributors. Application
+developers integrating a published package should start with [README.md](README.md)
+or [README-EN.md](README-EN.md).
+
 Levixel keeps every maintained implementation and adapter in this repository. Generated output belongs under `dist/` and is ignored by Git.
 
 The `verify-*` scripts in this repository inspect package identity, metadata, legal notices, checksums, binary contents, and public contracts. Final interaction acceptance happens in separate artifact-only consumer hosts. Those hosts install the generated artifact and never import this source tree.
@@ -61,9 +65,9 @@ DCLOUD_UNIAPP_X_IOS_SDK_ROOT=/absolute/path/to/UniAppX-iOS \
 
 The package command requires a clean worktree for a formal candidate. It builds into temporary storage first and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. Use `--allow-dirty` only for a local pipeline rehearsal; use `--replace` only after deliberately rejecting the previous local candidate, then repeat every artifact-only and device acceptance step.
 
-The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification requires HBuilderX 5.24+ and generates classic/x Kotlin and Swift, then typechecks the x output against the extracted official SDKs; set `HBUILDERX_CONTENTS` when HBuilderX is installed elsewhere. No SDK absolute path is committed.
+The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification requires the HBuilderX minimum declared in `uni_modules/Sandrox-Levixel/package.json` or newer. It generates classic/x Kotlin and Swift, then typechecks the x output against the extracted official SDKs; set `HBUILDERX_CONTENTS` when HBuilderX is installed elsewhere. No SDK absolute path is committed.
 
-The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only uni-app x Vapor on Android/iOS is supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported.** Every release candidate must pass both classic/x Android/iOS device matrices against its recorded SHA-256 before publication.
+The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only the classic and uni-app x Vapor Android/iOS targets declared in the plugin metadata are supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported by the UniApp package.** Every release candidate must pass both classic/x Android/iOS device matrices against its recorded SHA-256 before publication.
 
 The accepted App native-plugin bridge remains available for existing and offline consumers. It is built separately because it requires the DCloud legacy SDK and is not a Marketplace upload candidate:
 
@@ -78,7 +82,7 @@ The legacy ZIP is a compatibility artifact, not a second UniApp implementation. 
 
 ## Web
 
-The framework-independent browser runtime is developed under `adapters/web`. It preserves the canonical JavaScript fields and event JSON but owns only browser-specific DOM geometry, media elements, input handling, accessibility, and lifecycle restoration. The accepted Android/iOS/UniApp implementations remain the product authority; the earlier H5 proof of concept is not a source dependency.
+The framework-independent browser runtime is developed under `adapters/web`. It preserves the shared JavaScript fields and event JSON but owns only browser-specific DOM geometry, media elements, input handling, accessibility, and lifecycle restoration. The current Android/iOS/UniApp behavior is its interaction reference; the earlier H5 proof of concept is not a source dependency.
 
 Install its locked development tooling, run the real-browser demo, and execute all checks with:
 
