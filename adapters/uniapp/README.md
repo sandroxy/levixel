@@ -52,6 +52,8 @@ await openLevixelFromSelector({
 })
 ```
 
+在 uni-app x App Vapor 中，可见源元素应使用与上例数值一致的 `border-radius: 6px`。当前 Vapor 的 `border-radius` 不支持 `rpx`；使用 `rpx` 会让源视图在转场期间失去圆角，而 native hint 仍按数值插值，形成短暂的直角闪变。经典 uni-app 的 CSS 处理不受此限制。
+
 `sourceVisibility` 默认值必须保持 `visible`。经典 UniApp 已验收的 WebView 交接策略会让 HTML 源图留在原生转场下方，以避免关闭末帧出现纹理闪烁；x Vapor 沿用相同公共语义，但其原生渲染源仍待双端真机逐帧验收。只有页面完整处理 `sourceVisibilityChange` 且在实际宿主重新验收后，才应显式传 `hidden`。
 
 ## iOS 事件订阅生命周期

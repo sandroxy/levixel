@@ -198,7 +198,15 @@ async function openViewer(index: number) {
 
 items.value.forEach((item, index) => preparePreview(item, index))
 </script>
+
+<style>
+.levixel-source {
+  border-radius: 6px;
+}
+</style>
 ```
+
+当前 App Vapor 的 `border-radius` 不支持 `rpx`。源元素圆角必须使用 `px`，并与 `sourceStyles.cornerRadius` 的数值保持一致；上例的可见源为 `6px`，因此传给 Levixel 的值也是 `6`。这能保证 `sourceVisibility: 'visible'` 时，Vapor 源图与原生转场快照在开关场期间使用相同轮廓。
 
 UTS 会把具名类型中未填写的可选属性具体化为 `null`。插件包装层会在进入 canonical SDK 前仅移除这些可选 `null` 字段；必填字段、未知字段和显式空字符串仍按同一公共协议拒绝。业务侧无需为图片补空 `posterUrl`，也无需为视频补空 `thumbnailUrl`。
 
