@@ -4,6 +4,9 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+read -r uniapp_target_version uniapp_native_version _ uniapp_legacy_version resolved_root_version < <(
+  bash "${script_dir}/resolve-uniapp-product.sh" "${plugin_dir}/plugin.yaml"
+)
 web_version="$(ruby -ryaml -e '
   manifest = YAML.load_file(ARGV.fetch(0))
   target = manifest.fetch("targets").find { |entry| entry.fetch("id") == "web" }
@@ -53,8 +56,18 @@ if [[ "${harmony_version}" != "${version}" ]]; then
   exit 1
 fi
 
-if [[ "${uniapp_version}" != "${version}" ]]; then
-  echo "UniApp UTS version ${uniapp_version} does not match ${version}." >&2
+if [[ "${resolved_root_version}" != "${version}" ]]; then
+  echo "Resolved root version ${resolved_root_version} does not match ${version}." >&2
+  exit 1
+fi
+
+if [[ "${uniapp_version}" != "${uniapp_target_version}" ]]; then
+  echo "UniApp UTS version ${uniapp_version} does not match target ${uniapp_target_version}." >&2
+  exit 1
+fi
+
+if [[ "${uniapp_native_version}" != "${version}" || "${uniapp_legacy_version}" != "${version}" ]]; then
+  echo "UniApp native provenance and legacy product must remain at root version ${version}." >&2
   exit 1
 fi
 
@@ -68,9 +81,16 @@ ruby -rjson -e '
   version = ARGV.fetch(1)
   android = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "android", "extVersion")
   ios = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "ios", "extVersion")
+  x_android = package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "android", "extVersion")
+  x_ios = package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "ios", "extVersion")
+  abort("DCloud permits at most five keywords") unless package.fetch("keywords").length <= 5
   abort("UniApp Android extVersion #{android.inspect} does not match #{version}") unless android == version
   abort("UniApp iOS extVersion #{ios.inspect} does not match #{version}") unless ios == version
-' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json" "${version}"
+  abort("UniApp x Android extVersion #{x_android.inspect} does not match #{version}") unless x_android == version
+  abort("UniApp x iOS extVersion #{x_ios.inspect} does not match #{version}") unless x_ios == version
+  abort("UniApp x Android minimum must be API 23") unless package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "android", "minVersion") == "23"
+  abort("UniApp x iOS minimum must be 15.0") unless package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "ios", "minVersion") == "15.0"
+' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json" "${uniapp_target_version}"
 
 ios_versions="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' \
   "${plugin_dir}/native/ios/Levixel.xcodeproj/project.pbxproj" | sort -u)"
@@ -120,6 +140,10 @@ if ! ruby -ryaml -e '
   abort("Artifact paths missing their target version: #{missing.join(", ")}") unless missing.empty?
   uniapp = targets.find { |target| target.fetch("id") == "uniapp" }
   abort("UniApp target is missing") unless uniapp
+  abort("UniApp target must explicitly declare its independent version") unless uniapp.key?("version")
+  provenance = uniapp.fetch("constraints", []).select { |constraint| constraint.fetch("name") == "native-release-version" }
+  abort("UniApp must declare exactly one native-release-version") unless provenance.length == 1
+  abort("UniApp native release must remain at the root version") unless provenance.fetch(0).fetch("value") == default_version
   expected_source_root = "uni_modules/Sandrox-Levixel"
   actual_source_root = uniapp.fetch("sourceRoot")
   abort("UniApp sourceRoot must be #{expected_source_root}, got #{actual_source_root}") unless actual_source_root == expected_source_root
@@ -198,4 +222,4 @@ node --input-type=module --check < \
   "${plugin_dir}/uni_modules/Sandrox-Levixel/js_sdk/canonical.js"
 
 plutil -lint "${plugin_dir}/native/ios/Levixel/PrivacyInfo.xcprivacy" >/dev/null
-printf '%s\n' "Levixel ${version} release metadata is consistent (Web candidate ${web_version})."
+printf '%s\n' "Levixel root ${version} metadata is consistent (Web ${web_version}; UniApp UTS ${uniapp_target_version} uses native ${uniapp_native_version} and remains an unreleased candidate)."

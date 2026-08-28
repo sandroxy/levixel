@@ -13,3 +13,8 @@ export type CloseLevixelNative = (
 export type OnLevixelNativeEvent = (
   callback: LevixelNativeCallback
 ) => void
+
+export type ResolveLevixelNativePaths = (
+  pathsJson: string,
+  callback: LevixelNativeCallback
+) => void

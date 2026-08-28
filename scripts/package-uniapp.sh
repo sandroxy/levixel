@@ -3,13 +3,24 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
-version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
-source_root_relative="$(ruby -ryaml -e '
-  manifest = YAML.load_file(ARGV.fetch(0))
-  target = manifest.fetch("targets").find { |entry| entry.fetch("id") == "uniapp" }
-  abort "UniApp target is missing from plugin.yaml" unless target
-  print target.fetch("sourceRoot")
-' "${plugin_dir}/plugin.yaml")"
+allow_dirty=0
+replace=0
+
+for argument in "$@"; do
+  case "${argument}" in
+    --allow-dirty) allow_dirty=1 ;;
+    --replace) replace=1 ;;
+    *)
+      echo "Unknown option: ${argument}" >&2
+      echo "Usage: $0 [--allow-dirty] [--replace]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+read -r version native_version source_root_relative _ _ < <(
+  bash "${script_dir}/resolve-uniapp-product.sh" "${plugin_dir}/plugin.yaml"
+)
 if [[ "${source_root_relative}" != "uni_modules/Sandrox-Levixel" ]]; then
   echo "UniApp sourceRoot must be uni_modules/Sandrox-Levixel, got ${source_root_relative}" >&2
   exit 1
@@ -24,23 +35,32 @@ archive_name="levixel-uniapp-${version}.zip"
 archive_path="${artifact_dir}/${archive_name}"
 marketplace_template="${plugin_dir}/adapters/uniapp/MARKETPLACE.md"
 marketplace_path="${artifact_dir}/levixel-uniapp-${version}-marketplace.md"
-core_android_aar="${plugin_dir}/dist/native-android/levixel-${version}.aar"
-core_ios_zip="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
+core_android_aar="${plugin_dir}/dist/native-android/levixel-${native_version}.aar"
+core_ios_zip="${plugin_dir}/dist/native-ios/levixel-${native_version}.xcframework.zip"
+candidate_archive_path="${staging_dir}/${archive_name}"
+candidate_checksum_path="${candidate_archive_path}.sha256"
+candidate_marketplace_path="${staging_dir}/levixel-uniapp-${version}-marketplace.md"
 
 cleanup() {
   rm -rf "${staging_dir}"
+  rm -f \
+    "${archive_path}.tmp.$$" \
+    "${archive_path}.sha256.tmp.$$" \
+    "${marketplace_path}.tmp.$$"
 }
 trap cleanup EXIT
 
-"${script_dir}/sync-uniapp-canonical-js.sh" --check
-
-if [[ "${LEVIXEL_SKIP_NATIVE_PACKAGE:-0}" != "1" ]]; then
-  "${script_dir}/package-native-android.sh"
-  "${script_dir}/package-native-ios.sh"
+if [[ ${allow_dirty} -ne 1 && -n "$(git -C "${plugin_dir}" status --porcelain --untracked-files=all)" ]]; then
+  echo "Formal UniApp candidates require a clean worktree." >&2
+  echo "Commit the reviewed release changes first, or use --allow-dirty for a local rehearsal." >&2
+  exit 1
 fi
 
+"${script_dir}/sync-uniapp-canonical-js.sh" --check
+bash "${script_dir}/verify-uniapp-native-provenance.sh"
+
 if [[ ! -f "${core_android_aar}" || ! -f "${core_ios_zip}" ]]; then
-  echo "Canonical native artifacts for Levixel ${version} are missing" >&2
+  echo "Canonical native artifacts for Levixel ${native_version} are missing" >&2
   exit 1
 fi
 
@@ -69,10 +89,10 @@ mkdir -p \
 
 cp \
   "${android_adapter_dir}/levixel-uniapp-runtime/build/outputs/aar/levixel-uniapp-runtime-release.aar" \
-  "${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${version}.aar"
+  "${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${native_version}.aar"
 cp \
   "${core_android_aar}" \
-  "${package_root}/utssdk/app-android/libs/Levixel-${version}.aar"
+  "${package_root}/utssdk/app-android/libs/Levixel-${native_version}.aar"
 
 photoview_aar="$(find "${android_adapter_dir}/levixel-uniapp-runtime/build/uniapp-bundled-aars" -maxdepth 1 -type f -name '*.aar' -print -quit)"
 if [[ -z "${photoview_aar}" ]]; then
@@ -98,15 +118,68 @@ cmp "${plugin_dir}/adapters/uniapp/js_sdk/index.js" \
 cmp "${source_root}/js_sdk/canonical.js" \
   "${package_root}/js_sdk/canonical.js"
 
-rm -f "${archive_path}" "${archive_path}.sha256" "${marketplace_path}"
 (
   cd "${package_root}"
-  zip -qry "${archive_path}" .
+  zip -qry "${candidate_archive_path}" .
 )
-checksum="$(shasum -a 256 "${archive_path}" | awk '{print $1}')"
-printf '%s  %s\n' "${checksum}" "${archive_name}" > "${archive_path}.sha256"
+if command -v shasum >/dev/null 2>&1; then
+  checksum="$(shasum -a 256 "${candidate_archive_path}" | awk '{print $1}')"
+else
+  checksum="$(sha256sum "${candidate_archive_path}" | awk '{print $1}')"
+fi
+printf '%s  %s\n' "${checksum}" "${archive_name}" > "${candidate_checksum_path}"
 sed \
   -e "s/@VERSION@/${version}/g" \
+  -e "s/@NATIVE_VERSION@/${native_version}/g" \
   -e "s/@CHECKSUM@/${checksum}/g" \
-  "${marketplace_template}" > "${marketplace_path}"
+  "${marketplace_template}" > "${candidate_marketplace_path}"
+
+candidate_files=(
+  "${candidate_archive_path}"
+  "${candidate_checksum_path}"
+  "${candidate_marketplace_path}"
+)
+published_files=(
+  "${archive_path}"
+  "${archive_path}.sha256"
+  "${marketplace_path}"
+)
+for index in "${!candidate_files[@]}"; do
+  candidate_file="${candidate_files[${index}]}"
+  published_file="${published_files[${index}]}"
+  if [[ -e "${published_file}" && ! -f "${published_file}" ]]; then
+    echo "UniApp candidate target is not a regular file: ${published_file}" >&2
+    exit 1
+  fi
+  if [[ -f "${published_file}" ]] && ! cmp -s "${candidate_file}" "${published_file}"; then
+    if [[ ${replace} -ne 1 ]]; then
+      echo "A different UniApp ${version} candidate set already exists: ${published_file}" >&2
+      echo "Do not overwrite accepted bytes or release material silently. Review the change, then rerun with --replace." >&2
+      exit 1
+    fi
+  fi
+done
+
+mkdir -p "${artifact_dir}"
+pending_temp_files=()
+pending_published_files=()
+for index in "${!candidate_files[@]}"; do
+  candidate_file="${candidate_files[${index}]}"
+  published_file="${published_files[${index}]}"
+  if [[ -f "${published_file}" ]] && cmp -s "${candidate_file}" "${published_file}"; then
+    continue
+  fi
+  install_temp="${published_file}.tmp.$$"
+  cp "${candidate_file}" "${install_temp}"
+  pending_temp_files+=("${install_temp}")
+  pending_published_files+=("${published_file}")
+done
+for index in "${!pending_temp_files[@]}"; do
+  mv "${pending_temp_files[${index}]}" "${pending_published_files[${index}]}"
+done
+
+if [[ ${allow_dirty} -eq 1 ]]; then
+  printf '%s\n' "Local dirty-worktree rehearsal completed; do not publish it before clean-commit verification."
+fi
 printf '%s\n' "${archive_path}"
+printf '%s\n' "SHA-256: ${checksum}"

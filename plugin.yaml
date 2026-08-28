@@ -139,6 +139,7 @@ targets:
       - name: minimum-react-native
         value: '0.81'
   - id: uniapp
+    version: 1.2.0
     kind: adapter
     runtime: uniapp
     platforms:
@@ -162,21 +163,29 @@ targets:
     artifacts:
       - id: uts-plugin
         format: uts-plugin-zip
-        output: dist/uniapp/levixel-uniapp-1.1.1.zip
+        output: dist/uniapp/levixel-uniapp-1.2.0.zip
         distribution:
           channel: uniapp-marketplace
           packageId: Sandrox-Levixel
     constraints:
+      - name: native-release-version
+        value: '1.1.1'
       - name: minimum-hbuilderx
-        value: '5.07'
+        value: '5.24'
       - name: uniapp-runtime
-        value: classic-uni-app
-      - name: uni-app-x
+        value: classic-uni-app-and-uni-app-x-vapor
+      - name: uni-app-x-renderer
+        value: vapor-only
+      - name: uni-app-x-vdom
         value: unsupported
       - name: minimum-android-sdk
         value: 21
       - name: minimum-ios
         value: '13.0'
+      - name: minimum-uni-app-x-android-sdk
+        value: 23
+      - name: minimum-uni-app-x-ios
+        value: '15.0'
   - id: uniapp-native-compat
     kind: adapter
     runtime: uniapp

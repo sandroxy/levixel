@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable Levixel version whose ZIPs are already attached to the GitHub Release
+        description: Stable UniApp UTS product version whose ZIP is already attached to the matching GitHub Release
         required: true
         type: string
       uts_sha256:
@@ -62,6 +62,42 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           path: release-source
+          fetch-depth: 0
+
+      - name: Resolve target and native provenance versions
+        env:
+          VERSION: ${{ inputs.version }}
+          INCLUDE_LEGACY: ${{ inputs.include_legacy }}
+        run: |
+          read -r SOURCE_UTS_VERSION NATIVE_VERSION LEGACY_VERSION < <(
+            ruby -ryaml -e '
+              manifest = YAML.load_file("release-source/plugin.yaml")
+              root_version = manifest.fetch("version")
+              targets = manifest.fetch("targets")
+              uts = targets.find { |target| target.fetch("id") == "uniapp" }
+              abort("UniApp target is missing") unless uts
+              constraints = uts.fetch("constraints", []).select do |constraint|
+                constraint.fetch("name") == "native-release-version"
+              end
+              abort("Multiple native-release-version constraints") if constraints.length > 1
+              native_version = constraints.empty? ? root_version : constraints.fetch(0).fetch("value")
+              legacy = targets.find { |target| target.fetch("id") == "uniapp-native-compat" }
+              puts [
+                uts.fetch("version", root_version),
+                native_version,
+                legacy ? legacy.fetch("version", root_version) : root_version,
+              ].join(" ")
+            '
+          )
+          if [[ "${SOURCE_UTS_VERSION}" != "${VERSION}" ]]; then
+            echo "Release source declares UniApp ${SOURCE_UTS_VERSION}, not ${VERSION}." >&2
+            exit 1
+          fi
+          if [[ "${INCLUDE_LEGACY}" == "true" && "${LEGACY_VERSION}" != "${VERSION}" ]]; then
+            echo "Legacy ${LEGACY_VERSION} must be audited from its own release workflow, not UniApp ${VERSION}." >&2
+            exit 1
+          fi
+          echo "NATIVE_VERSION=${NATIVE_VERSION}" >> "${GITHUB_ENV}"
 
       - name: Set up Java archive inspection
         uses: actions/setup-java@v5
@@ -86,9 +122,12 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "levixel-uniapp-${VERSION}.zip" \
             --pattern "levixel-uniapp-${VERSION}.zip.sha256" \
-            --pattern "levixel-native-${VERSION}.json" \
-            --pattern "levixel-${VERSION}.aar" \
-            --pattern "levixel-${VERSION}.xcframework.zip" \
+            --dir dist
+          gh release download "${NATIVE_VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "levixel-native-${NATIVE_VERSION}.json" \
+            --pattern "levixel-${NATIVE_VERSION}.aar" \
+            --pattern "levixel-${NATIVE_VERSION}.xcframework.zip" \
             --dir dist
           if [[ "${INCLUDE_LEGACY}" == "true" ]]; then
             gh release download "${VERSION}" \
@@ -107,10 +146,11 @@ jobs:
         run: |
           arguments=(
             "${VERSION}"
+            "${NATIVE_VERSION}"
             release-source
-            "dist/levixel-native-${VERSION}.json"
-            "dist/levixel-${VERSION}.aar"
-            "dist/levixel-${VERSION}.xcframework.zip"
+            "dist/levixel-native-${NATIVE_VERSION}.json"
+            "dist/levixel-${NATIVE_VERSION}.aar"
+            "dist/levixel-${NATIVE_VERSION}.xcframework.zip"
             "dist/levixel-uniapp-${VERSION}.zip"
             "dist/levixel-uniapp-${VERSION}.zip.sha256"
             "${UTS_SHA256}"

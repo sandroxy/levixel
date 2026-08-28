@@ -3,6 +3,7 @@ import {
   LevixelNativeCallback,
   OnLevixelNativeEvent,
   OpenLevixelNative,
+  ResolveLevixelNativePaths,
 } from '../interface.uts'
 import { LevixelUniPresenter } from 'LevixelUniRuntime'
 
@@ -38,4 +39,51 @@ export const onLevixelNativeEvent: OnLevixelNativeEvent = function (
   LevixelUniPresenter.shared.setJSONEventHandler((eventJson: string) => {
     callback(eventJson)
   })
+}
+
+function shouldPreservePath(path: string): boolean {
+  const lowerPath = path.toLowerCase()
+  if (lowerPath.startsWith('http://')
+    || lowerPath.startsWith('https://')
+    || lowerPath.startsWith('data:')
+    || lowerPath.startsWith('file:')
+    || lowerPath.startsWith('blob:'))
+    return true
+  const schemeSeparator = lowerPath.indexOf('://')
+  return schemeSeparator > 0 && !lowerPath.startsWith('unifile://')
+}
+
+function resolveNativePath(path: string): string {
+  const normalizedPath = path.trim()
+  if (normalizedPath.length == 0 || shouldPreservePath(normalizedPath))
+    return path
+
+  let resolvedPath = path
+  try {
+    resolvedPath = UTSiOS.convert2AbsFullPath(normalizedPath)
+  }
+  catch (error) {
+    resolvedPath = path
+  }
+  return resolvedPath.length > 0 ? resolvedPath : path
+}
+
+export const resolveLevixelNativePaths: ResolveLevixelNativePaths = function (
+  pathsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  let paths: string[]
+  try {
+    paths = JSON.parse<string[]>(pathsJson)!
+  }
+  catch (error) {
+    callback('[]')
+    return
+  }
+
+  const resolvedPaths: string[] = []
+  paths.forEach((path: string) => {
+    resolvedPaths.push(resolveNativePath(path))
+  })
+  callback(JSON.stringify(resolvedPaths)!)
 }

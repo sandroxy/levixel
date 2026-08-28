@@ -4,6 +4,7 @@ const LOADED_SOURCE_PREVIEW_TIMEOUT_MS = 1200
 const MAX_IMAGE_INFO_CACHE_SIZE = 80
 const SAVED_PREVIEW_REGISTRY_KEY = '__sandrox_levixel_saved_previews_v1__'
 const DOWNLOADED_PREVIEW_DIRECTORY = '_doc/sandrox_levixel_previews/'
+const FILE_SYSTEM_PREVIEW_DIRECTORY = 'sandrox-levixel-previews'
 
 const ITEM_KEYS = new Set([
   'id',
@@ -17,6 +18,7 @@ const ITEM_KEYS = new Set([
 ])
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius'])
 const PREPARE_ITEM_KEYS = new Set(['priority'])
+const NATIVE_MEDIA_PATH_KEYS = ['url', 'thumbnailUrl', 'posterUrl']
 const SELECTOR_OPEN_KEYS = new Set([
   'items',
   'index',
@@ -36,7 +38,7 @@ const previewQueue = []
 const ownedPreviewPaths = new Set()
 let activePreviewJob = null
 let savedPreviewRegistryInitialized = false
-let downloadedPreviewSequence = 0
+let previewPathSequence = 0
 
 function getNativePlugin() {
   if (nativePlugin)
@@ -99,14 +101,92 @@ function getNativeTransport() {
   return injectedNativeTransport || legacyNativeTransport
 }
 
-function invokeNative(method, options) {
-  const transport = getNativeTransport()
+function shouldResolveNativeMediaPath(value) {
+  if (typeof value !== 'string')
+    return false
+  const path = value.trim()
+  if (!path || path.startsWith('//'))
+    return false
+  if (/^[a-z]:[\\/]/i.test(path))
+    return true
+
+  const scheme = path.match(/^([a-z][a-z0-9+.-]*):/i)
+  return !scheme || scheme[1].toLowerCase() === 'unifile'
+}
+
+async function resolveOpenNativeMediaPaths(options, transport) {
+  if (!options || typeof options !== 'object' || Array.isArray(options) || !Array.isArray(options.items))
+    return options
+
+  const resolutions = []
+  const uniquePaths = []
+  const uniquePathIndexes = new Map()
+  options.items.forEach((item, itemIndex) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item))
+      return
+    NATIVE_MEDIA_PATH_KEYS.forEach((key) => {
+      const path = item[key]
+      if (!shouldResolveNativeMediaPath(path))
+        return
+      let pathIndex = uniquePathIndexes.get(path)
+      if (pathIndex === undefined) {
+        pathIndex = uniquePaths.length
+        uniquePathIndexes.set(path, pathIndex)
+        uniquePaths.push(path)
+      }
+      resolutions.push({
+        itemIndex,
+        key,
+        path,
+        pathIndex,
+      })
+    })
+  })
+  if (resolutions.length === 0)
+    return options
+
+  let resolvedPaths
+  try {
+    resolvedPaths = await Promise.resolve(transport.resolvePaths(uniquePaths))
+  }
+  catch (_) {
+    return options
+  }
+  if (!Array.isArray(resolvedPaths) || resolvedPaths.length !== uniquePaths.length)
+    return options
+
+  let resolvedItems
+  resolutions.forEach((entry) => {
+    const candidate = resolvedPaths[entry.pathIndex]
+    const resolvedPath = typeof candidate === 'string' && candidate.length > 0
+      ? candidate
+      : entry.path
+    if (resolvedPath === entry.path)
+      return
+    if (!resolvedItems)
+      resolvedItems = options.items.slice()
+    if (resolvedItems[entry.itemIndex] === options.items[entry.itemIndex])
+      resolvedItems[entry.itemIndex] = { ...options.items[entry.itemIndex] }
+    resolvedItems[entry.itemIndex][entry.key] = resolvedPath
+  })
+  return resolvedItems ? { ...options, items: resolvedItems } : options
+}
+
+function invokeNativeWithTransport(transport, method, options) {
   try {
     return Promise.resolve(transport.invoke(method, options)).then(assertNativeResult)
   }
   catch (error) {
     return Promise.reject(error)
   }
+}
+
+function invokeNative(method, options) {
+  const transport = getNativeTransport()
+  if (method !== 'open' || typeof transport.resolvePaths !== 'function')
+    return invokeNativeWithTransport(transport, method, options)
+  return resolveOpenNativeMediaPaths(options, transport)
+    .then(resolvedOptions => invokeNativeWithTransport(transport, method, resolvedOptions))
 }
 
 function rejectUnknownKeys(value, allowed, path) {
@@ -220,6 +300,21 @@ function transitionURL(item) {
   return item.thumbnailUrl || item.url
 }
 
+function getFileSystemManager() {
+  if (typeof uni === 'undefined' || typeof uni.getFileSystemManager !== 'function')
+    return undefined
+  try {
+    return uni.getFileSystemManager()
+  }
+  catch (_) {
+    return undefined
+  }
+}
+
+function prefersFileSystemManager() {
+  return typeof plus === 'undefined'
+}
+
 function requestRemoveSavedPreview(path) {
   if (!path)
     return
@@ -236,19 +331,46 @@ function requestRemoveSavedPreview(path) {
     catch (_) {}
   }
 
-  if (typeof uni === 'undefined' || typeof uni.removeSavedFile !== 'function') {
-    removeWithPlus()
-    return
-  }
-  try {
-    uni.removeSavedFile({
-      filePath: path,
-      fail: removeWithPlus,
+  const fileSystemManager = getFileSystemManager()
+  const removeWithFileSystemManager = typeof fileSystemManager?.removeSavedFile === 'function'
+    ? (fallback) => {
+        try {
+          fileSystemManager.removeSavedFile({ filePath: path, fail: fallback })
+        }
+        catch (_) {
+          fallback()
+        }
+      }
+    : undefined
+  const removeWithUni = typeof uni !== 'undefined' && typeof uni.removeSavedFile === 'function'
+    ? (fallback) => {
+        try {
+          uni.removeSavedFile({ filePath: path, fail: fallback })
+        }
+        catch (_) {
+          fallback()
+        }
+      }
+    : undefined
+  const removers = prefersFileSystemManager()
+    ? [removeWithFileSystemManager, removeWithUni]
+    : [removeWithUni]
+  const availableRemovers = removers.filter(Boolean)
+  const attempt = (index) => {
+    const remover = availableRemovers[index]
+    if (!remover) {
+      removeWithPlus()
+      return
+    }
+    let advanced = false
+    remover(() => {
+      if (advanced)
+        return
+      advanced = true
+      attempt(index + 1)
     })
   }
-  catch (_) {
-    removeWithPlus()
-  }
+  attempt(0)
 }
 
 function persistOwnedPreviewPaths() {
@@ -371,9 +493,26 @@ function canDownloadStablePreview(url) {
     && typeof plus.downloader.createDownload === 'function'
 }
 
+function nextPreviewFileName(extension) {
+  previewPathSequence += 1
+  return `${Date.now()}-${previewPathSequence}${extension}`
+}
+
 function nextDownloadedPreviewPath() {
-  downloadedPreviewSequence += 1
-  return `${DOWNLOADED_PREVIEW_DIRECTORY}${Date.now()}-${downloadedPreviewSequence}.preview`
+  return `${DOWNLOADED_PREVIEW_DIRECTORY}${nextPreviewFileName('.preview')}`
+}
+
+function nextFileSystemPreviewPath(tempFilePath) {
+  if (typeof uni === 'undefined')
+    return ''
+  const cachePath = normalizeURL(uni.env && uni.env.CACHE_PATH).replace(/\/+$/, '')
+  if (!cachePath)
+    return ''
+
+  const pathWithoutQuery = normalizeURL(tempFilePath).split(/[?#]/)[0]
+  const extensionMatch = pathWithoutQuery.match(/\.(avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i)
+  const extension = extensionMatch ? `.${extensionMatch[1].toLowerCase()}` : '.preview'
+  return `${cachePath}/${FILE_SYSTEM_PREVIEW_DIRECTORY}/${nextPreviewFileName(extension)}`
 }
 
 function downloadStablePreview(url) {
@@ -451,13 +590,27 @@ function readImageInfo(url) {
 
 function saveStablePreview(tempFilePath) {
   const normalizedPath = normalizeURL(tempFilePath)
-  if (!normalizedPath || typeof uni === 'undefined' || typeof uni.saveFile !== 'function')
+  if (!normalizedPath || typeof uni === 'undefined')
+    return Promise.resolve(undefined)
+
+  const fileSystemManager = getFileSystemManager()
+  const saveWithFileSystemManager = typeof fileSystemManager?.saveFile === 'function'
+    ? options => fileSystemManager.saveFile(options)
+    : undefined
+  const saveWithUni = typeof uni.saveFile === 'function'
+    ? options => uni.saveFile(options)
+    : undefined
+  const useFileSystemManager = prefersFileSystemManager() && Boolean(saveWithFileSystemManager)
+  const saveFile = useFileSystemManager
+    ? saveWithFileSystemManager
+    : saveWithUni
+  if (!saveFile)
     return Promise.resolve(undefined)
 
   initializeSavedPreviewRegistry()
   return new Promise((resolve) => {
     try {
-      uni.saveFile({
+      const saveOptions = {
         tempFilePath: normalizedPath,
         success(result) {
           const savedFilePath = normalizeURL(result && result.savedFilePath)
@@ -479,7 +632,13 @@ function saveStablePreview(tempFilePath) {
         fail() {
           resolve(undefined)
         },
-      })
+      }
+      const filePath = useFileSystemManager
+        ? nextFileSystemPreviewPath(normalizedPath)
+        : ''
+      if (filePath)
+        saveOptions.filePath = filePath
+      saveFile(saveOptions)
     }
     catch (_) {
       resolve(undefined)
@@ -507,7 +666,7 @@ async function stabilizeImageInfo(url) {
         ownedPreview: true,
       })
     }
-    requestRemoveSavedPreview(downloadedPreview.savedFilePath)
+    releaseOwnedPreview(downloadedPreview.savedFilePath)
   }
 
   const rawInfo = await readImageInfo(url)

@@ -3,6 +3,7 @@ import {
   LevixelNativeCallback,
   OnLevixelNativeEvent,
   OpenLevixelNative,
+  ResolveLevixelNativePaths,
 } from '../interface.uts'
 import LevixelUniJsonCallback from 'com.sandrox.levixel.uniapp.runtime.LevixelUniJsonCallback'
 import LevixelUniJsonEventListener from 'com.sandrox.levixel.uniapp.runtime.LevixelUniJsonEventListener'
@@ -77,4 +78,69 @@ export const onLevixelNativeEvent: OnLevixelNativeEvent = function (
   ensureDestroyHook()
   const listener = new RuntimeEventListener(callback)
   LevixelUniRuntime.getShared().setJsonEventListener(listener)
+}
+
+function shouldPreservePath(path: string): boolean {
+  const lowerPath = path.toLowerCase()
+  if (lowerPath.startsWith('http://')
+    || lowerPath.startsWith('https://')
+    || lowerPath.startsWith('data:')
+    || lowerPath.startsWith('file:')
+    || lowerPath.startsWith('blob:'))
+    return true
+  const schemeSeparator = lowerPath.indexOf('://')
+  return schemeSeparator > 0 && !lowerPath.startsWith('unifile://')
+}
+
+function codePackageResourcePath(path: string): string {
+  const resourcePath = path.startsWith('/')
+    ? path.substring(1)
+    : path
+  if (resourcePath.startsWith('static/'))
+    return resourcePath
+  if (!resourcePath.startsWith('uni_modules/'))
+    return ''
+  const staticSegment = resourcePath.indexOf('/static/')
+  return staticSegment > 'uni_modules/'.length ? resourcePath : ''
+}
+
+function resolveNativePath(path: string): string {
+  const normalizedPath = path.trim()
+  if (normalizedPath.length == 0 || shouldPreservePath(normalizedPath))
+    return path
+
+  let resolvedPath = path
+  try {
+    const resourcePath = codePackageResourcePath(normalizedPath)
+    if (resourcePath.length > 0) {
+      resolvedPath = UTSAndroid.getResourcePath(resourcePath)
+    }
+    else {
+      resolvedPath = UTSAndroid.convert2AbsFullPath(normalizedPath)
+    }
+  }
+  catch (error) {
+    resolvedPath = path
+  }
+  return resolvedPath.length > 0 ? resolvedPath : path
+}
+
+export const resolveLevixelNativePaths: ResolveLevixelNativePaths = function (
+  pathsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  let paths: string[]
+  try {
+    paths = JSON.parse<string[]>(pathsJson)!
+  }
+  catch (error) {
+    callback('[]')
+    return
+  }
+
+  const resolvedPaths: string[] = []
+  paths.forEach((path: string) => {
+    resolvedPaths.push(resolveNativePath(path))
+  })
+  callback(JSON.stringify(resolvedPaths)!)
 }

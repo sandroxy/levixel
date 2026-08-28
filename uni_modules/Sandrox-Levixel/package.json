@@ -1,20 +1,21 @@
 {
   "id": "Sandrox-Levixel",
   "displayName": "Levixel 共享转场图片视频查看器",
-  "version": "1.1.1",
-  "description": "经典 uni-app Android/iOS 的 Levixel 原生共享转场图片与视频查看器 UTS 薄桥。",
+  "version": "1.2.0",
+  "description": "经典 uni-app 与 uni-app x Vapor Android/iOS 的 Levixel 原生共享转场图片与视频查看器 UTS 薄桥。",
   "keywords": [
     "UTS",
     "uni-app",
+    "uni-app x",
     "图片预览",
-    "视频预览",
-    "共享转场"
+    "视频预览"
   ],
   "repository": "https://github.com/sandroxy/levixel",
   "license": "MIT",
   "engines": {
-    "HBuilderX": "^5.07",
-    "uni-app": "^3.1.0"
+    "HBuilderX": "^5.24",
+    "uni-app": "^3.1.0",
+    "uni-app-x": "^5.24"
   },
   "dcloudext": {
     "type": "uts",
@@ -62,11 +63,11 @@
             "vue": "√",
             "nvue": "x",
             "android": {
-              "extVersion": "1.1.1",
+              "extVersion": "1.2.0",
               "minVersion": "21"
             },
             "ios": {
-              "extVersion": "1.1.1",
+              "extVersion": "1.2.0",
               "minVersion": "13.0"
             },
             "harmony": "x"
@@ -93,8 +94,14 @@
             "chrome": "x"
           },
           "app": {
-            "android": "x",
-            "ios": "x",
+            "android": {
+              "extVersion": "1.2.0",
+              "minVersion": "23"
+            },
+            "ios": {
+              "extVersion": "1.2.0",
+              "minVersion": "15.0"
+            },
             "harmony": "x"
           },
           "mp": {

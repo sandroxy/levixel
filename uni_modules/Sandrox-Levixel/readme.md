@@ -1,18 +1,19 @@
 # Levixel 共享转场图片视频查看器（UTS）
 
-Levixel 为经典 uni-app 的 App 端提供原生图片/视频查看体验，包括共享转场、左右分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 代码只是桥接层；Android/iOS 均调用与 legacy UniApp 插件相同的平台 runtime，不在 UTS 中重写查看器、手势、加载或坐标语义。
+Levixel 已为经典 uni-app 的 App 端提供原生图片/视频查看体验；当前候选把同一能力扩展到 uni-app x Vapor，包括共享转场、左右分页、双指缩放、缩放后平移、竖拖关闭、点按关闭和视频播放。UTS 代码只是桥接层；Android/iOS 均调用与 legacy UniApp 插件相同的平台 runtime，不在 UTS 中重写查看器、手势、加载或坐标语义。
 
 ## 支持范围
 
-- HBuilderX 5.07 及以上。
+- HBuilderX 5.24 及以上。
 - 经典 uni-app Vue 2 / Vue 3 的 App Vue 页面。
-- Android 5.0（API 21）及以上。
-- iOS 13.0 及以上，arm64 真机。
-- 不支持 nvue、Web、小程序、HarmonyOS 或 uni-app x。
+- 经典 Android 5.0（API 21）及以上；经典 iOS 13.0 及以上，arm64 真机。
+- **仅支持 uni-app x Vapor，要求 HBuilderX 5.24+；不支持 VDOM。**
+- uni-app x Android 6（API 23）及以上；uni-app x iOS 15 及以上，arm64 真机。
+- 不支持 nvue、Web、小程序或 HarmonyOS。
 
-1.1.1 尚未完成 uni-app x 下的 SDK 编译、文件路径、坐标换算和双端真机验证，因此不声明支持。
+1.2.0 是待双端真机验收的 UTS 候选版本，不得提前发布或提交市场。它严格复用已发布的 1.1.1 Android AAR 与 iOS XCFramework；原生 core、legacy 包和其他原生产品没有随 UTS 产品虚假升版。插件携带原生 AAR/framework，普通基座不包含这些原生制品。经典项目可使用匹配的自定义基座、云打包或离线打包；x Vapor 必须使用 HBuilderX 标准运行、自定义基座或云打包。DCloud 尚未提供 Android/iOS Vapor 离线 SDK，不能把官方 x SDK typecheck 当作离线 App 验证。
 
-插件携带原生 AAR/framework。调试和打包时请使用包含本插件的自定义调试基座、云打包或离线打包；普通基座不包含这些原生制品。
+经典分支继续使用既有保存与路径行为。x 分支通过 `uni.getFileSystemManager()` 保存和清理自有预览；保存失败时只保留可靠宽高，不缓存、传递或清理 `getImageInfo` 返回的非自有临时路径，查看器继续按正式媒体 URL 原生加载。进入 UTS 前会收集并去重媒体项的 `url`、`thumbnailUrl`、`posterUrl` 本地路径，通过一次批量桥接完成转换；HTTP(S)、`data:` 与已有 `file:` URL 保持不变。Android 代码包中的 `static/` 和 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其他本地路径使用 `convert2AbsFullPath`；单项转换异常原样回退，native `open` 仍只调用一次。
 
 ## 引入
 
@@ -27,7 +28,7 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-`utssdk` 暴露的三个 JSON 接口只服务内部 transport，业务代码应使用上面的 canonical JS SDK。
+`utssdk` 暴露的 JSON 与路径接口只服务内部 transport，业务代码应使用上面的 canonical JS SDK。
 
 ## 媒体数据
 
@@ -129,9 +130,81 @@ export default {
 </script>
 ```
 
+## uni-app x Vapor / script setup 示例
+
+Vapor 页面只能使用 Composition API / `script setup`。公共 SDK 与 classic 完全相同；不要直接调用 UTS 内部路径接口，也不要在业务层复制参数对象做平台特判。
+
+```vue
+<template>
+  <view class="gallery">
+    <image
+      v-for="(item, index) in items"
+      :key="item.id"
+      class="levixel-source"
+      :src="previewSources[index] || item.thumbnailUrl || item.posterUrl || item.url"
+      mode="aspectFill"
+      @load="handleLoad(item, $event)"
+      @click="openViewer(index)"
+    />
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import {
+  openLevixelFromSelector,
+  prepareLevixelItem,
+  warmupLevixelItem,
+} from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
+
+type DemoMediaItem = {
+  id: string
+  type: 'image' | 'video'
+  url: string
+  thumbnailUrl?: string
+  posterUrl?: string
+}
+
+const items = ref<DemoMediaItem[]>([
+  {
+    id: 'photo-1',
+    type: 'image',
+    url: 'https://example.com/photo.jpg',
+    thumbnailUrl: 'https://example.com/photo-thumb.jpg',
+  },
+])
+const previewSources = ref<string[]>([''])
+
+async function preparePreview(item: DemoMediaItem, index: number) {
+  const prepared = await prepareLevixelItem(item, { priority: true })
+  if (prepared != null)
+    previewSources.value[index] = prepared.src
+}
+
+function handleLoad(item: DemoMediaItem, event: UniImageLoadEvent) {
+  warmupLevixelItem(item, event).catch(() => {})
+}
+
+async function openViewer(index: number) {
+  await openLevixelFromSelector({
+    items: items.value,
+    index,
+    theme: 'dark',
+    sourceSelector: '.levixel-source',
+    sourceStyles: items.value.map(() => ({ objectFit: 'cover', cornerRadius: 6 })),
+    sourceVisibility: 'visible',
+  })
+}
+
+items.value.forEach((item, index) => preparePreview(item, index))
+</script>
+```
+
+UTS 会把具名类型中未填写的可选属性具体化为 `null`。插件包装层会在进入 canonical SDK 前仅移除这些可选 `null` 字段；必填字段、未知字段和显式空字符串仍按同一公共协议拒绝。业务侧无需为图片补空 `posterUrl`，也无需为视频补空 `thumbnailUrl`。
+
 ## UniApp 专属源图策略
 
-`sourceVisibility` 默认且建议保持 `visible`。这是已经在 UniApp Android/iOS 真机逐帧验收的 WebView 交接策略，用来避免关闭转场最后阶段出现源图纹理闪烁。只有业务页面完整处理 `sourceVisibilityChange`，并在实际 WebView 宿主中重新验收后，才应显式改为 `hidden`。
+`sourceVisibility` 默认且建议保持 `visible`。经典 UniApp 已在 Android/iOS 真机逐帧验收该 WebView 交接策略，用来避免关闭转场最后阶段出现源图纹理闪烁；x Vapor 候选沿用同一默认值，仍需在双端真机验证。只有业务页面完整处理 `sourceVisibilityChange`，并在实际宿主中重新验收后，才应显式改为 `hidden`。
 
 ## 事件与直接控制
 

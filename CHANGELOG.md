@@ -2,6 +2,11 @@
 
 ## 1.2.0 - Unreleased
 
+- Added a UniApp UTS 1.2.0 candidate for App-Android and App-iOS uni-app x Vapor on HBuilderX 5.24+, with Android API 23 and iOS 15 host minimums; VDOM, nvue, Web, mini apps, and HarmonyOS remain unsupported.
+- Kept the canonical JavaScript API and shared Android/iOS UniApp runtimes, adding only FileSystemManager-backed preview ownership and a thin UTS local-path resolver.
+- Reused the exact published 1.1.1 Android/iOS native artifacts through explicit native-release provenance; the legacy UniApp product and all other native products remain 1.1.1.
+- Added classic/x UTS compiler checks, official uni-app x SDK typechecks, and an independent ZIP-consuming Vapor host; UniApp 1.2.0 remains unpublished until real-device acceptance completes.
+- Normalized the `null` values generated for omitted optional UTS type properties at the UTS JavaScript boundary, while retaining canonical rejection of missing required fields, unknown fields, and empty strings.
 - Added the first framework-independent Levixel Web package while preserving the accepted native interaction model and canonical JavaScript protocol.
 - Added shared source transitions, image and video paging, fit/zoom/pan behavior, vertical dismissal, lifecycle restoration, accessibility, and reduced-motion handling for modern browsers.
 - Added atomic preview-to-full-resolution image handoff and bounded touch source activation to prevent rapid-switch flashes and missed immediate reopens.

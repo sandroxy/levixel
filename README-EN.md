@@ -139,7 +139,7 @@ The npm package contains thin bridges and the verified Android/iOS native artifa
 
 ## UniApp
 
-The UniApp adapter provides a formal UTS API bridge for classic uni-app on Android and iOS while retaining the accepted App native-plugin bridge as an opt-in integration path. Both bridges reuse one platform runtime, the canonical JavaScript SDK, and the published native cores; `sourceVisibility` remains `visible` by default. This release does not claim uni-app x support. See the [UniApp adapter guide](adapters/uniapp/README.md) for the contract and packaging workflow.
+The Marketplace currently publishes 1.1.1 for classic uni-app on Android and iOS. A separate UTS 1.2.0 candidate adds Android/iOS uni-app x support for **Vapor only**, requiring HBuilderX 5.24+, Android API 23+, and iOS 15+; VDOM is not supported. Classic and Vapor reuse one platform runtime, the canonical JavaScript SDK, and the published 1.1.1 native cores, while `sourceVisibility` remains `visible` by default. The 1.2.0 matrix is not publishable until both real-device runs accept the exact candidate bytes. See the [UniApp adapter guide](adapters/uniapp/README.md) for the full boundary and packaging workflow.
 
 The [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) is the recommended default channel for new projects. The matching [GitHub Release](https://github.com/sandroxy/levixel/releases) also provides the same `levixel-uniapp-<version>.zip` and its SHA-256 file for direct downloads, offline archives, and manual installation under `uni_modules/Sandrox-Levixel/`.
 

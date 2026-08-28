@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 8 && $# -ne 11 ]]; then
-  echo "Usage: $0 VERSION RELEASE_SOURCE NATIVE_MANIFEST ANDROID_AAR IOS_XCFRAMEWORK_ZIP UTS_ZIP UTS_CHECKSUM UTS_ACCEPTED_SHA256 [LEGACY_ZIP LEGACY_CHECKSUM LEGACY_ACCEPTED_SHA256]" >&2
+if [[ $# -ne 9 && $# -ne 12 ]]; then
+  echo "Usage: $0 UTS_VERSION NATIVE_VERSION RELEASE_SOURCE NATIVE_MANIFEST ANDROID_AAR IOS_XCFRAMEWORK_ZIP UTS_ZIP UTS_CHECKSUM UTS_ACCEPTED_SHA256 [LEGACY_ZIP LEGACY_CHECKSUM LEGACY_ACCEPTED_SHA256]" >&2
   exit 1
 fi
 
 version="$1"
-release_source="$2"
-native_manifest="$3"
-android_artifact="$4"
-ios_artifact="$5"
-uts_artifact="$6"
-uts_checksum="$7"
-uts_accepted_sha256="$8"
-legacy_artifact="${9:-}"
-legacy_checksum="${10:-}"
-legacy_accepted_sha256="${11:-}"
+native_version="$2"
+release_source="$3"
+native_manifest="$4"
+android_artifact="$5"
+ios_artifact="$6"
+uts_artifact="$7"
+uts_checksum="$8"
+uts_accepted_sha256="$9"
+legacy_artifact="${10:-}"
+legacy_checksum="${11:-}"
+legacy_accepted_sha256="${12:-}"
 
-if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Only stable semantic versions are verifiable: ${version}" >&2
-  exit 1
-fi
+for declared_version in "${version}" "${native_version}"; do
+  if [[ ! "${declared_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Only stable semantic versions are verifiable: ${declared_version}" >&2
+    exit 1
+  fi
+done
 
 for checksum in "${uts_accepted_sha256}" "${legacy_accepted_sha256}"; do
   if [[ -n "${checksum}" && ! "${checksum}" =~ ^[0-9a-f]{64}$ ]]; then
@@ -54,6 +57,10 @@ if [[ -n "${legacy_artifact}" || -n "${legacy_checksum}" || -n "${legacy_accepte
       exit 1
     fi
   done
+  if [[ "${native_version}" != "${version}" ]]; then
+    echo "Legacy verification must use its own release where product and native versions match." >&2
+    exit 1
+  fi
 fi
 
 work_dir="$(mktemp -d)"
@@ -125,26 +132,48 @@ read -r expected_android_sha expected_android_bytes expected_ios_sha expected_io
       android.fetch("sha256"), android.fetch("bytes"),
       ios.fetch("sha256"), ios.fetch("bytes"), commit
     ].join(" ")
-  ' "${native_manifest}" "${version}"
+  ' "${native_manifest}" "${native_version}"
 )
 
 actual_release_commit="$(git -C "${release_source}" rev-parse HEAD)"
-if [[ "${actual_release_commit}" != "${native_commit}" ]]; then
-  echo "Release source ${actual_release_commit} does not match native candidate ${native_commit}." >&2
+if ! git -C "${release_source}" cat-file -e "${native_commit}^{commit}" 2>/dev/null \
+  || ! git -C "${release_source}" merge-base --is-ancestor "${native_commit}" HEAD; then
+  echo "Native release commit ${native_commit} is not an ancestor of release source ${actual_release_commit}." >&2
   exit 1
 fi
 
-read -r source_version uts_source_version < <(
+read -r source_version source_uts_version source_native_version source_legacy_version uts_source_version < <(
   ruby -ryaml -rjson -e '
     root = ARGV.fetch(0)
+    manifest = YAML.load_file(File.join(root, "plugin.yaml"))
+    root_version = manifest.fetch("version")
+    targets = manifest.fetch("targets")
+    uts = targets.find { |target| target.fetch("id") == "uniapp" }
+    abort("UniApp target is missing") unless uts
+    native_constraints = uts.fetch("constraints", []).select do |constraint|
+      constraint.fetch("name") == "native-release-version"
+    end
+    abort("Multiple native-release-version constraints") if native_constraints.length > 1
+    resolved_native_version = native_constraints.empty? ? root_version : native_constraints.fetch(0).fetch("value")
+    legacy = targets.find { |target| target.fetch("id") == "uniapp-native-compat" }
     puts [
-      YAML.load_file(File.join(root, "plugin.yaml")).fetch("version"),
+      root_version,
+      uts.fetch("version", root_version),
+      resolved_native_version,
+      legacy ? legacy.fetch("version", root_version) : root_version,
       JSON.parse(File.read(File.join(root, "uni_modules/Sandrox-Levixel/package.json"))).fetch("version")
     ].join(" ")
   ' "${release_source}"
 )
-if [[ "${source_version}" != "${version}" || "${uts_source_version}" != "${version}" ]]; then
-  echo "Release source metadata does not match ${version}." >&2
+if [[ "${source_uts_version}" != "${version}" \
+  || "${uts_source_version}" != "${version}" \
+  || "${source_native_version}" != "${native_version}" \
+  || "${source_version}" != "${native_version}" ]]; then
+  echo "Release source does not declare UTS ${version} with native ${native_version}." >&2
+  exit 1
+fi
+if [[ -n "${legacy_artifact}" && "${source_legacy_version}" != "${version}" ]]; then
+  echo "Legacy verification must run against its own ${source_legacy_version} release source, not UTS ${version}." >&2
   exit 1
 fi
 
@@ -228,8 +257,8 @@ verify_uts() {
     utssdk/interface.uts \
     utssdk/app-android/index.uts \
     utssdk/app-android/config.json \
-    "utssdk/app-android/libs/LevixelUniRuntime-${version}.aar" \
-    "utssdk/app-android/libs/Levixel-${version}.aar" \
+    "utssdk/app-android/libs/LevixelUniRuntime-${native_version}.aar" \
+    "utssdk/app-android/libs/Levixel-${native_version}.aar" \
     utssdk/app-android/libs/PhotoView-2.3.0.aar \
     utssdk/app-ios/index.uts \
     utssdk/app-ios/config.json \
@@ -262,26 +291,46 @@ verify_uts() {
   ruby -rjson -e '
     package = JSON.parse(File.read(ARGV.fetch(0)))
     version = ARGV.fetch(1)
+    source_package = JSON.parse(File.read(ARGV.fetch(2)))
     abort("Unexpected package id") unless package.fetch("id") == "Sandrox-Levixel"
     abort("Unexpected package version") unless package.fetch("version") == version
     abort("Package must be a UTS plugin") unless package.dig("dcloudext", "type") == "uts"
     abort("Legacy metadata must not exist") if package.key?("_dp_nativeplugin")
-    classic = package.dig("uni_modules", "platforms", "client", "uni-app")
-    abort("Classic Vue 2 support missing") unless classic.dig("vue", "vue2") == "√"
-    abort("Classic Vue 3 support missing") unless classic.dig("vue", "vue3") == "√"
-    abort("nvue must be unsupported") unless classic.dig("app", "nvue") == "x"
-    abort("Unexpected Android minimum") unless classic.dig("app", "android", "minVersion") == "21"
-    abort("Unexpected iOS minimum") unless classic.dig("app", "ios", "minVersion") == "13.0"
-    unsupported = package.dig("uni_modules", "platforms", "client", "uni-app-x")
-    values = lambda { |value| value.is_a?(Hash) ? value.values.flat_map { |entry| values.call(entry) } : [value] }
-    abort("uni-app x must be unsupported") unless values.call(unsupported).all? { |entry| entry == "x" }
-  ' "${package_root}/package.json" "${version}"
+    abort("Release-source package id mismatch") unless source_package.fetch("id") == package.fetch("id")
+    abort("Release-source package version mismatch") unless source_package.fetch("version") == version
+    abort("Engine declaration drifted from release source") unless package.fetch("engines") == source_package.fetch("engines")
+    expected_platforms = source_package.dig("uni_modules", "platforms")
+    abort("Platform declaration drifted from release source") unless package.dig("uni_modules", "platforms") == expected_platforms
+    keywords = package.fetch("keywords")
+    abort("DCloud permits at most five keywords") unless keywords.is_a?(Array) && keywords.length <= 5
+
+    client = expected_platforms.fetch("client")
+    client.each_value do |runtime|
+      next unless runtime.is_a?(Hash)
+      app = runtime["app"]
+      next unless app.is_a?(Hash)
+      %w[android ios].each do |platform|
+        declaration = app[platform]
+        next if declaration.nil? || declaration == "x"
+        abort("Invalid #{platform} support declaration") unless declaration.is_a?(Hash)
+        abort("#{platform} extVersion must match the package version") unless declaration["extVersion"] == version
+        minimum = declaration["minVersion"]
+        abort("#{platform} minVersion must be non-empty") unless minimum.is_a?(String) && !minimum.empty?
+      end
+    end
+  ' "${package_root}/package.json" "${version}" "${source_root}/package.json"
 
   verify_android_runtime \
-    "${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${version}.aar" \
+    "${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${native_version}.aar" \
     "${work_dir}/uts-runtime-classes.jar" \
     "${work_dir}/uts-runtime-classes.txt"
-  cmp "${android_artifact}" "${package_root}/utssdk/app-android/libs/Levixel-${version}.aar"
+  cmp "${android_artifact}" "${package_root}/utssdk/app-android/libs/Levixel-${native_version}.aar"
+  if [[ "${version}" != "${native_version}" \
+    && ( -e "${package_root}/utssdk/app-android/libs/Levixel-${version}.aar" \
+      || -e "${package_root}/utssdk/app-android/libs/LevixelUniRuntime-${version}.aar" ) ]]; then
+    echo "UTS ${version} must not relabel its native ${native_version} Android dependencies." >&2
+    exit 1
+  fi
   diff -qr "${accepted_ios_framework}" "${package_root}/utssdk/app-ios/Frameworks/Levixel.framework"
 
   local runtime_binary="${package_root}/utssdk/app-ios/Frameworks/LevixelUniRuntime.framework/LevixelUniRuntime"
@@ -403,6 +452,7 @@ if [[ -n "${legacy_artifact}" ]]; then
   verify_legacy
 fi
 
-printf '%s\n' "  release source: ${native_commit}"
+printf '%s\n' "  UTS release source: ${actual_release_commit}"
+printf '%s\n' "  native ${native_version} source: ${native_commit}"
 printf '%s\n' "  Android AAR: ${expected_android_sha}"
 printf '%s\n' "  iOS XCFramework: ${expected_ios_sha}"
