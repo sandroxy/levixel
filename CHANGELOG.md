@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0 - Unreleased
+## 1.2.0 - 2026-08-28
 
 - Added formally accepted UniApp UTS support for App-Android and App-iOS uni-app x Vapor on HBuilderX 5.24+, with Android API 23 and iOS 15 host minimums; VDOM, nvue, Web, mini apps, and HarmonyOS remain unsupported.
 - Kept the canonical JavaScript API and shared Android/iOS UniApp runtimes, adding only FileSystemManager-backed preview ownership and a thin UTS local-path resolver.

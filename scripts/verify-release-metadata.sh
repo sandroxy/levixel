@@ -47,6 +47,31 @@ if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
   exit 1
 fi
 
+ruby -rdate -e '
+  version = ARGV.shift
+  dated = ARGV.shift(2)
+  undated = ARGV
+
+  dated.each do |path|
+    heading = File.readlines(path, chomp: true).find { |line| line.start_with?("## #{version}") }
+    abort("#{path} must declare ## #{version} - YYYY-MM-DD") unless heading
+    match = heading.match(/\A## #{Regexp.escape(version)} - (\d{4}-\d{2}-\d{2})\z/)
+    abort("#{path} must replace Unreleased with a valid release date") unless match
+    Date.iso8601(match[1])
+  rescue ArgumentError
+    abort("#{path} contains an invalid release date: #{match && match[1]}")
+  end
+
+  undated.each do |path|
+    expected = "## #{version}"
+    abort("#{path} must declare #{expected}") unless File.readlines(path, chomp: true).include?(expected)
+  end
+' "${version}" \
+  "${plugin_dir}/CHANGELOG.md" \
+  "${plugin_dir}/native/harmonyos/levixel/CHANGELOG.md" \
+  "${plugin_dir}/adapters/web/CHANGELOG.md" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/changelog.md"
+
 if [[ "${react_native_version}" != "${version}" ]]; then
   echo "React Native version ${react_native_version} does not match ${version}." >&2
   exit 1
