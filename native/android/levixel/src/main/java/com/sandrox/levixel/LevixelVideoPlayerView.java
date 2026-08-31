@@ -16,13 +16,14 @@ import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.AppCompatImageButton;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.common.PlaybackException;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
-import androidx.media3.ui.PlayerControlView;
 import androidx.media3.ui.PlayerView;
 
 import com.bumptech.glide.Glide;
@@ -45,26 +46,33 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     private String preparedSourceUrl;
     @Nullable
     private Listener listener;
-    private boolean firstFrameReady;
+    private final LevixelVideoPresentationState presentationState =
+            new LevixelVideoPresentationState();
     private boolean active;
+    private boolean controllerVisible;
 
     private final Player.Listener playerListener = new Player.Listener() {
         @Override
         public void onRenderedFirstFrame() {
-            firstFrameReady = true;
-            notifyContentReady();
-            if (active) {
+            LevixelVideoPresentationState.FrameUpdate update =
+                    presentationState.onFrameRendered(active);
+            if (update.contentBecameReady()) {
+                notifyContentReady();
+            }
+            if (update.shouldRevealPlayer()) {
                 revealPlayer();
             }
         }
 
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
-            firstFrameReady = false;
-            notifyContentReady();
+            if (presentationState.onPlayerError()) {
+                notifyContentReady();
+            }
         }
     };
 
+    @OptIn(markerClass = UnstableApi.class)
     public LevixelVideoPlayerView(@NonNull Context context) {
         super(context);
         setLayoutParams(new LayoutParams(
@@ -124,11 +132,12 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         });
         addView(closeButton);
 
-        playerView.setControllerVisibilityListener((PlayerControlView.VisibilityListener) visibility -> {
-            if (firstFrameReady) {
-                closeButton.setVisibility(visibility == View.VISIBLE ? View.VISIBLE : View.GONE);
-            }
-        });
+        playerView.setControllerVisibilityListener(
+                (PlayerView.ControllerVisibilityListener) visibility -> {
+                    controllerVisible = visibility == View.VISIBLE;
+                    updateCloseButtonVisibility();
+                }
+        );
     }
 
     public void setListener(@Nullable Listener listener) {
@@ -140,21 +149,26 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     }
 
     public void bind(@NonNull LevixelMediaItem item) {
+        boolean retainsPreparedSource = player != null
+                && item.getSourceUrl().equals(preparedSourceUrl);
         this.item = item;
-        firstFrameReady = false;
-        playerView.animate().cancel();
-        playerView.setAlpha(0f);
-        playerView.setVisibility(VISIBLE);
-        closeButton.setVisibility(GONE);
-        posterImageView.animate().cancel();
-        posterImageView.setAlpha(1f);
-        posterImageView.setVisibility(VISIBLE);
+        if (!retainsPreparedSource) {
+            presentationState.resetForMedia();
+            showPoster();
+        } else if (presentationState.isPlayerPresented()) {
+            showPlayerImmediately();
+        } else {
+            showPoster();
+        }
         Glide.with(posterImageView).clear(posterImageView);
         posterImageView.setImageDrawable(null);
         Glide.with(posterImageView)
                 .load(item.getThumbnailUrl())
                 .dontAnimate()
                 .into(posterImageView);
+        if (retainsPreparedSource && presentationState.isContentSettled()) {
+            notifyContentReady();
+        }
         if (active) {
             ensurePlayerPrepared(item.getSourceUrl());
         }
@@ -170,8 +184,10 @@ public final class LevixelVideoPlayerView extends FrameLayout {
             if (player != null) {
                 player.play();
             }
-            if (firstFrameReady) {
+            if (presentationState.onActivated()) {
                 revealPlayer();
+            } else {
+                updateCloseButtonVisibility();
             }
         } else {
             if (player != null) {
@@ -196,24 +212,16 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     }
 
     public void prepareForReturnTransition() {
-        playerView.animate().cancel();
-        posterImageView.animate().cancel();
-        posterImageView.setAlpha(1f);
-        posterImageView.setVisibility(VISIBLE);
-        playerView.setAlpha(0f);
-        playerView.setVisibility(VISIBLE);
-        closeButton.setVisibility(GONE);
+        presentationState.forcePosterForTransition();
+        showPoster();
     }
 
     public void restoreAfterDismissCancelled() {
-        if (!firstFrameReady) {
-            prepareForReturnTransition();
-            return;
+        if (presentationState.restoreAfterDismissCancelled()) {
+            showPlayerImmediately();
+        } else {
+            showPoster();
         }
-        playerView.setVisibility(VISIBLE);
-        playerView.setAlpha(1f);
-        posterImageView.setVisibility(VISIBLE);
-        posterImageView.setAlpha(0f);
     }
 
     public boolean isTouchOnInteractiveControls(float rawX, float rawY) {
@@ -223,7 +231,7 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     }
 
     public void setPosterPlaceholder(@NonNull Drawable drawable) {
-        if (firstFrameReady) {
+        if (presentationState.isFrameReady()) {
             return;
         }
         Glide.with(posterImageView).clear(posterImageView);
@@ -249,7 +257,7 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         playerView.setAlpha(0f);
         playerView.setVisibility(VISIBLE);
         preparedSourceUrl = null;
-        firstFrameReady = false;
+        presentationState.resetForMedia();
     }
 
     private void ensurePlayerPrepared(@NonNull String sourceUrl) {
@@ -261,11 +269,8 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         if (sourceUrl.equals(preparedSourceUrl)) {
             return;
         }
-        firstFrameReady = false;
-        playerView.animate().cancel();
-        playerView.setAlpha(0f);
-        playerView.setVisibility(VISIBLE);
-        closeButton.setVisibility(GONE);
+        presentationState.resetForMedia();
+        showPoster();
         player.setMediaItem(MediaItem.fromUri(Uri.parse(sourceUrl)));
         player.prepare();
         preparedSourceUrl = sourceUrl;
@@ -278,6 +283,7 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         posterImageView.animate().cancel();
         posterImageView.setVisibility(VISIBLE);
         posterImageView.setAlpha(1f);
+        closeButton.setVisibility(GONE);
         playerView.animate()
                 .alpha(1f)
                 .setDuration(180L)
@@ -285,12 +291,35 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         posterImageView.animate()
                 .alpha(0f)
                 .setDuration(220L)
-                .withEndAction(() -> {
-                    if (playerView.isControllerFullyVisible()) {
-                        closeButton.setVisibility(VISIBLE);
-                    }
-                })
+                .withEndAction(this::updateCloseButtonVisibility)
                 .start();
+    }
+
+    private void showPoster() {
+        playerView.animate().cancel();
+        posterImageView.animate().cancel();
+        playerView.setAlpha(0f);
+        playerView.setVisibility(VISIBLE);
+        posterImageView.setAlpha(1f);
+        posterImageView.setVisibility(VISIBLE);
+        closeButton.setVisibility(GONE);
+    }
+
+    private void showPlayerImmediately() {
+        playerView.animate().cancel();
+        posterImageView.animate().cancel();
+        playerView.setAlpha(1f);
+        playerView.setVisibility(VISIBLE);
+        posterImageView.setAlpha(0f);
+        posterImageView.setVisibility(VISIBLE);
+        updateCloseButtonVisibility();
+    }
+
+    private void updateCloseButtonVisibility() {
+        boolean visible = active
+                && presentationState.isPlayerPresented()
+                && controllerVisible;
+        closeButton.setVisibility(visible ? VISIBLE : GONE);
     }
 
     private void notifyContentReady() {

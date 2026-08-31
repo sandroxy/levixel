@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevented Android video posters from flashing after progress-bar seeks by making the decoded-frame handoff idempotent across renderer callbacks, page reactivation, and cancelled dismiss gestures.
 - Accepted empty asynchronous `items` state in the React Native provider while keeping every rendered source index strict, and removed stale Android/iOS source bindings when media becomes empty or the wrapped image changes.
 - Added backward-compatible stable item identities to the iOS native data source and transition registry, then carried them through the React Native and UniApp iOS bridges so reordered lists return to the correct source.
 - Required media ids to be unique within each request across React Native, UniApp Android/iOS, and Web contract validation.

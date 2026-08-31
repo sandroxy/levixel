@@ -399,9 +399,9 @@ public final class LevixelViewerPageView extends FrameLayout {
         previewImageView.setVisibility(GONE);
         videoPlayerView.setVisibility(VISIBLE);
         videoPlayerView.setMediaHidden(false);
+        setLoadingVisible(true);
         videoPlayerView.bind(item);
         videoPlayerView.setActive(active);
-        setLoadingVisible(true);
     }
 
     @Nullable
