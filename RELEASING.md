@@ -8,6 +8,33 @@ integration are documented in [README.md](README.md) and
 
 Levixel records every ecosystem product and its immutable artifact. Targets normally inherit the canonical manifest version; an independently staged target may explicitly declare its product version without relabeling already published artifacts on other platforms.
 
+## Release state and candidate identity
+
+The version in `plugin.yaml` is the current release target, not a declaration
+that the version is already public. Published stability comes from the
+immutable tag and public Release. Concrete local bytes are identified by the
+candidate manifest, never by the version alone:
+
+- platform `dist/` directories are mutable build workspaces;
+- `dist/rehearsals/<version>/<candidate-id>/` contains dirty or unsigned local
+  pipeline snapshots and is never publishable;
+- `dist/candidates/<version>/<candidate-id>/` contains a clean, signed,
+  immutable full artifact set and `candidate.json`;
+- the candidate id binds the product version, source commit, and artifact-set
+  SHA-256. Rebuilding a rejected still-unpublished version produces a new id;
+  published versions can never be rebuilt or replaced.
+
+After all coordinated artifacts have passed their repository self-checks,
+snapshot them once with:
+
+```sh
+./scripts/prepare-release-candidate.sh
+```
+
+The separate `integrated-plugins` repository must consume the printed absolute
+manifest path with `--candidate`; its default mode always uses public stable
+artifacts from `verification/stable-lock.json` and never a sibling checkout.
+
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
 | Android | `io.gitee.sandrox:levixel` | Maven publication containing the AAR, POM, Gradle metadata, sources, and Javadocs |
@@ -28,7 +55,19 @@ Product publication workflows are intentionally manual. Publishing a GitHub Rele
 3. Run the artifact self-checks in this repository.
 4. Install those exact files in artifact-only consumer hosts. Consumer hosts must not compile or copy Levixel source.
 5. Complete the required Android, iOS, HarmonyOS, React Native, UniApp, and Web interaction verification for the targets being released.
-6. Publish only the accepted files and their recorded checksums. Never rebuild after acceptance or reuse a public version for different bytes.
+6. Record an `accepted` receipt in `integrated-plugins` for the exact candidate
+   id and artifact-set digest.
+7. Create the canonical annotated tag on the candidate source commit, then run
+   the local publication gate before uploading any file:
+
+   ```sh
+   ./scripts/verify-publish-candidate.rb \
+     --candidate /absolute/path/to/candidate.json \
+     --acceptance /absolute/path/to/accepted-receipt.json
+   ```
+
+   Publish only the paths printed by the gate.
+8. Publish only the accepted files and their recorded checksums. Never rebuild after acceptance or reuse a public version for different bytes.
 
 Every artifact-producing script rejects a version that already has a local or
 canonical `origin` tag before invoking a compiler or touching its release path.
@@ -61,9 +100,11 @@ Before creating a tag, run:
 ./scripts/verify-release-readiness.sh
 ```
 
-`verify-release-metadata.sh` remains usable on the development branch while its
-top entry is `Unreleased`. Only `verify-release-readiness.sh` is the formal
-candidate gate: it requires an unused stable version, checks `origin` directly,
+`verify-documentation.sh` remains usable during the `Unreleased` source phase.
+After assigning the unused target version and dating its coordinated changelog
+entries, run `verify-release-metadata.sh`. Only
+`verify-release-readiness.sh` is the formal candidate gate: it requires an
+unused stable version, checks `origin` directly,
 and requires the current version and date to be the first coordinated changelog
 entries.
 
@@ -212,8 +253,12 @@ The npm product embeds the native artifacts recorded in `dist/native-release/lev
 The workflow downloads and verifies the accepted GitHub Release assets and publishes through OIDC without a long-lived npm token. Direct local publication remains an authenticated fallback:
 
 ```sh
-./scripts/publish-react-native.sh --dry-run
-./scripts/publish-react-native.sh --publish
+./scripts/publish-react-native.sh --dry-run \
+  --candidate /absolute/path/to/candidate.json \
+  --acceptance /absolute/path/to/accepted-receipt.json
+./scripts/publish-react-native.sh --publish \
+  --candidate /absolute/path/to/candidate.json \
+  --acceptance /absolute/path/to/accepted-receipt.json
 ```
 
 ## UniApp / DCloud UTS Plugin

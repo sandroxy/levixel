@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 - 2026-08-31
 
 - Prevented Android video posters from flashing after progress-bar seeks by making the decoded-frame handoff idempotent across renderer callbacks, page reactivation, and cancelled dismiss gestures.
 - Accepted empty asynchronous `items` state in the React Native provider while keeping every rendered source index strict, and removed stale Android/iOS source bindings when media becomes empty or the wrapped image changes.

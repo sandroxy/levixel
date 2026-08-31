@@ -1,6 +1,6 @@
 {
   "name": "@sandrox/levixel",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Shared-transition image and video viewer for React Native and Expo.",
   "license": "MIT",
   "author": "sandrox",

@@ -8,11 +8,13 @@ Levixel keeps every maintained implementation and adapter in this repository. Ge
 
 The `verify-*` scripts in this repository inspect package identity, metadata, legal notices, checksums, binary contents, and public contracts. Final interaction acceptance happens in separate artifact-only consumer hosts. Those hosts install the generated artifact and never import this source tree.
 
-While `plugin.yaml` still names an already tagged stable version, release
-packaging is intentionally disabled. Test the working source directly during
-that `Unreleased` phase; choose the next version only after source and device
-behavior are accepted. A version bump is release preparation, not a prerequisite
-for ordinary source validation.
+Ordinary source tests do not require a version bump. Artifact-consumer testing
+does: before building a release candidate, set `plugin.yaml` and every package
+manifest to an unused target version and commit that release intent. The latest
+published stable version remains identified by its public tag and Release; it
+is not inferred from the development branch's version. A target version can
+have multiple rejected builds, but each build receives a content-derived
+candidate id and only an accepted candidate may be published.
 
 ## Native Cores
 
@@ -148,11 +150,14 @@ Validate versions, target declarations, notices, privacy metadata, and runtime i
 ./scripts/verify-release-metadata.sh
 ```
 
-Those checks are safe during ordinary development and do not mean that the
-current version is publishable. Immediately before creating formal artifacts,
-run `./scripts/verify-release-readiness.sh`. It fails closed unless the root
-version is unused locally and on `origin`, the release entry is first in each
-coordinated changelog, and all release metadata is internally consistent.
+`verify-documentation.sh` is safe during ordinary development.
+`verify-release-metadata.sh` belongs to release preparation after the unused
+target version and dated changelog entries are committed; passing it alone does
+not mean that any concrete bytes were accepted. Immediately before creating
+formal artifacts, run `./scripts/verify-release-readiness.sh`. It fails closed
+unless the root version is unused locally and on `origin`, the release entry is
+first in each coordinated changelog, and all release metadata is internally
+consistent.
 
 The root README files describe the latest stable binaries. Keep unreleased API
 examples in `CHANGELOG.md` or maintainer documentation until a compatible

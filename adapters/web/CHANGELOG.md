@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0
 
 - Rejected duplicate media ids so each request has an unambiguous stable identity.
 

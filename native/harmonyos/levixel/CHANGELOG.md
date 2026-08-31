@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0 - 2026-08-31
+
+- Aligns the package version with the coordinated Levixel 1.3.0 candidate.
+- Keeps the HarmonyOS API and viewer behavior unchanged.
+
 ## 1.2.0 - 2026-08-28
 
 - Aligns the package version with the coordinated Levixel 1.2.0 release.
