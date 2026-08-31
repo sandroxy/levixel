@@ -8,6 +8,12 @@ Levixel keeps every maintained implementation and adapter in this repository. Ge
 
 The `verify-*` scripts in this repository inspect package identity, metadata, legal notices, checksums, binary contents, and public contracts. Final interaction acceptance happens in separate artifact-only consumer hosts. Those hosts install the generated artifact and never import this source tree.
 
+While `plugin.yaml` still names an already tagged stable version, release
+packaging is intentionally disabled. Test the working source directly during
+that `Unreleased` phase; choose the next version only after source and device
+behavior are accepted. A version bump is release preparation, not a prerequisite
+for ordinary source validation.
+
 ## Native Cores
 
 Build and inspect all native artifacts:
@@ -30,18 +36,40 @@ Platform-specific commands are also available:
 ./scripts/verify-native-harmonyos.sh
 ```
 
+Verification commands are read-only: they inspect artifacts that already exist
+and never rebuild them implicitly. `verify-native-ios.sh` additionally runs the
+current iOS source tests and confirms that the packaged XCFramework exposes the
+API required by the current adapters. Use
+`./scripts/verify-native-ios.sh --artifact-only` only when auditing an immutable
+historical XCFramework independently of newer source.
+
 Android requires the repository Gradle wrapper. iOS requires Xcode command-line tools. HarmonyOS requires DevEco Studio tooling and `ohpm`; custom locations can be supplied through `DEVECO_STUDIO_CONTENTS`, `DEVECO_SDK_HOME`, `HVIGORW`, and `OHPM` where used by the packaging scripts.
+
+The iOS source-only regression entry point is:
+
+```sh
+./scripts/test-native-ios-source.sh
+```
 
 ## React Native
 
 Build and inspect the immutable npm candidate:
 
 ```sh
+./scripts/verify-react-native-contract.sh
 ./scripts/package-react-native.sh
 ./scripts/verify-react-native-package.sh
 ```
 
 The tarball embeds the accepted Android AAR and iOS XCFramework. It must be tested as a tarball dependency in Android and iOS consumer hosts before publication.
+Contract verification requires Node.js 22.6 or newer. It exercises the shared
+request validator only; TypeScript component compilation and Android/iOS bridge
+integration remain artifact-consumer checks. Packaging also type-checks the
+adapter-facing iOS API against the exact embedded XCFramework on macOS; the same
+API surface is inspected portably when a release asset is verified on Linux.
+React Native packaging verifies its temporary candidate before installing it in
+`dist/` and refuses to replace different same-version bytes unless `--replace`
+is explicitly supplied for a rejected, still-untagged local candidate.
 
 ## UniApp
 
@@ -106,6 +134,11 @@ The package command writes `dist/web/levixel-web-<version>.tgz` and its SHA-256 
 
 `plugin.yaml` is the only source of truth for the root version, independently staged target versions, artifact paths, and UniApp native provenance. Native Android/iOS/HarmonyOS, React Native, and the UniApp legacy target normally inherit the root version; Web and UniApp UTS may declare explicit target versions. UniApp packaging must resolve `native-release-version` from that manifest and embed the exact AAR/XCFramework recorded by the corresponding native release manifest. Do not copy a current release number into development prose.
 
+`contract/open.schema.json` declares cross-item media identity with the custom
+`x-levixel-uniqueBy` annotation. JSON Schema 2020-12 does not evaluate that rule
+on its own, so every runtime must also reject duplicate IDs and retain a behavior
+test for that boundary.
+
 ## Release Metadata
 
 Validate versions, target declarations, notices, privacy metadata, and runtime identifiers:
@@ -114,5 +147,15 @@ Validate versions, target declarations, notices, privacy metadata, and runtime i
 ./scripts/verify-documentation.sh
 ./scripts/verify-release-metadata.sh
 ```
+
+Those checks are safe during ordinary development and do not mean that the
+current version is publishable. Immediately before creating formal artifacts,
+run `./scripts/verify-release-readiness.sh`. It fails closed unless the root
+version is unused locally and on `origin`, the release entry is first in each
+coordinated changelog, and all release metadata is internally consistent.
+
+The root README files describe the latest stable binaries. Keep unreleased API
+examples in `CHANGELOG.md` or maintainer documentation until a compatible
+artifact is accepted and its new version becomes the stable installation target.
 
 The release procedure and signing requirements are documented in [RELEASING.md](RELEASING.md).

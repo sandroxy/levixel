@@ -24,6 +24,8 @@ for required_file in \
   fi
 done
 
+"${script_dir}/verify-ios-core-adapter-api.sh" "${ios_artifact}"
+
 read -r expected_android_sha expected_ios_sha native_commit < <(
   ruby -rjson -e '
     manifest = JSON.parse(File.read(ARGV.fetch(0)))
@@ -38,6 +40,12 @@ read -r expected_android_sha expected_ios_sha native_commit < <(
     puts [android, ios, manifest.fetch("commit")].join(" ")
   ' "${native_manifest}" "${version}"
 )
+
+source_commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
+if [[ "${native_commit}" != "${source_commit}" ]]; then
+  echo "Native release commit ${native_commit} does not equal React Native source commit ${source_commit}." >&2
+  exit 1
+fi
 
 actual_android_sha="$(shasum -a 256 "${android_artifact}" | awk '{print $1}')"
 actual_ios_sha="$(shasum -a 256 "${ios_artifact}" | awk '{print $1}')"
@@ -153,6 +161,8 @@ if find "${package_root}" -type f \
   echo "Potential secret file found in the React Native package." >&2
   exit 1
 fi
+
+"${script_dir}/verify-react-native-contract.sh" "${package_root}/src/contract.ts"
 
 printf '%s\n' "Verified ${artifact_name}"
 printf '%s\n' "  package sha256: ${actual_package_sha}"

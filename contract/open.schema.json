@@ -9,6 +9,9 @@
     "items": {
       "type": "array",
       "minItems": 1,
+      "description": "Media item ids must be unique within one open request. Levixel runtime validation enforces this cross-item rule.",
+      "$comment": "JSON Schema 2020-12 cannot compare one property across sibling array items. Levixel validators enforce the custom x-levixel-uniqueBy assertion.",
+      "x-levixel-uniqueBy": "id",
       "items": {
         "$ref": "#/$defs/mediaItem"
       }
@@ -47,7 +50,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Stable identity used to match media with its transition source. Must be unique within the request."
         },
         "type": {
           "enum": ["image", "video"]

@@ -6,6 +6,7 @@ plugin_dir="$(cd "${script_dir}/.." && pwd)"
 harmony_dir="${plugin_dir}/native/harmonyos"
 module_dir="${harmony_dir}/levixel"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+"${script_dir}/assert-release-version-available.sh" "${version}" --check-origin
 artifact_name="levixel-${version}.har"
 artifact_dir="${plugin_dir}/dist/native-harmonyos"
 artifact_path="${artifact_dir}/${artifact_name}"

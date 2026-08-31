@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+"${script_dir}/verify-release-readiness.sh"
 dcloud_android_aar="${DCLOUD_ANDROID_UNIAPP_AAR:-}"
 dcloud_ios_sdk_root="${DCLOUD_IOS_SDK_ROOT:-}"
 android_adapter_dir="${plugin_dir}/adapters/uniapp/android"

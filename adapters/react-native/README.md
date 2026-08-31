@@ -66,6 +66,10 @@ accepts exactly one React element and its `index` must identify the matching
 item. Wrapping the visible source lets Levixel use the real native view as the
 opening and return anchor.
 
+Every item `id` must be non-empty and unique within the gallery. `Levixel`
+itself accepts an empty `items` array while asynchronous data is loading; render
+no `Levixel.Source` until the corresponding item exists.
+
 `galleryId` is optional and is generated automatically; provide one only when
 the host needs to assign a stable identity to the gallery. Use `onIndexChange`
 when the host needs to observe the currently visible item. Video items should

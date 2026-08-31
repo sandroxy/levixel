@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rejected duplicate media ids so each request has an unambiguous stable identity.
+
 ## 1.2.0
 
 - Added the first framework-independent Levixel Web runtime.

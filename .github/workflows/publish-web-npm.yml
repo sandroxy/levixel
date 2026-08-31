@@ -45,6 +45,7 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           path: release-source
+          fetch-depth: 0
 
       - name: Set up JavaScript package verification
         uses: actions/setup-node@v6
@@ -55,9 +56,10 @@ jobs:
           cache-dependency-path: release-source/adapters/web/package-lock.json
 
       - name: Verify tag source and build an independent comparison
+        working-directory: release-source/adapters/web
         run: |
-          npm --prefix release-source/adapters/web ci
-          npm --prefix release-source/adapters/web test
+          npm ci
+          npm test
 
       - name: Download accepted public release assets
         env:
@@ -81,15 +83,25 @@ jobs:
             release-source \
             "dist/levixel-web-${VERSION}.tgz" \
             "dist/levixel-web-${VERSION}.tgz.sha256" \
-            "${ACCEPTED_SHA256}"
+            "${ACCEPTED_SHA256}" \
+            --require-tag
 
       - name: Confirm the npm version is unused
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if npm view "@sandrox/levixel-web@${VERSION}" version \
-            --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
+          set +e
+          view_output="$(npm view "@sandrox/levixel-web@${VERSION}" version \
+            --registry https://registry.npmjs.org/ 2>&1)"
+          view_status=$?
+          set -e
+          if [[ ${view_status} -eq 0 ]]; then
             echo "@sandrox/levixel-web@${VERSION} is already published." >&2
+            exit 1
+          fi
+          if ! grep -q 'E404' <<<"${view_output}"; then
+            echo "Could not prove that @sandrox/levixel-web@${VERSION} is unused:" >&2
+            echo "${view_output}" >&2
             exit 1
           fi
 

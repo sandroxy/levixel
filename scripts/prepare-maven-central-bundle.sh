@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+"${script_dir}/assert-release-version-available.sh" "${version}" --check-origin
 repository_path="${plugin_dir}/dist/native-android/levixel-${version}-maven.zip"
 artifact_dir="${plugin_dir}/dist/native-android"
 bundle_name="levixel-${version}-maven-central.zip"

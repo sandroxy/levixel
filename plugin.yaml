@@ -125,6 +125,7 @@ targets:
       command: ./scripts/package-react-native.sh
     verify:
       commands:
+        - ./scripts/verify-react-native-contract.sh
         - ./scripts/verify-react-native-package.sh
     artifacts:
       - id: npm-package

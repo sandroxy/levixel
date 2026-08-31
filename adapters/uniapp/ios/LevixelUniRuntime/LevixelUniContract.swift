@@ -131,6 +131,14 @@ enum LevixelUniContract {
         let items = try rawItems.enumerated().map { index, rawItem in
             try parseItem(rawItem, path: "$.items[\(index)]")
         }
+        var itemIds = Set<String>()
+        for (index, item) in items.enumerated() where itemIds.insert(item.id).inserted == false {
+            throw failure(
+                "INVALID_VALUE",
+                "$.items[\(index)].id",
+                "must be unique within $.items"
+            )
+        }
         let initialIndex = try optionalInteger(options["index"], fallback: 0, path: "$.index")
         guard items.indices.contains(initialIndex) else {
             throw failure("OUT_OF_RANGE", "$.index", "must reference an item in $.items")

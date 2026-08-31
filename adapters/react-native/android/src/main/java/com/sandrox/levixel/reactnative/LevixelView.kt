@@ -57,6 +57,12 @@ class LevixelView(context: Context) : ViewGroup(context) {
         post { refreshBinding() }
     }
 
+    override fun onViewRemoved(child: View) {
+        unregisterSourceImageView()
+        super.onViewRemoved(child)
+        post { refreshBinding() }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         for (index in 0 until childCount) {
             getChildAt(index).layout(0, 0, width, height)
@@ -74,8 +80,9 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     private fun refreshBinding() {
+        val mediaItems = buildMediaItems()
         val imageView = findBestImageView(this)
-        if (imageView == null) {
+        if (imageView == null || mediaItems.isEmpty()) {
             unregisterSourceImageView()
             return
         }
@@ -83,14 +90,13 @@ class LevixelView(context: Context) : ViewGroup(context) {
         val previous = sourceImageView
         if (previous != null && previous !== imageView) {
             clearSourceImageObserver()
-            if (!isSourceImageViewUsable(previous)) {
-                LevixelSourceViewRegistry.unregisterView(previous)
-            }
+            previous.setOnClickListener(null)
+            LevixelSourceViewRegistry.unregisterView(previous)
         }
 
         sourceImageView = imageView
         imageView.setOnClickListener { openViewer(imageView) }
-        registerSourceImageViewWhenReady(imageView)
+        registerSourceImageViewWhenReady(imageView, mediaItems)
     }
 
     private fun openViewer(sourceView: ImageView) {
@@ -143,25 +149,44 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     private fun buildMediaItems(): List<LevixelMediaItem> {
-        return items.mapIndexedNotNull { index, value ->
-            val type = value["type"] as? String ?: return@mapIndexedNotNull null
-            val url = value["url"] as? String ?: return@mapIndexedNotNull null
-            val id = (value["id"] as? String)?.takeIf(String::isNotBlank) ?: index.toString()
-            if (type.equals("video", ignoreCase = true)) {
-                val poster = value["posterUrl"] as? String
-                    ?: value["thumbnailUrl"] as? String
-                    ?: url
-                LevixelMediaItem(id, LevixelMediaItem.MediaType.VIDEO, url, poster)
-            } else {
-                val thumbnail = value["thumbnailUrl"] as? String ?: url
-                LevixelMediaItem(id, LevixelMediaItem.MediaType.IMAGE, url, thumbnail)
+        val mediaItems = ArrayList<LevixelMediaItem>(items.size)
+        val itemIds = HashSet<String>(items.size)
+        for (value in items) {
+            val type = value["type"] as? String ?: return emptyList()
+            val url = (value["url"] as? String)?.takeIf(String::isNotBlank)
+                ?: return emptyList()
+            val id = (value["id"] as? String)?.takeIf(String::isNotBlank)
+                ?: return emptyList()
+            if (!itemIds.add(id)) {
+                return emptyList()
             }
+
+            val mediaItem = when (type) {
+                "video" -> {
+                    val poster = value["posterUrl"] as? String
+                        ?: value["thumbnailUrl"] as? String
+                        ?: url
+                    LevixelMediaItem(id, LevixelMediaItem.MediaType.VIDEO, url, poster)
+                }
+                "image" -> {
+                    val thumbnail = value["thumbnailUrl"] as? String ?: url
+                    LevixelMediaItem(id, LevixelMediaItem.MediaType.IMAGE, url, thumbnail)
+                }
+                else -> return emptyList()
+            }
+            mediaItems.add(mediaItem)
         }
+        return mediaItems
     }
 
-    private fun registerSourceImageViewWhenReady(imageView: ImageView) {
-        val mediaItems = buildMediaItems()
+    private fun registerSourceImageViewWhenReady(
+        imageView: ImageView,
+        mediaItems: List<LevixelMediaItem> = buildMediaItems()
+    ) {
         if (mediaItems.isEmpty()) {
+            if (sourceImageView === imageView) {
+                unregisterSourceImageView()
+            }
             return
         }
         val safeIndex = initialIndex.coerceIn(0, mediaItems.lastIndex)
@@ -262,7 +287,10 @@ class LevixelView(context: Context) : ViewGroup(context) {
 
     private fun unregisterSourceImageView() {
         clearSourceImageObserver()
-        sourceImageView?.let(LevixelSourceViewRegistry::unregisterView)
+        sourceImageView?.let { imageView ->
+            imageView.setOnClickListener(null)
+            LevixelSourceViewRegistry.unregisterView(imageView)
+        }
         sourceImageView = null
     }
 

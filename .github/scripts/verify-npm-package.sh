@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 6 ]]; then
-  echo "Usage: $0 VERSION PACKAGE CHECKSUM NATIVE_MANIFEST ANDROID_AAR IOS_XCFRAMEWORK_ZIP" >&2
+if [[ $# -ne 7 ]]; then
+  echo "Usage: $0 VERSION PACKAGE CHECKSUM NATIVE_MANIFEST ANDROID_AAR IOS_XCFRAMEWORK_ZIP RELEASE_SOURCE" >&2
   exit 1
 fi
 
@@ -12,9 +12,18 @@ checksum_path="$3"
 native_manifest="$4"
 android_artifact="$5"
 ios_artifact="$6"
+release_source="$(cd "$7" && pwd)"
 artifact_name="levixel-react-native-${version}.tgz"
+release_adapter="${release_source}/adapters/react-native"
+
+if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Only stable semantic versions are publishable: ${version}" >&2
+  exit 1
+fi
 
 for required_file in \
+  "${release_source}/plugin.yaml" \
+  "${release_adapter}/package.json" \
   "${artifact_path}" \
   "${checksum_path}" \
   "${native_manifest}" \
@@ -25,6 +34,36 @@ for required_file in \
     exit 1
   fi
 done
+
+tag_commit="$(git -C "${release_source}" rev-parse --verify "refs/tags/${version}^{commit}")"
+release_commit="$(git -C "${release_source}" rev-parse HEAD)"
+if [[ "${release_commit}" != "${tag_commit}" ]]; then
+  echo "Release source HEAD ${release_commit} does not equal tag ${version} commit ${tag_commit}." >&2
+  exit 1
+fi
+
+read -r source_version source_package_version < <(
+  ruby -ryaml -rjson -e '
+    root = ARGV.fetch(0)
+    manifest = YAML.load_file(File.join(root, "plugin.yaml"))
+    package = JSON.parse(File.read(File.join(root, "adapters/react-native/package.json")))
+    puts [manifest.fetch("version"), package.fetch("version")].join(" ")
+  ' "${release_source}"
+)
+if [[ "${source_version}" != "${version}" || "${source_package_version}" != "${version}" ]]; then
+  echo "Canonical tag source does not declare React Native ${version}." >&2
+  exit 1
+fi
+
+ios_api_verifier="${release_source}/scripts/verify-ios-core-adapter-api.sh"
+if [[ -f "${ios_api_verifier}" ]]; then
+  bash "${ios_api_verifier}" "${ios_artifact}"
+elif grep -E -q \
+  'itemIdentifiers[[:space:]]*:|registerLevixelSource\([^)]*itemIdentifier[[:space:]]*:' \
+  "${release_adapter}/ios/LevixelView.swift"; then
+  echo "Release source uses stable iOS media identities but is missing its matching API verifier." >&2
+  exit 1
+fi
 
 if [[ "$(basename "${artifact_path}")" != "${artifact_name}" ]]; then
   echo "Unexpected npm package filename: ${artifact_path}" >&2
@@ -59,6 +98,11 @@ read -r expected_android_sha expected_android_bytes expected_ios_sha expected_io
   ' "${native_manifest}" "${version}"
 )
 
+if [[ "${native_commit}" != "${tag_commit}" ]]; then
+  echo "Native manifest commit ${native_commit} does not equal canonical ${version} tag commit ${tag_commit}." >&2
+  exit 1
+fi
+
 file_size() {
   if stat -f '%z' "$1" >/dev/null 2>&1; then
     stat -f '%z' "$1"
@@ -82,9 +126,21 @@ fi
 
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "${temporary_dir}"' EXIT
+listing_path="${temporary_dir}/package-listing.txt"
+tar -tzf "${artifact_path}" > "${listing_path}"
 
-if tar -tvzf "${artifact_path}" | grep -Eq '^l'; then
-  echo "Symbolic links are not allowed in the npm package." >&2
+ruby -e '
+  entries = File.readlines(ARGV.fetch(0), chomp: true)
+  abort("npm archive is empty") if entries.empty?
+  entries.each do |entry|
+    abort("Unsafe absolute npm archive path: #{entry}") if entry.start_with?("/")
+    abort("Unsafe npm archive path separator: #{entry}") if entry.include?("\\")
+    abort("Unsafe parent npm archive path: #{entry}") if entry.split("/").include?("..")
+  end
+' "${listing_path}"
+
+if tar -tvzf "${artifact_path}" | awk '$1 ~ /^[lh]/ { found = 1 } END { exit(found ? 0 : 1) }'; then
+  echo "Links are not allowed in the npm package." >&2
   exit 1
 fi
 
@@ -99,7 +155,7 @@ while IFS= read -r entry; do
       exit 1
       ;;
   esac
-done < <(tar -tzf "${artifact_path}")
+done < "${listing_path}"
 
 tar -xzf "${artifact_path}" -C "${temporary_dir}"
 package_root="${temporary_dir}/package"
@@ -135,6 +191,20 @@ ruby -rjson -e '
   lifecycle = package.fetch("scripts", {}).keys.grep(/^(preinstall|install|postinstall|prepublish|prepare)$/)
   abort("Unexpected lifecycle scripts: #{lifecycle.join(", ")}") unless lifecycle.empty?
 ' "${package_root}/package.json" "${version}"
+
+for relative_path in \
+  package.json \
+  expo-module.config.json \
+  SandroxLevixel.podspec \
+  README.md; do
+  cmp "${release_adapter}/${relative_path}" "${package_root}/${relative_path}"
+done
+for relative_path in CHANGELOG.md LICENSE PROVENANCE.md THIRD_PARTY_NOTICES.md; do
+  cmp "${release_source}/${relative_path}" "${package_root}/${relative_path}"
+done
+diff -qr "${release_adapter}/src" "${package_root}/src"
+diff -qr -x libs "${release_adapter}/android" "${package_root}/android"
+diff -qr -x Frameworks "${release_adapter}/ios" "${package_root}/ios"
 
 unexpected_project_urls="$(
   grep -R -I -h -o -E '(git\+)?https://github\.com/sandroxy/[A-Za-z0-9_.-]+' "${package_root}" \
@@ -172,6 +242,11 @@ if find "${package_root}" -type f \
   -print -quit | grep -q .; then
   echo "Potential secret file found in the npm package." >&2
   exit 1
+fi
+
+release_contract_verifier="${release_source}/scripts/verify-react-native-contract.sh"
+if [[ -f "${release_contract_verifier}" ]]; then
+  bash "${release_contract_verifier}" "${package_root}/src/contract.ts"
 fi
 
 printf '%s\n' "Verified ${artifact_name}"

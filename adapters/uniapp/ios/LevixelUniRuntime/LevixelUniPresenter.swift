@@ -275,7 +275,7 @@ public final class LevixelUniPresenter: NSObject {
             previews[request.initialIndex] = initialPreview
         }
 
-        let anchors = request.items.enumerated().map { index, _ -> UIImageView? in
+        let anchors = request.items.enumerated().map { index, item -> UIImageView? in
             guard let hint = request.sourceHints[index] else { return nil }
             guard let anchor = makeAnchor(
                 hint: hint,
@@ -286,14 +286,17 @@ public final class LevixelUniPresenter: NSObject {
             ) else {
                 return nil
             }
-            anchor.registerLevixelSource(galleryId: galleryId, index: index)
+            anchor.registerLevixelSource(galleryId: galleryId, itemIdentifier: item.id)
             return anchor
         }
 
         let nativeItems = request.items.enumerated().map { index, item in
             item.nativeItem(placeholder: previews[index])
         }
-        let dataSource = LevixelArrayDataSource(items: nativeItems)
+        let dataSource = LevixelArrayDataSource(
+            items: nativeItems,
+            itemIdentifiers: request.items.map(\.id)
+        )
         let session = LevixelUniSession(
             galleryId: galleryId,
             request: request,

@@ -1,61 +1,94 @@
 import type { LevixelMediaItem, NativeLevixelMediaItem } from './types';
 
+const ITEM_KEYS = new Set([
+  'id',
+  'type',
+  'url',
+  'thumbnailUrl',
+  'posterUrl',
+  'width',
+  'height',
+  'alt',
+]);
+
 export function normalizeMediaItems(
   items: readonly LevixelMediaItem[],
 ): NativeLevixelMediaItem[] {
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new TypeError('[Levixel] items must contain at least one media item.');
+  if (!Array.isArray(items)) {
+    throw new TypeError('[Levixel] items must be an array.');
   }
 
   const ids = new Set<string>();
   return items.map((item, index) => {
     const path = `items[${index}]`;
-    const id = requireNonEmptyString(item.id, `${path}.id`);
+    const record = requireRecord(item, path);
+    rejectUnknownKeys(record, path);
+
+    const id = requireNonEmptyString(record.id, `${path}.id`);
     if (ids.has(id)) {
       throw new TypeError(`[Levixel] ${path}.id must be unique.`);
     }
     ids.add(id);
 
-    if (item.type !== 'image' && item.type !== 'video') {
+    if (record.type !== 'image' && record.type !== 'video') {
       throw new TypeError(`[Levixel] ${path}.type must be "image" or "video".`);
     }
 
     const normalized: NativeLevixelMediaItem = {
       id,
-      type: item.type,
-      url: requireNonEmptyString(item.url, `${path}.url`),
+      type: record.type,
+      url: requireNonEmptyString(record.url, `${path}.url`),
     };
 
     const thumbnailUrl = optionalNonEmptyString(
-      item.thumbnailUrl,
+      record.thumbnailUrl,
       `${path}.thumbnailUrl`,
     );
     if (thumbnailUrl !== undefined) {
       normalized.thumbnailUrl = thumbnailUrl;
     }
-    if (item.type === 'video') {
+    if (record.type === 'video') {
       const posterUrl = optionalNonEmptyString(
-        item.posterUrl,
+        record.posterUrl,
         `${path}.posterUrl`,
       );
       if (posterUrl !== undefined) {
         normalized.posterUrl = posterUrl;
       }
     }
-    const alt = optionalNonEmptyString(item.alt, `${path}.alt`);
-    if (alt !== undefined) {
-      normalized.alt = alt;
+    if (record.alt !== undefined) {
+      if (typeof record.alt !== 'string') {
+        throw new TypeError(`[Levixel] ${path}.alt must be a string.`);
+      }
+      normalized.alt = record.alt;
     }
-    const width = optionalPositiveNumber(item.width, `${path}.width`);
+    const width = optionalPositiveNumber(record.width, `${path}.width`);
     if (width !== undefined) {
       normalized.width = width;
     }
-    const height = optionalPositiveNumber(item.height, `${path}.height`);
+    const height = optionalPositiveNumber(record.height, `${path}.height`);
     if (height !== undefined) {
       normalized.height = height;
     }
     return normalized;
   });
+}
+
+function requireRecord(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`[Levixel] ${path} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function rejectUnknownKeys(value: Record<string, unknown>, path: string): void {
+  for (const key of Object.keys(value)) {
+    if (!ITEM_KEYS.has(key)) {
+      throw new TypeError(
+        `[Levixel] ${path}.${key} is not part of the Levixel contract.`,
+      );
+    }
+  }
 }
 
 function requireNonEmptyString(value: unknown, path: string): string {

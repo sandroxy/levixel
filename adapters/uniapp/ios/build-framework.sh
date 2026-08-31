@@ -23,6 +23,8 @@ if [[ ! -f "${core_artifact}" ]]; then
   exit 1
 fi
 
+bash "${plugin_dir}/scripts/verify-ios-core-adapter-api.sh" "${core_artifact}"
+
 rm -rf "${build_root}"
 mkdir -p "${core_artifact_dir}"
 ditto -x -k "${core_artifact}" "${core_artifact_dir}"

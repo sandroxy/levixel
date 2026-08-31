@@ -7,10 +7,6 @@ version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")'
 artifact_path="${plugin_dir}/dist/native-android/levixel-${version}.aar"
 repository_path="${plugin_dir}/dist/native-android/levixel-${version}-maven.zip"
 
-if [[ "${LEVIXEL_SKIP_PACKAGE:-0}" != "1" ]]; then
-    "${script_dir}/package-native-android.sh"
-fi
-
 if [[ ! -f "${artifact_path}" || ! -f "${repository_path}" ]]; then
     printf '%s\n' "Packaged Android artifacts are missing." >&2
     exit 1

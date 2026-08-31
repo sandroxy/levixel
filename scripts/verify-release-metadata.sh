@@ -40,6 +40,7 @@ node -e '
     throw new Error(`Unexpected Web lifecycle scripts: ${lifecycle.join(", ")}`)
 ' "${plugin_dir}/adapters/web/package.json" "${web_version}"
 
+node "${script_dir}/verify-contract-schema.mjs"
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 bash "${script_dir}/verify-documentation.sh"
 

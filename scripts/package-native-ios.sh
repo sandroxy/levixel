@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
 ios_dir="${plugin_dir}/native/ios"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
+"${script_dir}/assert-release-version-available.sh" "${version}" --check-origin
 build_dir="${ios_dir}/build"
 device_archive="${build_dir}/Levixel-iOS.xcarchive"
 simulator_archive="${build_dir}/Levixel-Simulator.xcarchive"

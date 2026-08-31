@@ -3,32 +3,24 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_dir="$(cd "${script_dir}/.." && pwd)"
+artifact_only=0
+if [[ $# -gt 1 ]]; then
+  echo "Usage: $0 [--artifact-only]" >&2
+  exit 1
+fi
+if [[ $# -eq 1 ]]; then
+  if [[ "$1" != "--artifact-only" ]]; then
+    echo "Usage: $0 [--artifact-only]" >&2
+    exit 1
+  fi
+  artifact_only=1
+fi
+
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 artifact_path="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
 artifact_checksum_path="${artifact_path}.sha256"
 swift_package_path="${plugin_dir}/dist/native-ios/levixel-${version}-swift-package.zip"
 swift_package_checksum_path="${swift_package_path}.sha256"
-
-bash "${plugin_dir}/native/ios/verify-viewport-layout.sh"
-
-test_derived_data="$(mktemp -d)"
-trap 'rm -rf "${test_derived_data}"' EXIT
-xcodebuild \
-  -quiet \
-  build-for-testing \
-  -project "${plugin_dir}/native/ios/Levixel.xcodeproj" \
-  -scheme Levixel \
-  -configuration Debug \
-  -destination "generic/platform=iOS Simulator" \
-  -derivedDataPath "${test_derived_data}" \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO
-rm -rf "${test_derived_data}"
-trap - EXIT
-
-if [[ "${LEVIXEL_SKIP_PACKAGE:-0}" != "1" ]]; then
-  "${script_dir}/package-native-ios.sh"
-fi
 
 for packaged_file in \
   "${artifact_path}" \
@@ -40,6 +32,10 @@ for packaged_file in \
     exit 1
   fi
 done
+
+if [[ ${artifact_only} -eq 0 ]]; then
+  "${script_dir}/test-native-ios-source.sh"
+fi
 
 verify_checksum() {
   local packaged_file="$1"
@@ -116,6 +112,11 @@ actual_checksum="$(swift package compute-checksum "${artifact_path}")"
 if [[ "${declared_checksum}" != "${actual_checksum}" ]]; then
   echo "Swift package checksum does not match ${artifact_path}" >&2
   exit 1
+fi
+
+if [[ ${artifact_only} -eq 0 ]]; then
+  "${script_dir}/verify-ios-readme-api.sh" "${artifact_path}"
+  "${script_dir}/verify-ios-core-adapter-api.sh" "${artifact_path}"
 fi
 
 printf '%s\n' "Verified ${artifact_path}"

@@ -294,6 +294,20 @@ function sanitizeItem(value, index) {
   return item
 }
 
+function sanitizeItems(value) {
+  if (!Array.isArray(value) || value.length === 0)
+    throw new Error('$.items must contain at least one item')
+
+  const items = value.map(sanitizeItem)
+  const ids = new Set()
+  items.forEach((item, index) => {
+    if (ids.has(item.id))
+      throw new Error(`$.items[${index}].id must be unique within $.items`)
+    ids.add(item.id)
+  })
+  return items
+}
+
 function transitionURL(item) {
   if (item.type === 'video')
     return item.posterUrl || item.thumbnailUrl || ''
@@ -954,10 +968,7 @@ export async function openLevixelFromSelector(options) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new Error('$ must be an object')
   rejectUnknownKeys(options, SELECTOR_OPEN_KEYS, '$')
-  if (!Array.isArray(options.items) || options.items.length === 0)
-    throw new Error('$.items must contain at least one item')
-
-  const items = options.items.map(sanitizeItem)
+  const items = sanitizeItems(options.items)
   const index = options.index === undefined ? 0 : options.index
   if (!Number.isInteger(index) || index < 0 || index >= items.length)
     throw new Error('$.index must reference an item in $.items')

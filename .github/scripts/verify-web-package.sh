@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 VERSION RELEASE_SOURCE PACKAGE CHECKSUM ACCEPTED_SHA256" >&2
+if [[ $# -ne 5 && $# -ne 6 ]]; then
+  echo "Usage: $0 VERSION RELEASE_SOURCE PACKAGE CHECKSUM ACCEPTED_SHA256 [--require-tag]" >&2
   exit 1
 fi
 
@@ -11,6 +11,14 @@ release_source="$(cd "$2" && pwd)"
 artifact_path="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
 checksum_path="$(cd "$(dirname "$4")" && pwd)/$(basename "$4")"
 accepted_sha256="$5"
+require_tag=0
+if [[ $# -eq 6 ]]; then
+  if [[ "$6" != "--require-tag" ]]; then
+    echo "Usage: $0 VERSION RELEASE_SOURCE PACKAGE CHECKSUM ACCEPTED_SHA256 [--require-tag]" >&2
+    exit 1
+  fi
+  require_tag=1
+fi
 artifact_name="levixel-web-${version}.tgz"
 web_source="${release_source}/adapters/web"
 
@@ -23,6 +31,7 @@ if [[ ! "${accepted_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
   exit 1
 fi
 for required_path in \
+  "${release_source}/.git" \
   "${release_source}" \
   "${web_source}/package.json" \
   "${web_source}/dist" \
@@ -36,6 +45,15 @@ done
 if [[ "$(basename "${artifact_path}")" != "${artifact_name}" ]]; then
   echo "Unexpected Web package filename: ${artifact_path}" >&2
   exit 1
+fi
+
+if [[ ${require_tag} -eq 1 ]]; then
+  tag_commit="$(git -C "${release_source}" rev-parse --verify "refs/tags/${version}^{commit}")"
+  release_commit="$(git -C "${release_source}" rev-parse HEAD)"
+  if [[ "${release_commit}" != "${tag_commit}" ]]; then
+    echo "Release source HEAD ${release_commit} does not equal tag ${version} commit ${tag_commit}." >&2
+    exit 1
+  fi
 fi
 
 sha256_file() {

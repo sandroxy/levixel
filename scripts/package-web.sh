@@ -25,6 +25,10 @@ version="$(ruby -ryaml -e '
   abort("Web target is missing from plugin.yaml") unless target
   print target.fetch("version", manifest.fetch("version"))
 ' "${plugin_dir}/plugin.yaml")"
+"${script_dir}/verify-product-release-readiness.sh" \
+  "${version}" \
+  "${web_dir}/CHANGELOG.md"
+"${script_dir}/verify-release-metadata.sh"
 package_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${web_dir}/package.json")"
 if [[ "${package_version}" != "${version}" ]]; then
   echo "Web package version ${package_version} does not match target version ${version}." >&2
@@ -42,7 +46,15 @@ artifact_name="levixel-web-${version}.tgz"
 artifact_path="${dist_dir}/${artifact_name}"
 checksum_path="${artifact_path}.sha256"
 work_dir="$(mktemp -d)"
-trap 'rm -rf "${work_dir}"' EXIT
+candidate_path="${work_dir}/${artifact_name}"
+candidate_checksum_path="${candidate_path}.sha256"
+artifact_install_path="${artifact_path}.tmp.$$"
+checksum_install_path="${checksum_path}.tmp.$$"
+cleanup() {
+  rm -rf "${work_dir}"
+  rm -f "${artifact_install_path}" "${checksum_install_path}"
+}
+trap cleanup EXIT
 
 "${script_dir}/verify-web.sh"
 
@@ -52,39 +64,51 @@ if [[ ! -f "${packed_path}" ]]; then
   echo "npm pack did not create the expected Web tarball: ${packed_path}" >&2
   exit 1
 fi
+if [[ "${packed_path}" != "${candidate_path}" ]]; then
+  mv "${packed_path}" "${candidate_path}"
+fi
 
-mkdir -p "${dist_dir}"
+if command -v shasum >/dev/null 2>&1; then
+  checksum="$(shasum -a 256 "${candidate_path}" | awk '{print $1}')"
+else
+  checksum="$(sha256sum "${candidate_path}" | awk '{print $1}')"
+fi
+printf '%s  %s\n' "${checksum}" "${artifact_name}" > "${candidate_checksum_path}"
+
+"${script_dir}/verify-web-package.sh" "${candidate_path}" "${checksum}"
+
+install_candidate=1
 if [[ -f "${artifact_path}" ]]; then
-  if cmp -s "${packed_path}" "${artifact_path}"; then
-    rm -f "${packed_path}"
-  elif [[ ${replace} -eq 1 ]]; then
-    mv "${packed_path}" "${artifact_path}"
-  else
+  if cmp -s "${candidate_path}" "${artifact_path}"; then
+    install_candidate=0
+    if [[ ! -f "${checksum_path}" ]] || ! cmp -s "${candidate_checksum_path}" "${checksum_path}"; then
+      if [[ ${replace} -eq 1 ]]; then
+        install_candidate=1
+      else
+        echo "The existing Web checksum sidecar does not match ${artifact_name}." >&2
+        echo "Review the candidate, then rerun with --replace." >&2
+        exit 1
+      fi
+    fi
+  elif [[ ${replace} -ne 1 ]]; then
     echo "A different Web ${version} candidate already exists: ${artifact_path}" >&2
     echo "Do not overwrite accepted bytes silently. Review the change, then rerun with --replace." >&2
     exit 1
   fi
-else
-  mv "${packed_path}" "${artifact_path}"
 fi
 
-if command -v shasum >/dev/null 2>&1; then
-  checksum="$(shasum -a 256 "${artifact_path}" | awk '{print $1}')"
-else
-  checksum="$(sha256sum "${artifact_path}" | awk '{print $1}')"
+if [[ ${install_candidate} -eq 1 ]]; then
+  mkdir -p "${dist_dir}"
+  cp "${candidate_path}" "${artifact_install_path}"
+  cp "${candidate_checksum_path}" "${checksum_install_path}"
+  mv "${artifact_install_path}" "${artifact_path}"
+  mv "${checksum_install_path}" "${checksum_path}"
 fi
-expected_sidecar="${work_dir}/${artifact_name}.sha256"
-printf '%s  %s\n' "${checksum}" "${artifact_name}" > "${expected_sidecar}"
-if [[ -f "${checksum_path}" ]] && ! cmp -s "${expected_sidecar}" "${checksum_path}"; then
-  if [[ ${replace} -ne 1 ]]; then
-    echo "The existing Web checksum sidecar does not match ${artifact_name}." >&2
-    echo "Review the candidate, then rerun with --replace." >&2
-    exit 1
-  fi
-fi
-cp "${expected_sidecar}" "${checksum_path}"
 
-"${script_dir}/verify-web-package.sh" "${artifact_path}" "${checksum}"
+if [[ ! -f "${artifact_path}" || ! -f "${checksum_path}" ]]; then
+  echo "Web candidate installation did not complete: ${artifact_path}" >&2
+  exit 1
+fi
 
 if [[ ${allow_dirty} -eq 1 ]]; then
   printf '%s\n' "Local dirty-worktree rehearsal completed; do not publish it before clean-commit verification."

@@ -47,6 +47,13 @@ test('unknown fields and drifting source arrays fail instead of being ignored', 
   );
 });
 
+test('media ids must be unique within a request', () => {
+  assert.throws(
+    () => normalizeOpenOptions({ items: [item, { ...item, url: 'https://example.com/other.jpg' }] }),
+    error => error.code === 'INVALID_VALUE' && error.path === '$.items[1].id',
+  );
+});
+
 test('selector defaults use the same field values without UniApp-only visibility behavior', () => {
   const request = normalizeSelectorOpenOptions({ items: [item], sourceSelector: '.source' });
   assert.equal(request.sourceVisibility, 'hidden');

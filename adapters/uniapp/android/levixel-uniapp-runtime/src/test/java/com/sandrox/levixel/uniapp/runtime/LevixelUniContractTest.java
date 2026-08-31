@@ -102,6 +102,16 @@ public final class LevixelUniContractTest {
     }
 
     @Test
+    public void rejectsDuplicateMediaIds() {
+        Map<String, Object> duplicate = imageItem();
+        duplicate.put("url", "https://example.com/other.jpg");
+        Map<String, Object> options = new HashMap<>();
+        options.put("items", Arrays.asList(imageItem(), duplicate));
+
+        assertContractError("INVALID_VALUE", "$.items[1].id", options);
+    }
+
+    @Test
     public void closeRequestMustBeAnEmptyObject() throws Exception {
         LevixelUniContract.validateCloseRequest(new HashMap<>());
 

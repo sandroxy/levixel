@@ -278,6 +278,13 @@ await assert.rejects(
   sdk.openLevixelFromSelector({ items, sourceSelector: '.source', galleryId: 'old-contract' }),
   /galleryId is not part of the Levixel SDK contract/,
 )
+await assert.rejects(
+  sdk.openLevixelFromSelector({
+    items: [items[0], { ...items[0], url: 'https://example.com/duplicate.jpg' }],
+    sourceSelector: '.source',
+  }),
+  /\$\.items\[1\]\.id must be unique within \$\.items/,
+)
 
 measuredRects = [measuredRects[0]]
 await sdk.openLevixelFromSelector({ items, sourceSelector: '.source' })

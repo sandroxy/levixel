@@ -15,6 +15,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Validate release version
         id: release
@@ -30,6 +31,15 @@ jobs:
 
       - name: Check out the public release verifier
         uses: actions/checkout@v6
+        with:
+          path: verifier
+
+      - name: Check out the canonical release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.version }}
+          path: release-source
+          fetch-depth: 0
 
       - name: Download accepted public artifacts
         env:
@@ -48,24 +58,44 @@ jobs:
             --output "dist/levixel-${VERSION}.aar" \
             "https://repo1.maven.org/maven2/io/gitee/sandrox/levixel/${VERSION}/levixel-${VERSION}.aar"
 
-      - name: Verify exact package and native cores
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          .github/scripts/verify-npm-package.sh \
-            "${VERSION}" \
-            "dist/levixel-react-native-${VERSION}.tgz" \
-            "dist/levixel-react-native-${VERSION}.tgz.sha256" \
-            "dist/levixel-native-${VERSION}.json" \
-            "dist/levixel-${VERSION}.aar" \
-            "dist/levixel-${VERSION}.xcframework.zip"
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org/'
           package-manager-cache: false
+
+      - name: Verify exact package and native cores
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          verifier/.github/scripts/verify-npm-package.sh \
+            "${VERSION}" \
+            "dist/levixel-react-native-${VERSION}.tgz" \
+            "dist/levixel-react-native-${VERSION}.tgz.sha256" \
+            "dist/levixel-native-${VERSION}.json" \
+            "dist/levixel-${VERSION}.aar" \
+            "dist/levixel-${VERSION}.xcframework.zip" \
+            release-source
+
+      - name: Confirm the npm version is unused
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set +e
+          view_output="$(npm view "@sandrox/levixel@${VERSION}" version \
+            --registry https://registry.npmjs.org/ 2>&1)"
+          view_status=$?
+          set -e
+          if [[ ${view_status} -eq 0 ]]; then
+            echo "@sandrox/levixel@${VERSION} is already published." >&2
+            exit 1
+          fi
+          if ! grep -q 'E404' <<<"${view_output}"; then
+            echo "Could not prove that @sandrox/levixel@${VERSION} is unused:" >&2
+            echo "${view_output}" >&2
+            exit 1
+          fi
 
       - name: Set up an OIDC-capable npm client
         run: npm install --global npm@11.17.0

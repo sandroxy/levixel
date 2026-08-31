@@ -115,6 +115,10 @@ final class LevixelViewerPageView: UIView {
     }
 
     func refreshLayoutForCurrentBounds() {
+        // The scroll view is constrained through an intermediate container. During
+        // the page's first layout pass, force that child layout before reading its
+        // bounds so an image configured at a zero-sized frame is fitted immediately.
+        mediaContainer.layoutIfNeeded()
         prepareSourcePreviewHandoffIfNeeded()
 
         let isCompletingFullImageHandoff = fullImageHandoffPending

@@ -1,6 +1,6 @@
 import { requireNativeView } from 'expo';
 import * as React from 'react';
-import { createContext, useContext, useMemo, useRef } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import type { NativeSyntheticEvent, ViewProps } from 'react-native';
 
 import { normalizeMediaItems } from './contract';
@@ -47,9 +47,9 @@ function LevixelProvider({
   theme = 'dark',
   onIndexChange,
 }: LevixelProps) {
-  const generatedGalleryId = useRef(createGalleryId());
+  const [generatedGalleryId] = useState(createGalleryId);
   const normalizedItems = useMemo(() => normalizeMediaItems(items), [items]);
-  const resolvedGalleryId = galleryId?.trim() || generatedGalleryId.current;
+  const resolvedGalleryId = galleryId?.trim() || generatedGalleryId;
 
   const value = useMemo<LevixelContextValue>(
     () => ({

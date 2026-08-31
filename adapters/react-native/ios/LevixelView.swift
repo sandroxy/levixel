@@ -27,14 +27,13 @@ final class LevixelView: ExpoView {
     private weak var configuredImageView: UIImageView?
 
     deinit {
-        configuredImageView?.removeLevixelViewerInteraction()
+        clearConfiguredImageView()
     }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window == nil {
-            configuredImageView?.removeLevixelViewerInteraction()
-            configuredImageView = nil
+            clearConfiguredImageView()
         } else {
             configureSourceView()
         }
@@ -45,57 +44,97 @@ final class LevixelView: ExpoView {
         super.insertReactSubview(subview, at: atIndex)
         configureSourceView()
     }
+
+    override func removeReactSubview(_ subview: UIView!) {
+        clearConfiguredImageView()
+        super.removeReactSubview(subview)
+    }
     #endif
 
     #if RCT_NEW_ARCH_ENABLED
     override func unmountChildComponentView(_ childComponentView: UIView, index: Int) {
-        configuredImageView?.removeLevixelViewerInteraction()
-        configuredImageView = nil
+        clearConfiguredImageView()
         super.unmountChildComponentView(childComponentView, index: index)
     }
     #endif
 
     func configureSourceView() {
-        guard window != nil, let imageView = findImageView() else { return }
-        let mediaItems = buildMediaItems()
-        guard !mediaItems.isEmpty else { return }
+        guard window != nil, let imageView = findImageView() else {
+            clearConfiguredImageView()
+            return
+        }
+        let media = buildMediaItems()
+        guard media.items.isEmpty == false else {
+            clearConfiguredImageView()
+            return
+        }
 
         if let configuredImageView, configuredImageView !== imageView {
             configuredImageView.removeLevixelViewerInteraction()
         }
         self.configuredImageView = imageView
 
-        let safeIndex = min(max(0, initialIndex), mediaItems.count - 1)
+        let safeIndex = min(max(0, initialIndex), media.items.count - 1)
         var configuration = LevixelViewerConfiguration(theme: theme.viewerTheme)
         configuration.onIndexChange = { [weak self] index in
             self?.onIndexChange(["currentIndex": index])
         }
         imageView.setupLevixelViewer(
-            dataSource: LevixelArrayDataSource(items: mediaItems),
+            dataSource: LevixelArrayDataSource(
+                items: media.items,
+                itemIdentifiers: media.itemIdentifiers
+            ),
             initialIndex: safeIndex,
             configuration: configuration,
             galleryId: galleryId.isEmpty ? nil : galleryId
         )
     }
 
-    private func buildMediaItems() -> [LevixelMediaItem] {
-        items.compactMap { value in
+    private func buildMediaItems() -> (
+        items: [LevixelMediaItem],
+        itemIdentifiers: [String]
+    ) {
+        var mediaItems: [LevixelMediaItem] = []
+        var itemIdentifiers: [String] = []
+        var seenItemIdentifiers = Set<String>()
+
+        for value in items {
             guard
+                let itemIdentifier = value["id"] as? String,
+                itemIdentifier.isEmpty == false,
+                seenItemIdentifiers.insert(itemIdentifier).inserted,
                 let type = value["type"] as? String,
                 let sourceValue = value["url"] as? String,
                 let sourceURL = makeURL(sourceValue)
             else {
-                return nil
+                return ([], [])
             }
 
-            if type == "video" {
+            let mediaItem: LevixelMediaItem
+            switch type {
+            case "video":
                 let posterValue = value["posterUrl"] as? String ?? value["thumbnailUrl"] as? String
-                return .video(url: sourceURL, poster: posterValue.flatMap(makeURL))
+                mediaItem = .video(url: sourceURL, poster: posterValue.flatMap(makeURL))
+            case "image":
+                let thumbnailURL = (value["thumbnailUrl"] as? String).flatMap(makeURL)
+                mediaItem = .imageURL(
+                    sourceURL,
+                    thumbnailURL: thumbnailURL,
+                    placeholder: nil
+                )
+            default:
+                return ([], [])
             }
 
-            let thumbnailURL = (value["thumbnailUrl"] as? String).flatMap(makeURL)
-            return .imageURL(sourceURL, thumbnailURL: thumbnailURL, placeholder: nil)
+            mediaItems.append(mediaItem)
+            itemIdentifiers.append(itemIdentifier)
         }
+        return (mediaItems, itemIdentifiers)
+    }
+
+    private func clearConfiguredImageView() {
+        configuredImageView?.removeLevixelViewerInteraction()
+        configuredImageView = nil
     }
 
     private func makeURL(_ value: String) -> URL? {

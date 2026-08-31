@@ -51,5 +51,5 @@ jobs:
         working-directory: adapters/web
         run: npm ci
 
-      - name: Build and verify the exact Web release candidate
-        run: ./scripts/package-web.sh
+      - name: Verify Web source and npm payload layout
+        run: ./scripts/verify-web.sh

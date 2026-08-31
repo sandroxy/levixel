@@ -63,8 +63,17 @@ final class LevixelUniContract {
         }
 
         List<Item> items = new ArrayList<>(itemValues.size());
+        Set<String> itemIds = new HashSet<>();
         for (int index = 0; index < itemValues.size(); index++) {
-            items.add(parseItem(itemValues.get(index), "$.items[" + index + "]"));
+            Item item = parseItem(itemValues.get(index), "$.items[" + index + "]");
+            if (!itemIds.add(item.id)) {
+                throw error(
+                        "INVALID_VALUE",
+                        "$.items[" + index + "].id",
+                        "must be unique within $.items"
+                );
+            }
+            items.add(item);
         }
 
         int initialIndex = optionalInteger(options.get("index"), 0, "$.index");

@@ -60,6 +60,8 @@ const disposeGalleryActivation = () => disposers.forEach(dispose => dispose());
 
 If the selector is omitted, does not match exactly one element per item, or the selected source has no usable geometry, Levixel opens with its native-style fade/loading fallback rather than guessing the wrong source rectangle.
 
+Each media `id` must be non-empty and unique within one open request. The shared Levixel contract treats it as stable media identity, so the Web runtime rejects duplicates instead of accepting a request that other adapters cannot anchor unambiguously.
+
 `openLevixel` accepts already measured `sourceHints` for hosts that own their DOM geometry. `prepareLevixelItem` preloads the transition preview (thumbnail or poster, falling back to the image URL), while `warmupLevixelItem` first reuses dimensions from an already loaded source element and otherwise preloads the same preview. Neither function runs automatically merely because the host renders a thumbnail list.
 
 ## Product behavior

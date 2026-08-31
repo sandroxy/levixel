@@ -85,7 +85,10 @@ final class LevixelViewerController: UIViewController {
         self.dataSource = dataSource
         self.imageLoader = imageLoader
         self.configuration = configuration
-        self.initialIndex = initialIndex
+        let itemCount = dataSource?.numberOfItems() ?? 0
+        self.initialIndex = itemCount > 0
+            ? min(max(initialIndex, 0), itemCount - 1)
+            : 0
         self.galleryId = galleryId
 
         let layout = UICollectionViewFlowLayout()
@@ -330,10 +333,25 @@ final class LevixelViewerController: UIViewController {
         presentationSession = nil
     }
 
-    private func anchorView(for index: Int) -> UIImageView? {
-        if let galleryId = galleryId,
-           let sourceView = LevixelSourceViewRegistry.shared.sourceView(for: galleryId, index: index) {
-            return sourceView
+    func anchorView(for index: Int) -> UIImageView? {
+        if let galleryId = galleryId {
+            if let identifiedDataSource = dataSource as? LevixelIdentifiedDataSource,
+               let itemIdentifier = identifiedDataSource.itemIdentifier(at: index),
+               itemIdentifier.isEmpty == false {
+                // A stable identity is authoritative. If its source no longer exists,
+                // fade out instead of falling back to a cell that may now represent
+                // different media after list mutation or reuse.
+                return LevixelSourceViewRegistry.shared.sourceView(
+                    for: galleryId,
+                    itemIdentifier: itemIdentifier
+                )
+            }
+            if let sourceView = LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                index: index
+            ) {
+                return sourceView
+            }
         }
         if index == initialIndex {
             return initialSourceView

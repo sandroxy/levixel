@@ -20,10 +20,6 @@ if [[ -z "${ohpm}" || ! -x "${ohpm}" ]]; then
   exit 1
 fi
 
-if [[ "${LEVIXEL_SKIP_PACKAGE:-0}" != "1" ]]; then
-  "${script_dir}/package-native-harmonyos.sh"
-fi
-
 if [[ ! -f "${artifact_path}" ]]; then
   echo "Packaged HarmonyOS artifact is missing: ${artifact_path}" >&2
   exit 1

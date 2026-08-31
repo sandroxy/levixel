@@ -46,6 +46,17 @@ for required_path in \
   fi
 done
 
+ios_runtime_source="${release_source}/adapters/uniapp/ios/LevixelUniRuntime"
+ios_api_verifier="${release_source}/scripts/verify-ios-core-adapter-api.sh"
+if [[ -f "${ios_api_verifier}" ]]; then
+  bash "${ios_api_verifier}" "${ios_artifact}"
+elif grep -R -E -q \
+  'itemIdentifiers[[:space:]]*:|registerLevixelSource\([^)]*itemIdentifier[[:space:]]*:' \
+  "${ios_runtime_source}" 2>/dev/null; then
+  echo "Release source uses stable iOS media identities but is missing its matching API verifier." >&2
+  exit 1
+fi
+
 if [[ -n "${legacy_artifact}" || -n "${legacy_checksum}" || -n "${legacy_accepted_sha256}" ]]; then
   if [[ -z "${legacy_artifact}" || -z "${legacy_checksum}" || -z "${legacy_accepted_sha256}" ]]; then
     echo "Legacy verification requires the ZIP, checksum sidecar, and accepted SHA-256 together." >&2
@@ -136,9 +147,14 @@ read -r expected_android_sha expected_android_bytes expected_ios_sha expected_io
 )
 
 actual_release_commit="$(git -C "${release_source}" rev-parse HEAD)"
-if ! git -C "${release_source}" cat-file -e "${native_commit}^{commit}" 2>/dev/null \
-  || ! git -C "${release_source}" merge-base --is-ancestor "${native_commit}" HEAD; then
-  echo "Native release commit ${native_commit} is not an ancestor of release source ${actual_release_commit}." >&2
+uts_tag_commit="$(git -C "${release_source}" rev-parse --verify "refs/tags/${version}^{commit}")"
+native_tag_commit="$(git -C "${release_source}" rev-parse --verify "refs/tags/${native_version}^{commit}")"
+if [[ "${actual_release_commit}" != "${uts_tag_commit}" ]]; then
+  echo "Release source HEAD ${actual_release_commit} does not equal UniApp tag ${version} commit ${uts_tag_commit}." >&2
+  exit 1
+fi
+if [[ "${native_commit}" != "${native_tag_commit}" ]]; then
+  echo "Native manifest commit ${native_commit} does not equal native tag ${native_version} commit ${native_tag_commit}." >&2
   exit 1
 fi
 

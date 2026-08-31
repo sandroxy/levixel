@@ -30,6 +30,11 @@ Product publication workflows are intentionally manual. Publishing a GitHub Rele
 5. Complete the required Android, iOS, HarmonyOS, React Native, UniApp, and Web interaction verification for the targets being released.
 6. Publish only the accepted files and their recorded checksums. Never rebuild after acceptance or reuse a public version for different bytes.
 
+Every artifact-producing script rejects a version that already has a local or
+canonical `origin` tag before invoking a compiler or touching its release path.
+There is no overwrite mode for a tagged version. Additive public API changes use
+a new SemVer minor version; fixes that do not add public API use a patch version.
+
 Prepare the complete native candidate and release manifest with:
 
 ```sh
@@ -53,9 +58,20 @@ Before creating a tag, run:
 ```sh
 ./scripts/verify-documentation.sh
 ./scripts/verify-release-metadata.sh
+./scripts/verify-release-readiness.sh
 ```
 
+`verify-release-metadata.sh` remains usable on the development branch while its
+top entry is `Unreleased`. Only `verify-release-readiness.sh` is the formal
+candidate gate: it requires an unused stable version, checks `origin` directly,
+and requires the current version and date to be the first coordinated changelog
+entries.
+
 Post-release documentation corrections are normal commits on the default branch. They must not move an already published tag, replace an accepted release asset, or rebuild a public version. A registry README embedded in an immutable artifact remains the historical copy shipped with that artifact; editable landing pages may link to the current guide.
+
+The root README files are stable-installation guides. Do not show an unreleased
+initializer, method, or option there while the latest tagged binary lacks it;
+record it under `Unreleased` until the compatible artifact is accepted.
 
 ## Canonical Git Tag
 
@@ -168,6 +184,12 @@ The npm product embeds the native artifacts recorded in `dist/native-release/lev
    ./scripts/package-react-native.sh
    ./scripts/verify-react-native-package.sh
    ```
+
+   The package command requires a clean worktree and installs a candidate only
+   after its tarball, sidecar, native manifest, embedded binaries, source bytes,
+   and adapter-facing iOS API pass verification. `--allow-dirty` is a local
+   rehearsal only. `--replace` may replace a rejected untagged local candidate;
+   the version guard cannot be bypassed after a tag exists.
 
 2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
 3. Confirm the shared canonical `<version>` tag points to the accepted release

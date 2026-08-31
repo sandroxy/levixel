@@ -158,7 +158,19 @@ function sanitizeItem(value: unknown, index: number): LevixelMediaItem {
 function sanitizeItems(value: unknown): LevixelMediaItem[] {
   if (!Array.isArray(value) || value.length === 0)
     contractError('$.items', '$.items must contain at least one item');
-  return value.map(sanitizeItem);
+  const items = value.map(sanitizeItem);
+  const ids = new Set<string>();
+  items.forEach((item, index) => {
+    if (ids.has(item.id)) {
+      contractError(
+        `$.items[${index}].id`,
+        `$.items[${index}].id must be unique within $.items`,
+        'INVALID_VALUE',
+      );
+    }
+    ids.add(item.id);
+  });
+  return items;
 }
 
 function normalizeIndex(value: unknown, itemCount: number): number {

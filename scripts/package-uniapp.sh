@@ -21,6 +21,10 @@ done
 read -r version native_version source_root_relative _ _ < <(
   bash "${script_dir}/resolve-uniapp-product.sh" "${plugin_dir}/plugin.yaml"
 )
+"${script_dir}/verify-product-release-readiness.sh" \
+  "${version}" \
+  "${plugin_dir}/uni_modules/Sandrox-Levixel/changelog.md"
+"${script_dir}/verify-release-metadata.sh"
 if [[ "${source_root_relative}" != "uni_modules/Sandrox-Levixel" ]]; then
   echo "UniApp sourceRoot must be uni_modules/Sandrox-Levixel, got ${source_root_relative}" >&2
   exit 1

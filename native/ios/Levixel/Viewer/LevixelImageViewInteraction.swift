@@ -34,9 +34,14 @@ public final class LevixelViewerSession {
 }
 
 extension UIImageView {
+    private enum LevixelAnchorReference {
+        case index(Int)
+        case itemIdentifier(String)
+    }
+
     private struct LevixelAnchorRegistration {
         let galleryId: String
-        let index: Int
+        let reference: LevixelAnchorReference
     }
 
     private final class LevixelTapGestureRecognizer: UITapGestureRecognizer {
@@ -167,16 +172,32 @@ extension UIImageView {
     }
 
     public func registerLevixelSource(galleryId: String, index: Int) {
-        updateLevixelAnchorRegistration(galleryId: galleryId, index: index)
+        updateLevixelAnchorRegistration(galleryId: galleryId, reference: .index(index))
+    }
+
+    public func registerLevixelSource(galleryId: String, itemIdentifier: String) {
+        let reference = itemIdentifier.isEmpty
+            ? nil
+            : LevixelAnchorReference.itemIdentifier(itemIdentifier)
+        updateLevixelAnchorRegistration(galleryId: galleryId, reference: reference)
     }
 
     public func unregisterLevixelSource() {
         guard let registration = levixelAnchorRegistration else { return }
-        LevixelSourceViewRegistry.shared.unregister(
-            self,
-            galleryId: registration.galleryId,
-            index: registration.index
-        )
+        switch registration.reference {
+        case .index(let index):
+            LevixelSourceViewRegistry.shared.unregister(
+                self,
+                galleryId: registration.galleryId,
+                index: index
+            )
+        case .itemIdentifier(let itemIdentifier):
+            LevixelSourceViewRegistry.shared.unregister(
+                self,
+                galleryId: registration.galleryId,
+                itemIdentifier: itemIdentifier
+            )
+        }
         levixelAnchorRegistration = nil
     }
 
@@ -190,7 +211,9 @@ extension UIImageView {
         galleryId: String? = nil,
         completion: (() -> Void)? = nil
     ) -> LevixelViewerSession? {
-        guard dataSource.numberOfItems() > 0 else { return nil }
+        let itemCount = dataSource.numberOfItems()
+        guard itemCount > 0 else { return nil }
+        let safeInitialIndex = min(max(initialIndex, 0), itemCount - 1)
 
         let resolvedImageLoader = imageLoader ?? LevixelImageLoaderFactory.makeDefault()
         let viewerController = LevixelViewerController(
@@ -198,7 +221,7 @@ extension UIImageView {
             dataSource: dataSource,
             imageLoader: resolvedImageLoader,
             configuration: configuration,
-            initialIndex: initialIndex,
+            initialIndex: safeInitialIndex,
             galleryId: galleryId
         )
         let rootViewController = viewController ?? topMostHostViewController
@@ -207,7 +230,10 @@ extension UIImageView {
         }
 
         if let galleryId, galleryId.isEmpty == false {
-            updateLevixelAnchorRegistration(galleryId: galleryId, index: initialIndex)
+            updateLevixelAnchorRegistration(
+                galleryId: galleryId,
+                reference: anchorReference(for: dataSource, index: safeInitialIndex)
+            )
         }
 
         let session = LevixelViewerSession(
@@ -228,6 +254,7 @@ extension UIImageView {
         imageLoader: LevixelImageLoading?,
         galleryId: String?
     ) {
+        let safeInitialIndex = clampedIndex(initialIndex, for: dataSource)
         let recognizer = levixelTapGestureRecognizer ?? {
             let recognizer = LevixelTapGestureRecognizer(target: self, action: #selector(showLevixelViewer(_:)))
             recognizer.numberOfTouchesRequired = 1
@@ -241,7 +268,7 @@ extension UIImageView {
 
         recognizer.dataSource = dataSource
         recognizer.imageLoader = imageLoader
-        recognizer.initialIndex = initialIndex
+        recognizer.initialIndex = safeInitialIndex
         recognizer.galleryId = galleryId
         recognizer.configuration = configuration
         recognizer.fromViewController = viewController
@@ -250,7 +277,10 @@ extension UIImageView {
             addGestureRecognizer(recognizer)
         }
 
-        updateLevixelAnchorRegistration(galleryId: galleryId, index: initialIndex)
+        updateLevixelAnchorRegistration(
+            galleryId: galleryId,
+            reference: anchorReference(for: dataSource, index: safeInitialIndex)
+        )
     }
 
     private var levixelTapGestureRecognizer: LevixelTapGestureRecognizer? {
@@ -303,18 +333,52 @@ extension UIImageView {
         return controller
     }
 
-    private func updateLevixelAnchorRegistration(galleryId: String?, index: Int) {
-        if let existing = levixelAnchorRegistration {
-            LevixelSourceViewRegistry.shared.unregister(
-                self,
-                galleryId: existing.galleryId,
-                index: existing.index
-            )
-            levixelAnchorRegistration = nil
+    private func clampedIndex(_ index: Int, for dataSource: LevixelDataSource?) -> Int {
+        let itemCount = dataSource?.numberOfItems() ?? 0
+        guard itemCount > 0 else { return 0 }
+        return min(max(index, 0), itemCount - 1)
+    }
+
+    private func anchorReference(
+        for dataSource: LevixelDataSource?,
+        index: Int
+    ) -> LevixelAnchorReference? {
+        guard let dataSource, dataSource.numberOfItems() > 0 else { return nil }
+        if let identifiedDataSource = dataSource as? LevixelIdentifiedDataSource,
+           let itemIdentifier = identifiedDataSource.itemIdentifier(at: index),
+           itemIdentifier.isEmpty == false {
+            return .itemIdentifier(itemIdentifier)
+        }
+        return .index(index)
+    }
+
+    private func updateLevixelAnchorRegistration(
+        galleryId: String?,
+        reference: LevixelAnchorReference?
+    ) {
+        unregisterLevixelSource()
+
+        guard
+            let galleryId = galleryId,
+            galleryId.isEmpty == false,
+            let reference
+        else {
+            return
         }
 
-        guard let galleryId = galleryId, galleryId.isEmpty == false else { return }
-        LevixelSourceViewRegistry.shared.register(self, galleryId: galleryId, index: index)
-        levixelAnchorRegistration = LevixelAnchorRegistration(galleryId: galleryId, index: index)
+        switch reference {
+        case .index(let index):
+            LevixelSourceViewRegistry.shared.register(self, galleryId: galleryId, index: index)
+        case .itemIdentifier(let itemIdentifier):
+            LevixelSourceViewRegistry.shared.register(
+                self,
+                galleryId: galleryId,
+                itemIdentifier: itemIdentifier
+            )
+        }
+        levixelAnchorRegistration = LevixelAnchorRegistration(
+            galleryId: galleryId,
+            reference: reference
+        )
     }
 }

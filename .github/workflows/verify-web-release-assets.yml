@@ -44,6 +44,7 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           path: release-source
+          fetch-depth: 0
 
       - name: Set up JavaScript package verification
         uses: actions/setup-node@v6
@@ -53,9 +54,10 @@ jobs:
           cache-dependency-path: release-source/adapters/web/package-lock.json
 
       - name: Verify tag source and build an independent comparison
+        working-directory: release-source/adapters/web
         run: |
-          npm --prefix release-source/adapters/web ci
-          npm --prefix release-source/adapters/web test
+          npm ci
+          npm test
 
       - name: Download accepted public release assets
         env:
@@ -79,4 +81,5 @@ jobs:
             release-source \
             "dist/levixel-web-${VERSION}.tgz" \
             "dist/levixel-web-${VERSION}.tgz.sha256" \
-            "${ACCEPTED_SHA256}"
+            "${ACCEPTED_SHA256}" \
+            --require-tag

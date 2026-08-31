@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- 同一次打开请求中的媒体 `id` 必须唯一，Android/iOS 原生运行时与公共 JavaScript 选择器入口会一致拒绝重复值。
+- iOS 共享转场改用稳定媒体 `id` 匹配回场源，列表插入、删除或重排后不再依赖旧下标。
+
 ## 1.2.0
 
 - 正式支持 HBuilderX 5.24+ 的 App-Android 与 App-iOS uni-app x，仅限 Vapor；x 宿主最低 Android 6 / API 23 与 iOS 15，不支持 VDOM、nvue、Web、小程序或 HarmonyOS。
