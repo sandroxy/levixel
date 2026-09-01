@@ -31,9 +31,28 @@ snapshot them once with:
 ./scripts/prepare-release-candidate.sh
 ```
 
+[`release-policy.json`](release-policy.json) is this product repository's
+machine-readable release contract. Candidate creation and the publication gate
+both require an exact match for the plugin id, source repository, qualification
+fields, artifact roles, and automated/manual acceptance matrix. Do not add
+sibling products to that policy: a new plugin owns its own policy and can be
+onboarded without changing Levixel's release gate.
+
 The separate `integrated-plugins` repository must consume the printed absolute
 manifest path with `--candidate`; its default mode always uses public stable
 artifacts from `verification/stable-lock.json` and never a sibling checkout.
+Every candidate-declared target runs in a Levixel-only consumer. Shared React
+Native and classic UniApp catalog sources are used to generate ignored isolated
+hosts, so another plugin's publication state can never block or influence a
+Levixel acceptance receipt. The separately named combined-showcase smoke uses
+only public stable artifacts and is not a Levixel publication gate.
+The manifest also declares the exact automated and manual acceptance targets.
+From a clean verifier commit, run each automated target through
+`verification/run-acceptance.rb`; direct `verify.sh all` output is useful for
+diagnosis but is not per-target release evidence. Record manual results with
+repeated `--manual <target>=passed` arguments to
+`verification/record-acceptance.rb`. Omitted targets remain `pending`, and the
+receipt cannot become `accepted` until every declared target has passed.
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
@@ -301,13 +320,16 @@ LEVIXEL_UNIAPP_VERSION="<version>"
 gh release upload "${LEVIXEL_UNIAPP_VERSION}" \
   "dist/uniapp/levixel-uniapp-${LEVIXEL_UNIAPP_VERSION}.zip" \
   "dist/uniapp/levixel-uniapp-${LEVIXEL_UNIAPP_VERSION}.zip.sha256" \
-  --repo sandroxy/levixel \
-  --clobber
+  --repo sandroxy/levixel
 ```
+
+The upload must fail if either asset name already exists. Verify or remove an
+unpublished draft mistake explicitly; never replace an asset on a published
+Release.
 
 GitHub Actions cannot receive a local file through `workflow_dispatch`, and the DCloud Marketplace requires an authenticated download and may normalize `package.json`. Therefore the release workflow verifies an already uploaded immutable candidate instead of silently rebuilding it or persisting a DCloud session.
 
-The separately generated `levixel-uniapp-legacy-<version>.zip` is the compatibility artifact for App native-plugin/offline consumers. Build it from the resolved native cores and canonical JavaScript SDK, pass Android/iOS artifact-only smoke tests, and attach it to the matching Release. Every historical legacy ZIP remains immutable on its original Release; no legacy ZIP may replace the Marketplace ZIP.
+The separately generated `levixel-uniapp-legacy-<version>.zip` is the compatibility artifact for App native-plugin/offline consumers. Build it from the resolved native cores and canonical JavaScript SDK, then run the independent `uniapp-legacy` target in `integrated-plugins`. That target consumes only the ZIP, validates the Android and iOS payloads, and generates an isolated classic uni-app host for Android and iOS packaging. Record `uniapp-legacy-android-device` and `uniapp-legacy-ios-device` separately. Attach the accepted ZIP to the matching Release. Every historical legacy ZIP remains immutable on its original Release; no legacy ZIP may replace the Marketplace ZIP.
 
 Audit the legacy ZIP independently by running `Verify UniApp Release Assets` with `include_legacy` against the same release source. Do not present the legacy artifact as a Marketplace package, a uni-app x package, or the recommended path for new projects.
 

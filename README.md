@@ -174,6 +174,7 @@ levixel/
 ├── packaging/       # 平台制品模板
 ├── scripts/         # 构建、制品检查与发布工具
 ├── schema/          # 插件清单 Schema
+├── release-policy.json # 发布候选与验收矩阵的机器契约
 └── plugin.yaml      # 版本、能力与交付目标的机器可读清单
 ```
 

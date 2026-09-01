@@ -1,0 +1,29 @@
+name: Release policy
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Candidate policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Verify release policy and scripts
+        run: |
+          ruby -c scripts/release-policy.rb
+          ruby -c scripts/snapshot-release-candidate.rb
+          ruby -c scripts/verify-publish-candidate.rb
+          bash -n scripts/prepare-release-candidate.sh
+          ruby scripts/test-release-policy.rb

@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Validate immutable candidate inputs
@@ -36,19 +36,19 @@ jobs:
           fi
 
       - name: Check out the public release verifier
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           path: verifier
 
       - name: Check out the canonical release tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.version }}
           path: release-source
           fetch-depth: 0
 
       - name: Set up JavaScript package verification
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org/'

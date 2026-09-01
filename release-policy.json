@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "plugin-release-policy",
+  "plugin": "levixel",
+  "sourceRepository": "https://github.com/sandroxy/levixel.git",
+  "verifierRepository": "https://github.com/sandroxy/integrated-plugins.git",
+  "candidateSchemaVersion": 2,
+  "acceptanceReceiptSchemaVersion": 2,
+  "qualifications": [
+    "androidMavenSigned",
+    "nativeManifestVerified",
+    "packageIdentitiesVerified",
+    "versionUnpublished"
+  ],
+  "artifactRoles": {
+    "required": [
+      "checksum-native-android-aar",
+      "checksum-native-android-maven-repository",
+      "checksum-native-harmonyos-har",
+      "checksum-native-ios-swift-package",
+      "checksum-native-ios-xcframework",
+      "checksum-react-native-package",
+      "checksum-uniapp-legacy-package",
+      "checksum-uniapp-uts-package",
+      "checksum-web-package",
+      "native-android-aar",
+      "native-android-maven-repository",
+      "native-build-checksums",
+      "native-build-manifest",
+      "native-harmonyos-har",
+      "native-ios-swift-package",
+      "native-ios-xcframework",
+      "react-native-package",
+      "uniapp-legacy-package",
+      "uniapp-marketplace-material",
+      "uniapp-uts-package",
+      "web-package"
+    ],
+    "conditional": {
+      "androidMavenSigned": [
+        "checksum-native-android-maven-central-bundle",
+        "native-android-maven-central-bundle"
+      ]
+    }
+  },
+  "acceptance": {
+    "automatedTargets": [
+      "android",
+      "harmonyos",
+      "ios",
+      "react-native-android",
+      "react-native-ios",
+      "uniapp",
+      "uniapp-legacy",
+      "uniapp-x",
+      "web"
+    ],
+    "manualTargets": [
+      "harmonyos-device",
+      "native-android-device",
+      "native-ios-device",
+      "react-native-android-device",
+      "react-native-ios-device",
+      "uniapp-android-device",
+      "uniapp-ios-device",
+      "uniapp-legacy-android-device",
+      "uniapp-legacy-ios-device",
+      "uniapp-x-android-device",
+      "uniapp-x-ios-device",
+      "web-browser"
+    ]
+  }
+}

@@ -6,15 +6,19 @@ require "json"
 require "optparse"
 require "pathname"
 require "tmpdir"
+require_relative "release-policy"
 
 options = {
+  automated_targets: [],
   artifacts: [],
+  manual_targets: [],
   qualifications: {},
 }
 
 OptionParser.new do |parser|
   parser.banner = "Usage: snapshot-release-candidate.rb [options]"
   parser.on("--plugin ID") { |value| options[:plugin] = value }
+  parser.on("--policy FILE") { |value| options[:policy] = value }
   parser.on("--version VERSION") { |value| options[:version] = value }
   parser.on("--repository URL") { |value| options[:repository] = value }
   parser.on("--commit SHA") { |value| options[:commit] = value }
@@ -22,14 +26,17 @@ OptionParser.new do |parser|
   parser.on("--root PATH") { |value| options[:root] = value }
   parser.on("--output-root PATH") { |value| options[:output_root] = value }
   parser.on("--state STATE") { |value| options[:state] = value }
+  parser.on("--automated-target TARGET") { |value| options[:automated_targets] << value }
+  parser.on("--manual-target TARGET") { |value| options[:manual_targets] << value }
   parser.on("--artifact ROLE=PATH") { |value| options[:artifacts] << value }
   parser.on("--qualification KEY=VALUE") do |value|
     key, raw = value.split("=", 2)
     abort("Invalid qualification: #{value}") unless key&.match?(/\A[a-z][A-Za-z0-9]*\z/) && raw
+    abort("Duplicate qualification: #{key}") if options[:qualifications].key?(key)
     parsed = case raw
              when "true" then true
              when "false" then false
-             else raw
+             else abort("Qualification must be true or false: #{value}")
              end
     options[:qualifications][key] = parsed
   end
@@ -37,10 +44,12 @@ end.parse!
 
 abort("Unexpected arguments: #{ARGV.join(" ")}") unless ARGV.empty?
 
-required = %i[plugin version repository commit dirty root output_root state]
+required = %i[plugin policy version repository commit dirty root output_root state]
 missing = required.reject { |key| options[key] && !options[key].empty? }
 abort("Missing required options: #{missing.join(", ")}") unless missing.empty?
 abort("At least one --artifact is required") if options[:artifacts].empty?
+abort("At least one acceptance target is required") if
+  options[:automated_targets].empty? && options[:manual_targets].empty?
 
 plugin = options.fetch(:plugin)
 version = options.fetch(:version)
@@ -60,6 +69,34 @@ abort("State must be candidate or rehearsal") unless %w[candidate rehearsal].inc
 abort("A dirty source cannot produce an acceptance candidate") if state == "candidate" && dirty
 
 root = Pathname.new(options.fetch(:root)).realpath
+policy_argument = Pathname.new(options.fetch(:policy))
+abort("Release policy path must be absolute") unless policy_argument.absolute?
+policy_path = policy_argument.realpath
+expected_policy_path = root.join("release-policy.json").realpath
+abort("Release policy must be #{expected_policy_path}") unless policy_path == expected_policy_path
+begin
+  policy = ReleasePolicy.load(policy_path)
+rescue ReleasePolicy::Error => error
+  abort(error.message)
+end
+abort("Candidate plugin differs from release policy") unless plugin == policy.fetch("plugin")
+abort("Candidate repository differs from release policy") unless repository == policy.fetch("sourceRepository")
+abort("Candidate qualification fields differ from release policy") unless
+  options.fetch(:qualifications).keys.sort == policy.fetch("qualifications")
+
+target_pattern = /\A[a-z][a-z0-9-]*\z/
+acceptance_targets = options.fetch(:automated_targets) + options.fetch(:manual_targets)
+invalid_targets = acceptance_targets.reject { |target| target.match?(target_pattern) }
+abort("Invalid acceptance targets: #{invalid_targets.join(", ")}") unless invalid_targets.empty?
+duplicate_targets = acceptance_targets.group_by(&:itself).select { |_target, values| values.length > 1 }.keys
+abort("Duplicate acceptance targets: #{duplicate_targets.join(", ")}") unless duplicate_targets.empty?
+provided_acceptance = {
+  "automatedTargets" => options.fetch(:automated_targets).sort,
+  "manualTargets" => options.fetch(:manual_targets).sort,
+}
+abort("Candidate acceptance matrix differs from release policy") unless
+  provided_acceptance == policy.fetch("acceptance")
+
 dist_root = root.join("dist")
 output_root = Pathname.new(options.fetch(:output_root)).expand_path
 FileUtils.mkdir_p(output_root)
@@ -84,6 +121,9 @@ duplicates = role_sources.map(&:first).group_by(&:itself).select { |_role, value
 abort("Duplicate artifact roles: #{duplicates.join(", ")}") unless duplicates.empty?
 duplicate_paths = role_sources.map(&:last).group_by(&:itself).select { |_path, values| values.length > 1 }.keys
 abort("Duplicate artifact paths: #{duplicate_paths.join(", ")}") unless duplicate_paths.empty?
+expected_roles = ReleasePolicy.expected_artifact_roles(policy, options.fetch(:qualifications))
+actual_roles = role_sources.map(&:first).sort
+abort("Candidate artifact roles differ from release policy") unless actual_roles == expected_roles
 
 entries = role_sources.map do |role, source, destination|
   {
@@ -102,7 +142,7 @@ candidate_id = [plugin, version, commit[0, 12], artifact_set_sha256[0, 12]].join
 candidate_dir = output_root.join(version, candidate_id)
 
 manifest = {
-  "schemaVersion" => 2,
+  "schemaVersion" => policy.fetch("candidateSchemaVersion"),
   "kind" => "plugin-release-candidate",
   "state" => state,
   "acceptanceEligible" => state == "candidate",
@@ -115,9 +155,18 @@ manifest = {
     "commit" => commit,
     "dirty" => dirty,
   },
+  "acceptance" => {
+    "automatedTargets" => options.fetch(:automated_targets).sort,
+    "manualTargets" => options.fetch(:manual_targets).sort,
+  },
   "qualifications" => options.fetch(:qualifications).sort.to_h,
   "artifacts" => entries,
 }
+begin
+  ReleasePolicy.validate_candidate!(manifest, policy)
+rescue ReleasePolicy::Error => error
+  abort(error.message)
+end
 manifest_json = JSON.pretty_generate(manifest) + "\n"
 
 verify_existing = lambda do

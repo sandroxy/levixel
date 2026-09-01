@@ -183,6 +183,7 @@ fi
 
 snapshot_arguments=(
   --plugin levixel
+  --policy "${plugin_dir}/release-policy.json"
   --version "${version}"
   --repository "${repository}"
   --commit "${commit}"
@@ -194,6 +195,27 @@ snapshot_arguments=(
   --qualification nativeManifestVerified=true
   --qualification packageIdentitiesVerified=true
   --qualification versionUnpublished=true
+  --automated-target android
+  --automated-target ios
+  --automated-target harmonyos
+  --automated-target react-native-android
+  --automated-target react-native-ios
+  --automated-target uniapp
+  --automated-target uniapp-x
+  --automated-target uniapp-legacy
+  --automated-target web
+  --manual-target native-android-device
+  --manual-target native-ios-device
+  --manual-target harmonyos-device
+  --manual-target react-native-android-device
+  --manual-target react-native-ios-device
+  --manual-target uniapp-android-device
+  --manual-target uniapp-ios-device
+  --manual-target uniapp-x-android-device
+  --manual-target uniapp-x-ios-device
+  --manual-target uniapp-legacy-android-device
+  --manual-target uniapp-legacy-ios-device
+  --manual-target web-browser
   --artifact "native-android-aar=${android_aar}"
   --artifact "native-android-maven-repository=${android_maven}"
   --artifact "native-ios-xcframework=${ios_xcframework}"
@@ -207,11 +229,24 @@ snapshot_arguments=(
   --artifact "native-build-manifest=${native_manifest}"
   --artifact "native-build-checksums=${native_checksums}"
 )
+sidecar_artifacts=(
+  "native-android-aar=${android_aar}"
+  "native-android-maven-repository=${android_maven}"
+  "native-ios-xcframework=${ios_xcframework}"
+  "native-ios-swift-package=${ios_swift_package}"
+  "native-harmonyos-har=${harmony_har}"
+  "react-native-package=${react_native_package}"
+  "uniapp-uts-package=${uniapp_uts_package}"
+  "uniapp-legacy-package=${uniapp_legacy_package}"
+  "web-package=${web_package}"
+)
 if [[ "${native_signed}" == true ]]; then
   snapshot_arguments+=(--artifact "native-android-maven-central-bundle=${android_maven_central}")
+  sidecar_artifacts+=("native-android-maven-central-bundle=${android_maven_central}")
 fi
-for artifact in "${artifacts[@]}"; do
-  role="$(basename "${artifact}" | tr '[:upper:]_.' '[:lower:]--')"
+for artifact_spec in "${sidecar_artifacts[@]}"; do
+  role="${artifact_spec%%=*}"
+  artifact="${artifact_spec#*=}"
   snapshot_arguments+=(--artifact "checksum-${role}=${artifact}.sha256")
 done
 

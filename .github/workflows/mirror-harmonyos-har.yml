@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   mirror:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Validate release version
         id: release
@@ -27,7 +27,7 @@ jobs:
           echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
 
       - name: Check out the public release verifier
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Download OHPM metadata, official HAR, and native manifest
         env:
@@ -68,6 +68,4 @@ jobs:
           gh release upload "${VERSION}" \
             "dist/levixel-${VERSION}.har" \
             "dist/levixel-${VERSION}.har.sha256" \
-            "dist/levixel-native-${VERSION}.json" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --clobber
+            --repo "${GITHUB_REPOSITORY}"
