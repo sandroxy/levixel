@@ -10,6 +10,7 @@ version="$1"
 metadata_path="$2"
 manifest_path="$3"
 har_path="$4"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 for required_file in "${metadata_path}" "${manifest_path}" "${har_path}"; do
   if [[ ! -f "${required_file}" ]]; then
@@ -33,7 +34,7 @@ if [[ -n "${source_entries}" ]]; then
   exit 1
 fi
 
-ruby -rbase64 -rdigest -rjson -e '
+ruby -I "${script_dir}/../../scripts" -rbase64 -rdigest -rjson -r native-release-manifest -e '
   version, metadata_path, manifest_path, har_path, package_metadata = ARGV
   artifact_name = "levixel-#{version}.har"
 
@@ -70,9 +71,7 @@ ruby -rbase64 -rdigest -rjson -e '
   abort("HarmonyOS release is not a bytecode HAR") unless package.dig("metadata", "byteCodeHar") == true
 
   manifest = JSON.parse(File.read(manifest_path))
-  abort("Unexpected native release schema") unless manifest["schemaVersion"] == 1
-  abort("Unexpected native release plugin") unless manifest["plugin"] == "levixel"
-  abort("Native release version mismatch") unless manifest["version"] == version
+  NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
   abort("Dirty native release is not publishable") unless manifest["dirty"] == false
 
   artifact = manifest.fetch("artifacts").find { |entry| entry["file"] == artifact_name }

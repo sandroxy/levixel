@@ -84,16 +84,32 @@ function normalizeHintRect(hint: LevixelSourceHint, viewport: ViewportMetrics): 
   };
 }
 
+function normalizeViewportRect(rect: LevixelRect, viewport: ViewportMetrics): LevixelRect {
+  return {
+    left: rect.left - viewport.left,
+    top: rect.top - viewport.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 export function resolveSourceGeometry(
   hint: LevixelSourceHint,
   fallbackImageSize: LevixelSize | undefined,
   viewport: ViewportMetrics,
+  sourceClippingRect?: LevixelRect,
 ): SharedElementGeometry | null {
   const source = normalizeHintRect(hint, viewport);
   if (!isUsableRect(source))
     return null;
   const viewportBounds = { left: 0, top: 0, width: viewport.width, height: viewport.height };
-  const clippedSource = intersectRect(source, viewportBounds);
+  let clippedSource = intersectRect(source, viewportBounds);
+  if (clippedSource && sourceClippingRect) {
+    clippedSource = intersectRect(
+      clippedSource,
+      normalizeViewportRect(sourceClippingRect, viewport),
+    );
+  }
   if (!clippedSource)
     return null;
 

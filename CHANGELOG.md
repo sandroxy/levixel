@@ -2,6 +2,9 @@
 
 ## 1.3.0 - 2026-08-31
 
+- Rebound React Native iOS Fabric source views after component mounting and reuse so recycled list cells remain valid open and return-transition targets.
+- Made Android shared-element names collision-safe across galleries and between stable item identities and legacy indices.
+- Rejected detached, hidden, and fully clipped iOS and Web source views so unavailable transition targets fall back cleanly instead of animating from stale geometry.
 - Prevented Android video posters from flashing after progress-bar seeks by making the decoded-frame handoff idempotent across renderer callbacks, page reactivation, and cancelled dismiss gestures.
 - Accepted empty asynchronous `items` state in the React Native provider while keeping every rendered source index strict, and removed stale Android/iOS source bindings when media becomes empty or the wrapped image changes.
 - Added backward-compatible stable item identities to the iOS native data source and transition registry, then carried them through the React Native and UniApp iOS bridges so reordered lists return to the correct source.

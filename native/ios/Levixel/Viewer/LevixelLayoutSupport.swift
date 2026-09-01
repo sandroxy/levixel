@@ -81,6 +81,38 @@ extension UIView {
     func frameInWindow() -> CGRect {
         convert(bounds, to: nil)
     }
+
+    func levixelClippingFrameInWindow() -> CGRect? {
+        let frame = frameInWindow()
+        guard frame.isNull == false, frame.isEmpty == false else { return nil }
+        guard let window else { return frame }
+
+        var visibleFrame = frame.intersection(window.convert(window.bounds, to: nil))
+        guard visibleFrame.isNull == false, visibleFrame.isEmpty == false else { return nil }
+
+        var ancestor = superview
+        while let current = ancestor {
+            if current.clipsToBounds || current.layer.masksToBounds {
+                visibleFrame = visibleFrame.intersection(current.convert(current.bounds, to: nil))
+                guard visibleFrame.isNull == false, visibleFrame.isEmpty == false else { return nil }
+            }
+            ancestor = current.superview
+        }
+        return visibleFrame
+    }
+
+    func levixelHasVisibleSourceHierarchy() -> Bool {
+        guard window != nil, isHidden == false else { return false }
+
+        var ancestor = superview
+        while let current = ancestor {
+            if current.isHidden || current.alpha <= 0.01 {
+                return false
+            }
+            ancestor = current.superview
+        }
+        return true
+    }
 }
 
 extension UIImageView {
@@ -119,10 +151,9 @@ extension UIImageView {
         guard let image = image else { return nil }
         guard image.size.width > 0, image.size.height > 0 else { return nil }
 
-        let frame = frameInWindow()
-        let clippingFrame = clippingFrameInWindow
-            ?? window.map { frame.intersection($0.bounds) }
-            ?? frame
+        guard let clippingFrame = clippingFrameInWindow ?? levixelClippingFrameInWindow() else {
+            return nil
+        }
         guard clippingFrame.isNull == false, clippingFrame.isEmpty == false else { return nil }
         guard clippingFrame.width > 0, clippingFrame.height > 0 else { return nil }
 
@@ -132,13 +163,17 @@ extension UIImageView {
             visibleFrame = clippingFrame
         }
 
+        let fullContainerVisible = clippingFrame.levixelApproximatelyEquals(frameInWindow())
+
         let geometry = LevixelSharedElementGeometry(
             visibleFrameInWindow: visibleFrame,
             contentFrameInVisibleBounds: contentFrame.offsetBy(
                 dx: -visibleFrame.minX,
                 dy: -visibleFrame.minY
             ),
-            cornerRadius: (clipsToBounds || layer.masksToBounds) ? layer.cornerRadius : 0
+            cornerRadius: fullContainerVisible && (clipsToBounds || layer.masksToBounds)
+                ? layer.cornerRadius
+                : 0
         )
         let scale = window?.screen.scale ?? UIScreen.main.scale
         return LevixelSharedElementState(

@@ -7,6 +7,7 @@ require "optparse"
 require "pathname"
 require "time"
 require "yaml"
+require_relative "native-release-manifest"
 require_relative "release-policy"
 
 options = {}
@@ -85,6 +86,44 @@ expected_candidate_id = [plugin, version, commit[0, 12], artifact_set_sha256[0, 
 abort("Candidate id differs from its content") unless candidate.fetch("candidateId") == expected_candidate_id
 candidate_manifest_sha256 = Digest::SHA256.file(candidate_path).hexdigest
 
+artifacts_by_role = entries.to_h { |entry| [entry.fetch("role"), entry] }
+native_manifest_path = candidate_root.join(artifacts_by_role.fetch("native-build-manifest").fetch("file"))
+ios_xcframework_path = candidate_root.join(artifacts_by_role.fetch("native-ios-xcframework").fetch("file"))
+native_manifest = JSON.parse(native_manifest_path.read)
+begin
+  NativeReleaseManifest.validate!(native_manifest, plugin: plugin, version: version)
+rescue NativeReleaseManifest::Error => error
+  abort(error.message)
+end
+abort("Candidate native manifest came from a dirty worktree") unless native_manifest.fetch("dirty") == false
+abort("Candidate native manifest lacks a signed Maven Central bundle") unless
+  native_manifest.fetch("androidMavenSigned") == true
+abort("Candidate native manifest commit differs from the candidate") unless
+  native_manifest.fetch("commit") == commit
+native_roles = %w[
+  native-android-aar native-android-maven-central-bundle native-android-maven-repository
+  native-harmonyos-har native-ios-swift-package native-ios-xcframework
+]
+candidate_native_entries = native_roles.filter_map { |role| artifacts_by_role[role] }
+manifest_native_entries = native_manifest.fetch("artifacts").to_h do |entry|
+  [entry.fetch("file"), entry]
+end
+abort("Native manifest artifact set differs from the candidate") unless
+  manifest_native_entries.keys.sort == candidate_native_entries.map { |entry| File.basename(entry.fetch("file")) }.sort
+candidate_native_entries.each do |entry|
+  artifact = manifest_native_entries.fetch(File.basename(entry.fetch("file")))
+  abort("Native manifest artifact metadata differs from the candidate") unless
+    artifact.fetch("bytes") == entry.fetch("bytes") &&
+      artifact.fetch("sha256") == entry.fetch("sha256")
+end
+_provenance_stdout, provenance_stderr, provenance_status = Open3.capture3(
+  root.join("scripts/verify-native-manifest-ios-provenance.sh").to_s,
+  native_manifest_path.to_s,
+  ios_xcframework_path.to_s,
+  version
+)
+abort(provenance_stderr.strip) unless provenance_status.success?
+
 acceptance = JSON.parse(acceptance_argument.read)
 abort("Unexpected acceptance receipt schema") unless
   acceptance.fetch("schemaVersion") == release_policy.fetch("acceptanceReceiptSchemaVersion")
@@ -119,10 +158,17 @@ abort("Automated consumer acceptance did not pass") unless
   automated_checks.values.all? do |entry|
     entry.is_a?(Hash) && entry.keys.sort == %w[evidence status] && entry.fetch("status") == "passed"
   end
-abort("Manual device acceptance did not pass") unless
-  manual_checks.values.all? do |entry|
-    entry.is_a?(Hash) && entry.keys == ["status"] && entry.fetch("status") == "passed"
-  end
+if release_policy.fetch("acceptanceReceiptSchemaVersion") >= 3
+  abort("Manual device acceptance did not pass with evidence") unless
+    manual_checks.values.all? do |entry|
+      entry.is_a?(Hash) && entry.keys.sort == %w[evidence status] && entry.fetch("status") == "passed"
+    end
+else
+  abort("Manual device acceptance did not pass") unless
+    manual_checks.values.all? do |entry|
+      entry.is_a?(Hash) && entry.keys == ["status"] && entry.fetch("status") == "passed"
+    end
+end
 verifier = acceptance.fetch("verifier")
 abort("Acceptance verifier has unexpected fields") unless
   verifier.is_a?(Hash) && verifier.keys.sort == %w[commit dirty repository]
@@ -130,7 +176,7 @@ abort("Acceptance verifier repository is invalid") unless
   verifier.fetch("repository") == release_policy.fetch("verifierRepository")
 abort("Acceptance was recorded from a dirty verifier worktree") unless verifier.fetch("dirty") == false
 abort("Acceptance verifier commit is invalid") unless verifier.fetch("commit").match?(/\A[0-9a-f]{40}\z/)
-Time.iso8601(acceptance.fetch("recordedAt"))
+recorded_at = Time.iso8601(acceptance.fetch("recordedAt"))
 automated_checks.each do |target, entry|
   evidence = entry.fetch("evidence")
   expected_evidence_fields = %w[
@@ -170,6 +216,49 @@ automated_checks.each do |target, entry|
   started_at = Time.iso8601(evidence.fetch("startedAt"))
   completed_at = Time.iso8601(evidence.fetch("completedAt"))
   abort("Automated evidence time range differs: #{target}") if completed_at < started_at
+end
+
+if release_policy.fetch("acceptanceReceiptSchemaVersion") >= 3
+  manual_checks.each do |target, entry|
+    evidence = entry.fetch("evidence")
+    expected_evidence_fields = %w[
+      artifactSetSha256 candidateId candidateManifestSha256 environment kind notes plugin
+      recordedAt runSha256 scenarios schemaVersion status target verifier version
+    ]
+    abort("Manual evidence has unexpected fields: #{target}") unless
+      evidence.is_a?(Hash) && evidence.keys.sort == expected_evidence_fields.sort
+    abort("Manual evidence schema differs: #{target}") unless
+      evidence.fetch("schemaVersion") == 1 &&
+        evidence.fetch("kind") == "plugin-candidate-manual-run" &&
+        evidence.fetch("status") == "passed"
+    abort("Manual evidence target differs: #{target}") unless evidence.fetch("target") == target
+    abort("Manual evidence candidate differs: #{target}") unless
+      evidence.fetch("plugin") == plugin && evidence.fetch("version") == version &&
+        evidence.fetch("candidateId") == expected_candidate_id &&
+        evidence.fetch("artifactSetSha256") == artifact_set_sha256 &&
+        evidence.fetch("candidateManifestSha256") == candidate_manifest_sha256
+    environment = evidence.fetch("environment")
+    abort("Manual evidence environment differs: #{target}") unless
+      environment.is_a?(Hash) && environment.keys.sort == %w[deviceModel operatingSystem runtime] &&
+        environment.values.all? { |value| value.is_a?(String) && !value.strip.empty? }
+    abort("Manual evidence scenarios differ: #{target}") unless
+      evidence.fetch("scenarios") == acceptance_requirements.fetch("manualScenarios")
+    abort("Manual evidence notes are invalid: #{target}") unless evidence.fetch("notes").is_a?(String)
+    evidence_verifier = evidence.fetch("verifier")
+    abort("Manual evidence verifier fields differ: #{target}") unless
+      evidence_verifier.is_a?(Hash) && evidence_verifier.keys.sort == %w[commit dirty repository]
+    abort("Manual evidence verifier differs: #{target}") unless
+      evidence_verifier.fetch("repository") == verifier.fetch("repository") &&
+        evidence_verifier.fetch("commit") == verifier.fetch("commit") &&
+        evidence_verifier.fetch("dirty") == false
+    run_sha256 = evidence.fetch("runSha256")
+    abort("Manual evidence digest is invalid: #{target}") unless run_sha256.match?(/\A[0-9a-f]{64}\z/)
+    original_run = evidence.reject { |key, _value| key == "runSha256" }
+    abort("Manual evidence digest differs: #{target}") unless
+      Digest::SHA256.hexdigest(JSON.pretty_generate(original_run) + "\n") == run_sha256
+    manual_recorded_at = Time.iso8601(evidence.fetch("recordedAt"))
+    abort("Manual evidence was recorded after its receipt: #{target}") if manual_recorded_at > recorded_at
+  end
 end
 
 head, status = Open3.capture2("git", "-C", root.to_s, "rev-parse", "HEAD")

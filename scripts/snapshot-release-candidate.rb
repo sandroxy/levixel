@@ -11,6 +11,7 @@ require_relative "release-policy"
 options = {
   automated_targets: [],
   artifacts: [],
+  manual_scenarios: [],
   manual_targets: [],
   qualifications: {},
 }
@@ -28,6 +29,7 @@ OptionParser.new do |parser|
   parser.on("--state STATE") { |value| options[:state] = value }
   parser.on("--automated-target TARGET") { |value| options[:automated_targets] << value }
   parser.on("--manual-target TARGET") { |value| options[:manual_targets] << value }
+  parser.on("--manual-scenario SCENARIO") { |value| options[:manual_scenarios] << value }
   parser.on("--artifact ROLE=PATH") { |value| options[:artifacts] << value }
   parser.on("--qualification KEY=VALUE") do |value|
     key, raw = value.split("=", 2)
@@ -92,6 +94,7 @@ duplicate_targets = acceptance_targets.group_by(&:itself).select { |_target, val
 abort("Duplicate acceptance targets: #{duplicate_targets.join(", ")}") unless duplicate_targets.empty?
 provided_acceptance = {
   "automatedTargets" => options.fetch(:automated_targets).sort,
+  "manualScenarios" => options.fetch(:manual_scenarios).sort,
   "manualTargets" => options.fetch(:manual_targets).sort,
 }
 abort("Candidate acceptance matrix differs from release policy") unless
@@ -157,6 +160,7 @@ manifest = {
   },
   "acceptance" => {
     "automatedTargets" => options.fetch(:automated_targets).sort,
+    "manualScenarios" => options.fetch(:manual_scenarios).sort,
     "manualTargets" => options.fetch(:manual_targets).sort,
   },
   "qualifications" => options.fetch(:qualifications).sort.to_h,

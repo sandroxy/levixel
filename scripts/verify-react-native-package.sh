@@ -6,7 +6,27 @@ plugin_dir="$(cd "${script_dir}/.." && pwd)"
 adapter_dir="${plugin_dir}/adapters/react-native"
 version="$(ruby -ryaml -e 'print YAML.load_file(ARGV.fetch(0)).fetch("version")' "${plugin_dir}/plugin.yaml")"
 artifact_name="levixel-react-native-${version}.tgz"
-artifact_path="${1:-${plugin_dir}/dist/react-native/${artifact_name}}"
+artifact_path="${plugin_dir}/dist/react-native/${artifact_name}"
+allow_dirty=0
+artifact_path_set=0
+for argument in "$@"; do
+  case "${argument}" in
+    --allow-dirty) allow_dirty=1 ;;
+    --*)
+      echo "Unknown option: ${argument}" >&2
+      echo "Usage: $0 [ARTIFACT_PATH] [--allow-dirty]" >&2
+      exit 1
+      ;;
+    *)
+      if [[ ${artifact_path_set} -eq 1 ]]; then
+        echo "Usage: $0 [ARTIFACT_PATH] [--allow-dirty]" >&2
+        exit 1
+      fi
+      artifact_path="${argument}"
+      artifact_path_set=1
+      ;;
+  esac
+done
 checksum_path="${artifact_path}.sha256"
 native_manifest="${plugin_dir}/dist/native-release/levixel-native-${version}.json"
 android_artifact="${plugin_dir}/dist/native-android/levixel-${version}.aar"
@@ -27,18 +47,17 @@ done
 "${script_dir}/verify-ios-core-adapter-api.sh" "${ios_artifact}"
 
 read -r expected_android_sha expected_ios_sha native_commit < <(
-  ruby -rjson -e '
+  ruby -I "${script_dir}" -rjson -r native-release-manifest -e '
     manifest = JSON.parse(File.read(ARGV.fetch(0)))
     version = ARGV.fetch(1)
-    abort("Unexpected native release schema") unless manifest["schemaVersion"] == 1
-    abort("Unexpected native release plugin") unless manifest["plugin"] == "levixel"
-    abort("Native release version mismatch") unless manifest["version"] == version
-    abort("Dirty native release is not publishable") unless manifest["dirty"] == false
+    NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
+    allow_dirty = ARGV.fetch(2) == "true"
+    abort("Dirty native release is not publishable") unless manifest["dirty"] == false || allow_dirty
     artifacts = manifest.fetch("artifacts").to_h { |entry| [entry.fetch("file"), entry] }
     android = artifacts.fetch("levixel-#{version}.aar").fetch("sha256")
     ios = artifacts.fetch("levixel-#{version}.xcframework.zip").fetch("sha256")
     puts [android, ios, manifest.fetch("commit")].join(" ")
-  ' "${native_manifest}" "${version}"
+  ' "${native_manifest}" "${version}" "$([[ ${allow_dirty} -eq 1 ]] && printf true || printf false)"
 )
 
 source_commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
@@ -57,6 +76,8 @@ if [[ "${actual_ios_sha}" != "${expected_ios_sha}" ]]; then
   echo "iOS XCFramework does not match the native ${version} release manifest." >&2
   exit 1
 fi
+"${script_dir}/verify-native-manifest-ios-provenance.sh" \
+  "${native_manifest}" "${ios_artifact}" "${version}"
 
 actual_package_sha="$(shasum -a 256 "${artifact_path}" | awk '{print $1}')"
 read -r recorded_package_sha recorded_package_name < "${checksum_path}"
@@ -163,6 +184,7 @@ if find "${package_root}" -type f \
 fi
 
 "${script_dir}/verify-react-native-contract.sh" "${package_root}/src/contract.ts"
+"${script_dir}/verify-react-native-ios-lifecycle.rb" "${package_root}/ios/LevixelView.swift"
 
 printf '%s\n' "Verified ${artifact_name}"
 printf '%s\n' "  package sha256: ${actual_package_sha}"

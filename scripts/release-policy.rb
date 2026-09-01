@@ -66,11 +66,15 @@ module ReleasePolicy
     raise Error, "Artifact roles overlap: #{duplicates.join(", ")}" unless duplicates.empty?
 
     acceptance = policy.fetch("acceptance")
-    expect_fields!(acceptance, %w[automatedTargets manualTargets], "acceptance policy")
+    expect_fields!(acceptance, %w[automatedTargets manualScenarios manualTargets], "acceptance policy")
     automated = acceptance.fetch("automatedTargets")
     manual = acceptance.fetch("manualTargets")
     validate_sorted_unique_array!(automated, ID_PATTERN, "automated acceptance targets")
     validate_sorted_unique_array!(manual, ID_PATTERN, "manual acceptance targets")
+    scenarios = acceptance.fetch("manualScenarios")
+    validate_sorted_unique_array!(scenarios, ID_PATTERN, "manual acceptance scenarios")
+    raise Error, "Release policy must declare manual acceptance scenarios" if
+      !manual.empty? && scenarios.empty?
     raise Error, "Release policy must declare acceptance targets" if automated.empty? && manual.empty?
     overlap = automated & manual
     raise Error, "Acceptance targets overlap: #{overlap.join(", ")}" unless overlap.empty?

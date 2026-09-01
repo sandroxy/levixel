@@ -5,6 +5,8 @@ import androidx.annotation.Nullable;
 
 public final class LevixelSharedElementNames {
     private static final String PREFIX = "levixel:media:";
+    private static final String ITEM_NAMESPACE = "item:";
+    private static final String INDEX_NAMESPACE = "index:";
 
     private LevixelSharedElementNames() {
     }
@@ -16,7 +18,7 @@ public final class LevixelSharedElementNames {
 
     @NonNull
     public static String forItem(@Nullable String galleryId, @NonNull LevixelMediaItem item) {
-        return forId(galleryId, item.getId());
+        return scopedName(galleryId, ITEM_NAMESPACE, item.getId());
     }
 
     @NonNull
@@ -26,14 +28,21 @@ public final class LevixelSharedElementNames {
 
     @NonNull
     public static String forIndex(@Nullable String galleryId, int index) {
-        return forId(galleryId, String.valueOf(index));
+        return scopedName(galleryId, INDEX_NAMESPACE, String.valueOf(index));
     }
 
     @NonNull
-    private static String forId(@Nullable String galleryId, @NonNull String id) {
-        if (galleryId == null || galleryId.isEmpty()) {
-            return PREFIX + id;
-        }
-        return PREFIX + galleryId + ":" + id;
+    private static String scopedName(
+            @Nullable String galleryId,
+            @NonNull String namespace,
+            @NonNull String value
+    ) {
+        String gallery = galleryId == null ? "" : galleryId;
+        return PREFIX + "gallery:" + encodedPart(gallery) + ":" + namespace + encodedPart(value);
+    }
+
+    @NonNull
+    private static String encodedPart(@NonNull String value) {
+        return value.length() + ":" + value;
     }
 }

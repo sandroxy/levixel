@@ -156,4 +156,124 @@ final class LevixelMediaIdentityTests: XCTestCase {
         )
         XCTAssertNil(LevixelSourceViewRegistry.shared.sourceView(for: galleryId, index: 1))
     }
+
+    func testRegistryRejectsAVisibleWindowFrameClippedByAnAncestor() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let clippingView = UIView(frame: CGRect(x: 20, y: 20, width: 100, height: 100))
+        clippingView.clipsToBounds = true
+        let imageView = UIImageView(frame: CGRect(x: 140, y: 0, width: 80, height: 80))
+        window.addSubview(clippingView)
+        clippingView.addSubview(imageView)
+        LevixelSourceViewRegistry.shared.register(
+            imageView,
+            galleryId: galleryId,
+            itemIdentifier: "clipped"
+        )
+        defer {
+            LevixelSourceViewRegistry.shared.unregister(
+                imageView,
+                galleryId: galleryId,
+                itemIdentifier: "clipped"
+            )
+            window.isHidden = true
+        }
+
+        XCTAssertNil(
+            LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                itemIdentifier: "clipped"
+            )
+        )
+    }
+
+    func testSharedElementGeometryUsesTheEffectiveAncestorClip() throws {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let clippingView = UIView(frame: CGRect(x: 20, y: 30, width: 100, height: 100))
+        clippingView.clipsToBounds = true
+        let imageView = UIImageView(frame: CGRect(x: 60, y: 10, width: 80, height: 80))
+        imageView.image = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 80)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 80))
+        }
+        imageView.contentMode = .scaleToFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = 12
+        window.addSubview(clippingView)
+        clippingView.addSubview(imageView)
+        defer { window.isHidden = true }
+
+        let state = try XCTUnwrap(imageView.levixelSharedElementState())
+        XCTAssertEqual(
+            state.geometry.visibleFrameInWindow,
+            CGRect(x: 80, y: 40, width: 40, height: 80)
+        )
+        XCTAssertEqual(
+            state.geometry.contentFrameInVisibleBounds,
+            CGRect(x: 0, y: 0, width: 80, height: 80)
+        )
+        XCTAssertEqual(state.geometry.cornerRadius, 0)
+    }
+
+    func testRegistryKeepsThePluginHiddenSourceAnchorResolvable() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let imageView = UIImageView(frame: CGRect(x: 20, y: 20, width: 80, height: 80))
+        imageView.alpha = 0
+        window.addSubview(imageView)
+        LevixelSourceViewRegistry.shared.register(
+            imageView,
+            galleryId: galleryId,
+            itemIdentifier: "hidden-by-transition"
+        )
+        defer {
+            LevixelSourceViewRegistry.shared.unregister(
+                imageView,
+                galleryId: galleryId,
+                itemIdentifier: "hidden-by-transition"
+            )
+            window.isHidden = true
+        }
+
+        XCTAssertTrue(
+            LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                itemIdentifier: "hidden-by-transition"
+            ) === imageView
+        )
+    }
+
+    func testRegistryRejectsAHiddenAncestor() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let hiddenContainer = UIView(frame: CGRect(x: 20, y: 20, width: 100, height: 100))
+        hiddenContainer.isHidden = true
+        let imageView = UIImageView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
+        window.addSubview(hiddenContainer)
+        hiddenContainer.addSubview(imageView)
+        LevixelSourceViewRegistry.shared.register(
+            imageView,
+            galleryId: galleryId,
+            itemIdentifier: "hidden-ancestor"
+        )
+        defer {
+            LevixelSourceViewRegistry.shared.unregister(
+                imageView,
+                galleryId: galleryId,
+                itemIdentifier: "hidden-ancestor"
+            )
+            window.isHidden = true
+        }
+
+        XCTAssertNil(
+            LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                itemIdentifier: "hidden-ancestor"
+            )
+        )
+    }
 }

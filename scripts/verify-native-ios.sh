@@ -53,6 +53,27 @@ verify_checksum() {
 verify_checksum "${artifact_path}" "${artifact_checksum_path}"
 verify_checksum "${swift_package_path}" "${swift_package_checksum_path}"
 
+source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
+source_commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
+read -r artifact_source_commit artifact_source_digest < <(
+  "${script_dir}/verify-ios-xcframework-provenance.sh" \
+    "${artifact_path}" "${version}" "${source_digest}"
+)
+if ! git -C "${plugin_dir}" cat-file -e "${artifact_source_commit}^{commit}" 2>/dev/null \
+    || ! git -C "${plugin_dir}" merge-base --is-ancestor "${artifact_source_commit}" "${source_commit}"; then
+  echo "XCFramework source commit ${artifact_source_commit} is not an ancestor of ${source_commit}." >&2
+  exit 1
+fi
+if [[ -z "$(git -C "${plugin_dir}" status --porcelain)" ]]; then
+  committed_source_digest="$(
+    "${script_dir}/compute-ios-source-digest.rb" --commit "${artifact_source_commit}"
+  )"
+  if [[ "${committed_source_digest}" != "${artifact_source_digest}" ]]; then
+    echo "XCFramework source digest does not belong to its embedded source commit." >&2
+    exit 1
+  fi
+fi
+
 staging_dir="$(mktemp -d)"
 trap 'rm -rf "${staging_dir}"' EXIT
 xcframework_path="${staging_dir}/Levixel.xcframework"
@@ -120,3 +141,5 @@ if [[ ${artifact_only} -eq 0 ]]; then
 fi
 
 printf '%s\n' "Verified ${artifact_path}"
+printf '%s\n' "  source commit: ${artifact_source_commit}"
+printf '%s\n' "  source digest: ${artifact_source_digest}"

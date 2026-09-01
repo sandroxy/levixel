@@ -415,6 +415,7 @@ try {
   assert.deepEqual(reducedMotionState, { hostState: 'true', transitionDuration: '0s' });
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+  await verifyLiveSourceGeometry(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
@@ -427,6 +428,79 @@ finally {
 }
 
 console.log('Levixel Web browser interaction checks passed.');
+
+async function verifyLiveSourceGeometry(targetBrowser, fixtureURL) {
+  const geometryPage = await targetBrowser.newPage({ viewport: { width: 390, height: 844 } });
+  const errors = [];
+  geometryPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await geometryPage.goto(fixtureURL);
+    await geometryPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+
+    const liveLayouts = await geometryPage.evaluate(async () => {
+      const { resolveElementSourceLayout } = await import('../dist/dom-geometry.js');
+      const container = document.createElement('div');
+      Object.assign(container.style, {
+        position: 'fixed',
+        left: '10px',
+        top: '20px',
+        width: '100px',
+        height: '100px',
+        overflow: 'hidden',
+      });
+      const source = document.createElement('div');
+      Object.assign(source.style, {
+        position: 'absolute',
+        left: '60px',
+        top: '10px',
+        width: '80px',
+        height: '80px',
+      });
+      container.append(source);
+      document.body.append(container);
+      const clipped = resolveElementSourceLayout(source);
+      container.style.visibility = 'hidden';
+      const hiddenAncestor = resolveElementSourceLayout(source);
+      container.style.visibility = 'visible';
+      source.style.width = '0';
+      const zeroSized = resolveElementSourceLayout(source);
+      container.remove();
+      const disconnected = resolveElementSourceLayout(source);
+      return { clipped, hiddenAncestor, zeroSized, disconnected };
+    });
+    assert.deepEqual(liveLayouts.clipped, {
+      rect: { left: 70, top: 30, width: 80, height: 80 },
+      clippingRect: { left: 70, top: 30, width: 40, height: 80 },
+    });
+    assert.equal(liveLayouts.hiddenAncestor, null);
+    assert.equal(liveLayouts.zeroSized, null);
+    assert.equal(liveLayouts.disconnected, null);
+
+    await geometryPage.locator('.source').first().click();
+    await geometryPage.waitForFunction(() => window.levixelFixture.results.length === 1);
+    const detachedClose = await geometryPage.evaluate(async () => {
+      const source = document.querySelector('.source[data-index="0"]');
+      const parent = source.parentElement;
+      const nextSibling = source.nextSibling;
+      source.remove();
+      const closing = window.levixelFixture.closeLevixel();
+      const host = document.querySelector('[data-levixel-web-root]');
+      const usedStaleSnapshot = Boolean(host?.shadowRoot.querySelector('.snapshot'));
+      await closing;
+      parent.insertBefore(source, nextSibling);
+      return usedStaleSnapshot;
+    });
+    assert.equal(
+      detachedClose,
+      false,
+      'a detached live source must fall back to a simple dismissal instead of its stale hint',
+    );
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await geometryPage.close();
+  }
+}
 
 async function verifySingleTouchReopen(targetBrowser, fixtureURL) {
   const touchPage = await targetBrowser.newPage({

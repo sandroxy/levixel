@@ -25,5 +25,14 @@ jobs:
           ruby -c scripts/release-policy.rb
           ruby -c scripts/snapshot-release-candidate.rb
           ruby -c scripts/verify-publish-candidate.rb
+          ruby -c scripts/verify-react-native-ios-lifecycle.rb
+          ruby -c scripts/native-release-manifest.rb
+          ruby -c scripts/compute-ios-source-digest.rb
+          ruby -c scripts/test-ios-source-digest.rb
+          bash -n scripts/verify-ios-xcframework-provenance.sh
+          bash -n scripts/verify-native-manifest-ios-provenance.sh
           bash -n scripts/prepare-release-candidate.sh
+          ruby scripts/verify-react-native-ios-lifecycle.rb
+          ruby scripts/test-ios-source-digest.rb
+          ruby scripts/test-native-release-manifest.rb
           ruby scripts/test-release-policy.rb

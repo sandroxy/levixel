@@ -75,14 +75,9 @@ final class LevixelSourceViewRegistry {
         cleanup()
         guard
             let imageView = anchors[galleryId]?[key]?.value,
-            let window = imageView.window,
-            !imageView.isHidden
+            imageView.levixelHasVisibleSourceHierarchy(),
+            imageView.levixelClippingFrameInWindow() != nil
         else {
-            return nil
-        }
-
-        let frameInWindow = imageView.frameInWindow()
-        guard !frameInWindow.isEmpty, frameInWindow.intersects(window.bounds) else {
             return nil
         }
 

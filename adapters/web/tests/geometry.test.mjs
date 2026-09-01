@@ -39,6 +39,28 @@ test('cover source geometry preserves clipping and visible content offsets', () 
   assert.equal(geometry.cornerRadius, 14);
 });
 
+test('live source clipping preserves the full element image layout', () => {
+  const geometry = resolveSourceGeometry(
+    {
+      rect: { left: 20, top: 40, width: 200, height: 300 },
+      imageSize: { width: 2400, height: 1600 },
+      objectFit: 'cover',
+      coordinateSpace: 'viewport',
+      cornerRadius: 14,
+    },
+    undefined,
+    { left: 0, top: 0, width: 414, height: 896 },
+    { left: 120, top: 40, width: 100, height: 300 },
+  );
+  assert.ok(geometry);
+  assert.deepEqual(geometry.visible, { left: 120, top: 40, width: 100, height: 300 });
+  assert.equal(geometry.content.left, -225);
+  assert.equal(geometry.content.top, 0);
+  assert.equal(geometry.content.width, 450);
+  assert.equal(geometry.content.height, 300);
+  assert.equal(geometry.cornerRadius, 0);
+});
+
 test('full-image handoff preserves relative zoom and normalized visual center', () => {
   const previewLayout = imageLayout(
     { width: 400, height: 600 },

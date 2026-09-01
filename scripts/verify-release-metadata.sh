@@ -41,6 +41,7 @@ node -e '
 ' "${plugin_dir}/adapters/web/package.json" "${web_version}"
 
 node "${script_dir}/verify-contract-schema.mjs"
+"${script_dir}/verify-react-native-ios-lifecycle.rb"
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 bash "${script_dir}/verify-documentation.sh"
 

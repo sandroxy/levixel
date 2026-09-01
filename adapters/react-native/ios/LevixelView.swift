@@ -52,9 +52,19 @@ final class LevixelView: ExpoView {
     #endif
 
     #if RCT_NEW_ARCH_ENABLED
+    override func mountChildComponentView(_ childComponentView: UIView, index: Int) {
+        super.mountChildComponentView(childComponentView, index: index)
+        configureSourceView()
+    }
+
     override func unmountChildComponentView(_ childComponentView: UIView, index: Int) {
         clearConfiguredImageView()
         super.unmountChildComponentView(childComponentView, index: index)
+    }
+
+    override func prepareForRecycle() {
+        clearConfiguredImageView()
+        super.prepareForRecycle()
     }
     #endif
 

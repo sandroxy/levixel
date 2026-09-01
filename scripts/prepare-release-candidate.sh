@@ -96,13 +96,15 @@ for artifact in "${artifacts[@]}"; do
   verify_sidecar "${artifact}"
 done
 
-read -r native_commit native_dirty native_signed < <(ruby -rjson -rdigest -e '
+read -r native_commit native_dirty native_signed < <(ruby -I "${script_dir}" \
+  -rjson -rdigest -r native-release-manifest -e '
   path, version, *files = ARGV
   manifest = JSON.parse(File.read(path))
-  abort("Unexpected native manifest schema") unless manifest.fetch("schemaVersion") == 1
-  abort("Unexpected native manifest plugin") unless manifest.fetch("plugin") == "levixel"
-  abort("Unexpected native manifest version") unless manifest.fetch("version") == version
-  abort("Native manifest has no signing qualification") unless [true, false].include?(manifest["androidMavenSigned"])
+  begin
+    NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
+  rescue NativeReleaseManifest::Error => error
+    abort(error.message)
+  end
   indexed = manifest.fetch("artifacts").to_h { |entry| [entry.fetch("file"), entry] }
   files.each do |file|
     entry = indexed.fetch(File.basename(file)) { abort("Native manifest is missing #{File.basename(file)}") }
@@ -113,6 +115,9 @@ read -r native_commit native_dirty native_signed < <(ruby -rjson -rdigest -e '
   puts [manifest.fetch("commit"), manifest.fetch("dirty"), manifest.fetch("androidMavenSigned")].join(" ")
 ' "${native_manifest}" "${version}" \
   "${android_aar}" "${android_maven}" "${ios_xcframework}" "${ios_swift_package}" "${harmony_har}")
+
+"${script_dir}/verify-native-manifest-ios-provenance.sh" \
+  "${native_manifest}" "${ios_xcframework}" "${version}"
 
 if [[ "${native_commit}" != "${initial_commit}" ]]; then
   echo "Native artifacts came from ${native_commit}, not current commit ${initial_commit}." >&2
@@ -141,7 +146,7 @@ react_native_metadata="$(tar -xOf "${react_native_package}" package/package.json
 web_metadata="$(tar -xOf "${web_package}" package/package.json)"
 uniapp_metadata="$(unzip -p "${uniapp_uts_package}" package.json)"
 uniapp_legacy_metadata="$(unzip -p "${uniapp_legacy_package}" Sandrox-Levixel/package.json)"
-harmony_metadata="$(unzip -p "${harmony_har}" oh-package.json5 2>/dev/null || unzip -p "${harmony_har}" package/oh-package.json5)"
+harmony_metadata="$(tar -xOzf "${harmony_har}" package/oh-package.json5)"
 ruby -rjson -e '
   version, rn_raw, web_raw, uni_raw, legacy_raw, harmony_raw = ARGV
   rn = JSON.parse(rn_raw)
@@ -194,7 +199,7 @@ snapshot_arguments=(
   --qualification "androidMavenSigned=${native_signed}"
   --qualification nativeManifestVerified=true
   --qualification packageIdentitiesVerified=true
-  --qualification versionUnpublished=true
+  --qualification canonicalTagUnused=true
   --automated-target android
   --automated-target ios
   --automated-target harmonyos
@@ -216,6 +221,17 @@ snapshot_arguments=(
   --manual-target uniapp-legacy-android-device
   --manual-target uniapp-legacy-ios-device
   --manual-target web-browser
+  --manual-scenario dismiss-when-current-source-is-offscreen
+  --manual-scenario double-tap-zoom-and-pan
+  --manual-scenario open-page-and-dismiss-to-new-visible-source
+  --manual-scenario open-placeholder-before-preview-loads
+  --manual-scenario open-visible-source-and-dismiss-to-same-source
+  --manual-scenario pinch-during-full-image-loading
+  --manual-scenario rapid-open-drag-dismiss-and-reopen
+  --manual-scenario recycle-source-cell-and-reopen
+  --manual-scenario seek-long-video-under-throttled-network
+  --manual-scenario vertical-dismiss-only-while-fitted
+  --manual-scenario video-poster-playback-and-dismiss
   --artifact "native-android-aar=${android_aar}"
   --artifact "native-android-maven-repository=${android_maven}"
   --artifact "native-ios-xcframework=${ios_xcframework}"

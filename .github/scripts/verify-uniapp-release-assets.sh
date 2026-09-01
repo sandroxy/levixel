@@ -127,12 +127,10 @@ verify_safe_zip() {
 }
 
 read -r expected_android_sha expected_android_bytes expected_ios_sha expected_ios_bytes native_commit < <(
-  ruby -rjson -e '
+  ruby -I "${release_source}/scripts" -rjson -r native-release-manifest -e '
     manifest = JSON.parse(File.read(ARGV.fetch(0)))
     version = ARGV.fetch(1)
-    abort("Unexpected native release schema") unless manifest["schemaVersion"] == 1
-    abort("Unexpected native release plugin") unless manifest["plugin"] == "levixel"
-    abort("Native release version mismatch") unless manifest["version"] == version
+    NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
     abort("Dirty native release is not publishable") unless manifest["dirty"] == false
     commit = manifest.fetch("commit")
     abort("Unexpected native release commit") unless commit.match?(/\A[0-9a-f]{40}\z/)
@@ -157,6 +155,8 @@ if [[ "${native_commit}" != "${native_tag_commit}" ]]; then
   echo "Native manifest commit ${native_commit} does not equal native tag ${native_version} commit ${native_tag_commit}." >&2
   exit 1
 fi
+"${release_source}/scripts/verify-native-manifest-ios-provenance.sh" \
+  "${native_manifest}" "${ios_artifact}" "${native_version}"
 
 read -r source_version source_uts_version source_native_version source_legacy_version uts_source_version < <(
   ruby -ryaml -rjson -e '

@@ -20,6 +20,17 @@ swift_package_template="${plugin_dir}/packaging/swift-package/Package.swift.temp
 binary_url="${LEVIXEL_IOS_BINARY_URL:-https://github.com/sandroxy/levixel/releases/download/${version}/${artifact_name}}"
 accepted_xcframework_zip="${LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_ZIP:-}"
 accepted_xcframework_sha256="${LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_SHA256:-}"
+source_commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
+source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
+
+assert_source_commit_ancestor() {
+  local candidate_commit="$1"
+  if ! git -C "${plugin_dir}" cat-file -e "${candidate_commit}^{commit}" 2>/dev/null \
+      || ! git -C "${plugin_dir}" merge-base --is-ancestor "${candidate_commit}" "${source_commit}"; then
+    echo "XCFramework source commit ${candidate_commit} is not an ancestor of ${source_commit}." >&2
+    exit 1
+  fi
+}
 
 mkdir -p "${artifact_dir}"
 rm -f \
@@ -77,6 +88,12 @@ if [[ -n "${accepted_xcframework_zip}" ]]; then
     exit 1
   fi
 
+  read -r accepted_source_commit accepted_source_digest < <(
+    "${script_dir}/verify-ios-xcframework-provenance.sh" \
+      "${accepted_xcframework_zip}" "${version}" "${source_digest}"
+  )
+  assert_source_commit_ancestor "${accepted_source_commit}"
+
   accepted_absolute="$(cd "$(dirname "${accepted_xcframework_zip}")" && pwd)/$(basename "${accepted_xcframework_zip}")"
   artifact_absolute="$(cd "${artifact_dir}" && pwd)/${artifact_name}"
   if [[ "${accepted_absolute}" != "${artifact_absolute}" ]]; then
@@ -89,7 +106,7 @@ else
   rm -rf "${build_dir}"
   mkdir -p "${build_dir}"
 
-  xcodebuild archive \
+  xcodebuild -quiet archive \
     -project "${ios_dir}/Levixel.xcodeproj" \
     -scheme Levixel \
     -configuration Release \
@@ -101,7 +118,7 @@ else
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO
 
-  xcodebuild archive \
+  xcodebuild -quiet archive \
     -project "${ios_dir}/Levixel.xcodeproj" \
     -scheme Levixel \
     -configuration Release \
@@ -112,6 +129,16 @@ else
     MARKETING_VERSION="${version}" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO
+
+  for archived_framework in \
+    "${device_archive}/Products/Library/Frameworks/Levixel.framework" \
+    "${simulator_archive}/Products/Library/Frameworks/Levixel.framework"; do
+    info_plist="${archived_framework}/Info.plist"
+    /usr/libexec/PlistBuddy -c 'Delete :LevixelSourceCommit' "${info_plist}" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c 'Delete :LevixelSourceDigest' "${info_plist}" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Add :LevixelSourceCommit string ${source_commit}" "${info_plist}"
+    /usr/libexec/PlistBuddy -c "Add :LevixelSourceDigest string ${source_digest}" "${info_plist}"
+  done
 
   xcodebuild -create-xcframework \
     -framework "${device_archive}/Products/Library/Frameworks/Levixel.framework" \
@@ -124,8 +151,28 @@ else
     cp "${ios_dir}/Levixel/PrivacyInfo.xcprivacy" "${framework_path}/PrivacyInfo.xcprivacy"
   done < <(find "${xcframework_path}" -type d -name 'Levixel.framework' -print)
 
+  read -r built_source_commit built_source_digest < <(
+    "${script_dir}/verify-ios-xcframework-provenance.sh" \
+      "${xcframework_path}" "${version}" "${source_digest}" "${source_commit}"
+  )
+
   rm -f "${artifact_path}"
   ditto -c -k --sequesterRsrc --keepParent "${xcframework_path}" "${artifact_path}"
+fi
+
+read -r artifact_source_commit artifact_source_digest < <(
+  "${script_dir}/verify-ios-xcframework-provenance.sh" \
+    "${artifact_path}" "${version}" "${source_digest}"
+)
+assert_source_commit_ancestor "${artifact_source_commit}"
+if [[ -z "$(git -C "${plugin_dir}" status --porcelain)" ]]; then
+  committed_source_digest="$(
+    "${script_dir}/compute-ios-source-digest.rb" --commit "${artifact_source_commit}"
+  )"
+  if [[ "${committed_source_digest}" != "${artifact_source_digest}" ]]; then
+    echo "XCFramework source digest does not belong to its embedded source commit." >&2
+    exit 1
+  fi
 fi
 
 checksum="$(shasum -a 256 "${artifact_path}" | awk '{print $1}')"

@@ -49,10 +49,14 @@ only public stable artifacts and is not a Levixel publication gate.
 The manifest also declares the exact automated and manual acceptance targets.
 From a clean verifier commit, run each automated target through
 `verification/run-acceptance.rb`; direct `verify.sh all` output is useful for
-diagnosis but is not per-target release evidence. Record manual results with
-repeated `--manual <target>=passed` arguments to
-`verification/record-acceptance.rb`. Omitted targets remain `pending`, and the
-receipt cannot become `accepted` until every declared target has passed.
+diagnosis but is not per-target release evidence. After exercising every
+candidate-declared scenario on a device or browser, record one environment-bound
+run with `verification/record-manual-run.rb`; it captures the target, device
+model, operating-system version, runtime, verifier commit, and scenario set.
+Pass those files to `verification/record-acceptance.rb` as repeated
+`--manual-evidence <target>=/absolute/run.json` arguments. Omitted targets remain
+`pending`, and the receipt cannot become `accepted` until every declared target
+has passed with matching evidence.
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
@@ -196,7 +200,7 @@ LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_SHA256=<accepted-sha256> \
   ./scripts/prepare-native-release.sh
 ```
 
-The packaging script verifies the supplied SHA-256, embedded framework version, slices, privacy manifest, and legal notices before copying the ZIP byte-for-byte to its canonical release filename. Use this path only when the release commit changes metadata or packaging and the accepted candidate was built from the same native source; record both the source commit and accepted checksum in the release review.
+The packaging script verifies the supplied SHA-256, embedded framework version, slices, privacy manifest, legal notices, and native-source digest before copying the ZIP byte-for-byte to its canonical release filename. For a formal clean release, the embedded digest must belong to the embedded source commit; that commit must be an ancestor of the release commit; and the same digest must still match every current iOS build input. This two-phase rule permits a later metadata-only release commit to add the accepted SwiftPM checksum without creating a commit/checksum cycle, but rejects dirty-source attribution and any intervening native-source change. Record both the source commit and accepted checksum in the release review.
 
 ## HarmonyOS / OHPM
 
@@ -282,7 +286,7 @@ The workflow downloads and verifies the accepted GitHub Release assets and publi
 
 ## UniApp / DCloud UTS Plugin
 
-The Marketplace product supports classic uni-app Vue pages and uni-app x Vapor on Android/iOS. Exact HBuilderX and platform minimums come from `uni_modules/Sandrox-Levixel/package.json` and `plugin.yaml`; do not duplicate them in this guide. **Only uni-app x Vapor is in scope; VDOM, nvue, HarmonyOS, mini apps, and Web are unsupported.** The package embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
+The Marketplace product supports classic uni-app Vue pages and uni-app x Vapor on Android/iOS. Exact HBuilderX and platform minimums come from `uni_modules/Sandrox-Levixel/package.json` and `plugin.yaml`; do not duplicate them in this guide. **For uni-app x, only Vapor is in scope; x VDOM is unsupported. nvue, HarmonyOS, mini apps, and Web are also unsupported.** The package embeds the accepted Android AAR and iOS device framework, while UTS owns only context lookup, JSON/callback transport, and local-path conversion. DOM geometry and bounded preview warmup stay in the canonical JavaScript SDK; platform behavior stays in the shared UniApp runtimes.
 
 Resolve the UniApp product version and `native-release-version` from `plugin.yaml`; do not duplicate either value in this guide. Packaging must verify and embed the exact AAR/XCFramework recorded by the resolved native release manifest. If an independently staged UniApp target intentionally uses a different product or native version, that relationship must be explicit in the manifest and release review. Build and accept one final ZIP only after its native release manifest exists, never rebuild it after device acceptance, and never reuse a published version for different bytes.
 

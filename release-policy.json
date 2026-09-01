@@ -4,13 +4,13 @@
   "plugin": "levixel",
   "sourceRepository": "https://github.com/sandroxy/levixel.git",
   "verifierRepository": "https://github.com/sandroxy/integrated-plugins.git",
-  "candidateSchemaVersion": 2,
-  "acceptanceReceiptSchemaVersion": 2,
+  "candidateSchemaVersion": 3,
+  "acceptanceReceiptSchemaVersion": 3,
   "qualifications": [
     "androidMavenSigned",
+    "canonicalTagUnused",
     "nativeManifestVerified",
-    "packageIdentitiesVerified",
-    "versionUnpublished"
+    "packageIdentitiesVerified"
   ],
   "artifactRoles": {
     "required": [
@@ -68,6 +68,19 @@
       "uniapp-x-android-device",
       "uniapp-x-ios-device",
       "web-browser"
+    ],
+    "manualScenarios": [
+      "dismiss-when-current-source-is-offscreen",
+      "double-tap-zoom-and-pan",
+      "open-page-and-dismiss-to-new-visible-source",
+      "open-placeholder-before-preview-loads",
+      "open-visible-source-and-dismiss-to-same-source",
+      "pinch-during-full-image-loading",
+      "rapid-open-drag-dismiss-and-reopen",
+      "recycle-source-cell-and-reopen",
+      "seek-long-video-under-throttled-network",
+      "vertical-dismiss-only-while-fitted",
+      "video-poster-playback-and-dismiss"
     ]
   }
 }

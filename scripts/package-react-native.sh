@@ -50,6 +50,7 @@ if [[ "${package_version}" != "${version}" ]]; then
 fi
 
 "${script_dir}/verify-react-native-contract.sh"
+"${script_dir}/verify-react-native-ios-lifecycle.rb"
 
 android_artifact="${plugin_dir}/dist/native-android/levixel-${version}.aar"
 ios_artifact="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip"
@@ -103,7 +104,11 @@ fi
 checksum="$(shasum -a 256 "${candidate_path}" | awk '{print $1}')"
 expected_sidecar="${candidate_path}.sha256"
 printf '%s  %s\n' "${checksum}" "${artifact_name}" > "${expected_sidecar}"
-"${script_dir}/verify-react-native-package.sh" "${candidate_path}"
+verification_arguments=("${candidate_path}")
+if [[ ${allow_dirty} -eq 1 ]]; then
+  verification_arguments+=(--allow-dirty)
+fi
+"${script_dir}/verify-react-native-package.sh" "${verification_arguments[@]}"
 
 install_candidate=1
 if [[ -f "${artifact_path}" ]]; then

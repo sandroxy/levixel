@@ -75,6 +75,9 @@ end
 assert_rejected.call("a reduced automated matrix") do |value|
   value.fetch("acceptance").fetch("automatedTargets").shift
 end
+assert_rejected.call("a reduced manual scenario matrix") do |value|
+  value.fetch("acceptance").fetch("manualScenarios").shift
+end
 assert_rejected.call("a reduced artifact set") { |value| value.fetch("artifacts").shift }
 assert_rejected.call("an unsafe artifact path") { |value| value.fetch("artifacts").first["file"] = "../payload" }
 assert_rejected.call("a different artifact-set digest") { |value| value["artifactSetSha256"] = "b" * 64 }

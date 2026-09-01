@@ -4,6 +4,7 @@ import {
   type SharedElementGeometry,
   type ViewportMetrics,
 } from './geometry.js';
+import { resolveElementSourceLayout } from './dom-geometry.js';
 import { createPage, type PinchState, type ViewerPage } from './pages.js';
 import { imageInfoFromElement, peekImage, transitionURL } from './media-cache.js';
 import { LEVIXEL_STYLES } from './styles.js';
@@ -12,6 +13,7 @@ import type {
   LevixelEvent,
   LevixelMediaItem,
   LevixelOpenResult,
+  LevixelRect,
   LevixelSize,
   NormalizedOpenOptions,
   SourceBinding,
@@ -735,18 +737,23 @@ export class LevixelWebViewer {
     if (!binding || !item)
       return null;
     let hint = binding.hint;
-    if (binding.element?.isConnected) {
-      const rect = binding.element.getBoundingClientRect();
-      if (rect.width > 1 && rect.height > 1 && hint) {
-        const livePreview = imageInfoFromElement(binding.element) ?? binding.preview;
-        hint = {
-          ...hint,
-          rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-          coordinateSpace: 'viewport',
-          rectScale: 1,
-          ...(livePreview ? { imageSize: { width: livePreview.width, height: livePreview.height } } : {}),
-        };
-      }
+    let sourceClippingRect: LevixelRect | undefined;
+    if (binding.element) {
+      const liveLayout = resolveElementSourceLayout(
+        binding.element,
+        this.hiddenSource?.element === binding.element,
+      );
+      if (!liveLayout || !hint)
+        return null;
+      const livePreview = imageInfoFromElement(binding.element) ?? binding.preview;
+      hint = {
+        ...hint,
+        rect: liveLayout.rect,
+        coordinateSpace: 'viewport',
+        rectScale: 1,
+        ...(livePreview ? { imageSize: { width: livePreview.width, height: livePreview.height } } : {}),
+      };
+      sourceClippingRect = liveLayout.clippingRect;
     }
     if (!hint)
       return null;
@@ -754,7 +761,7 @@ export class LevixelWebViewer {
     const fallback = preview
       ? { width: preview.width, height: preview.height }
       : itemSize(item);
-    return resolveSourceGeometry(hint, fallback, this.viewport);
+    return resolveSourceGeometry(hint, fallback, this.viewport, sourceClippingRect);
   }
 
   private hideSourceElement(index: number): void {

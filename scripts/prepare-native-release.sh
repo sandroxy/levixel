@@ -70,6 +70,12 @@ done
 ) > "${checksums_path}"
 
 commit="$(git -C "${plugin_dir}" rev-parse HEAD)"
+ios_source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
+read -r ios_source_commit embedded_ios_source_digest < <(
+  "${script_dir}/verify-ios-xcframework-provenance.sh" \
+    "${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip" \
+    "${version}" "${ios_source_digest}"
+)
 dirty=false
 if [[ -n "$(git -C "${plugin_dir}" status --porcelain)" ]]; then
   dirty=true
@@ -79,25 +85,39 @@ if [[ ${allow_dirty} -eq 0 ]] \
   echo "The source revision changed while preparing the native candidate." >&2
   exit 1
 fi
-ruby -rjson -rdigest -e '
-  version, commit, dirty, signed, output, *files = ARGV
+ruby -I "${script_dir}" -rjson -rdigest -r native-release-manifest -e '
+  version, commit, dirty, signed, ios_commit, ios_digest, output, *files = ARGV
   payload = {
-    schemaVersion: 1,
-    plugin: "levixel",
-    version: version,
-    commit: commit,
-    dirty: dirty == "true",
-    androidMavenSigned: signed == "true",
-    artifacts: files.map do |file|
+    "schemaVersion" => 2,
+    "plugin" => "levixel",
+    "version" => version,
+    "commit" => commit,
+    "dirty" => dirty == "true",
+    "androidMavenSigned" => signed == "true",
+    "buildProvenance" => {
+      "iosXcframework" => {
+        "sourceCommit" => ios_commit,
+        "sourceDigest" => ios_digest
+      }
+    },
+    "artifacts" => files.map do |file|
       {
-        file: File.basename(file),
-        bytes: File.size(file),
-        sha256: Digest::SHA256.file(file).hexdigest
+        "file" => File.basename(file),
+        "bytes" => File.size(file),
+        "sha256" => Digest::SHA256.file(file).hexdigest
       }
     end
   }
+  NativeReleaseManifest.validate!(payload, plugin: "levixel", version: version)
   File.write(output, JSON.pretty_generate(payload) + "\n")
-' "${version}" "${commit}" "${dirty}" "${android_maven_signed}" "${manifest_path}" "${artifacts[@]}"
+' "${version}" "${commit}" "${dirty}" "${android_maven_signed}" \
+  "${ios_source_commit}" "${embedded_ios_source_digest}" \
+  "${manifest_path}" "${artifacts[@]}"
+
+"${script_dir}/verify-native-manifest-ios-provenance.sh" \
+  "${manifest_path}" \
+  "${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zip" \
+  "${version}"
 
 printf '%s\n' "${manifest_path}"
 printf '%s\n' "${checksums_path}"
