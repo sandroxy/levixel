@@ -18,28 +18,19 @@ for required_file in "${manifest_path}" "${xcframework_zip}"; do
   fi
 done
 
-manifest_schema="$(
-  ruby -I "${script_dir}" -rdigest -rjson -r native-release-manifest -e '
-    manifest = JSON.parse(File.read(ARGV.fetch(0)))
-    version = ARGV.fetch(1)
-    artifact_path = ARGV.fetch(2)
-    NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
-    artifact_name = "levixel-#{version}.xcframework.zip"
-    artifact = manifest.fetch("artifacts").find { |entry| entry.fetch("file") == artifact_name }
-    abort("Native release manifest is missing #{artifact_name}") unless artifact
-    abort("iOS XCFramework byte count differs from the native manifest") unless
-      File.size(artifact_path) == artifact.fetch("bytes")
-    abort("iOS XCFramework checksum differs from the native manifest") unless
-      Digest::SHA256.file(artifact_path).hexdigest == artifact.fetch("sha256")
-    print manifest.fetch("schemaVersion")
-  ' "${manifest_path}" "${version}" "${xcframework_zip}"
-)"
-
-if [[ "${manifest_schema}" == "1" ]]; then
-  printf 'Verified legacy iOS artifact manifest for %s; embedded source provenance was introduced in 1.3.0.\n' \
-    "${version}"
-  exit 0
-fi
+ruby -I "${script_dir}" -rdigest -rjson -r native-release-manifest -e '
+  manifest = JSON.parse(File.read(ARGV.fetch(0)))
+  version = ARGV.fetch(1)
+  artifact_path = ARGV.fetch(2)
+  NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
+  artifact_name = "levixel-#{version}.xcframework.zip"
+  artifact = manifest.fetch("artifacts").find { |entry| entry.fetch("file") == artifact_name }
+  abort("Native release manifest is missing #{artifact_name}") unless artifact
+  abort("iOS XCFramework byte count differs from the native manifest") unless
+    File.size(artifact_path) == artifact.fetch("bytes")
+  abort("iOS XCFramework checksum differs from the native manifest") unless
+    Digest::SHA256.file(artifact_path).hexdigest == artifact.fetch("sha256")
+' "${manifest_path}" "${version}" "${xcframework_zip}"
 
 source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
 read -r binary_source_commit binary_source_digest < <(

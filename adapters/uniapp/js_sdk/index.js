@@ -73,7 +73,7 @@ function assertNativeResult(result) {
   throw error
 }
 
-const legacyNativeTransport = {
+const nativePluginTransport = {
   invoke(method, options) {
     const plugin = getNativePlugin()
     if (!plugin || typeof plugin[method] !== 'function')
@@ -98,7 +98,7 @@ const legacyNativeTransport = {
 }
 
 function getNativeTransport() {
-  return injectedNativeTransport || legacyNativeTransport
+  return injectedNativeTransport || nativePluginTransport
 }
 
 function shouldResolveNativeMediaPath(value) {

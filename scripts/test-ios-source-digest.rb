@@ -39,7 +39,7 @@ expected_digest = lambda do |commit|
   abort("iOS source digest omits project inputs: #{missing.join(", ")}") unless missing.empty?
 
   digest = Digest::SHA256.new
-  digest << "levixel-ios-source-digest-v1\0"
+  digest << "levixel-ios-source-digest\0"
   paths.each do |relative_path|
     content = if commit
                 run_git.call("cat-file", "blob", "#{commit}:#{relative_path}")

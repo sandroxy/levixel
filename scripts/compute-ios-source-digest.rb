@@ -40,7 +40,7 @@ paths = output.split("\0").reject(&:empty?).sort
 abort("No iOS build inputs were found") if paths.empty?
 
 digest = Digest::SHA256.new
-digest << "levixel-ios-source-digest-v1\0"
+digest << "levixel-ios-source-digest\0"
 paths.each do |relative_path|
   content = if commit
               blob, blob_error, blob_status = Open3.capture3(

@@ -4,8 +4,8 @@
   "plugin": "levixel",
   "sourceRepository": "https://github.com/sandroxy/levixel.git",
   "verifierRepository": "https://github.com/sandroxy/integrated-plugins.git",
-  "candidateSchemaVersion": 3,
-  "acceptanceReceiptSchemaVersion": 3,
+  "candidateSchemaVersion": 2,
+  "acceptanceReceiptSchemaVersion": 2,
   "qualifications": [
     "androidMavenSigned",
     "canonicalTagUnused",

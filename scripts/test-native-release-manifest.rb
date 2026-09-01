@@ -20,6 +20,12 @@ manifest = {
   "artifacts" => [artifact],
 }
 NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: "1.3.0")
+begin
+  NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: "1.3")
+rescue NativeReleaseManifest::Error
+else
+  abort("Native manifest contract accepted a non-SemVer release version")
+end
 
 reject = lambda do |label, &mutation|
   changed = JSON.parse(JSON.generate(manifest))
@@ -32,7 +38,7 @@ reject = lambda do |label, &mutation|
   abort("Native manifest contract accepted #{label}")
 end
 
-reject.call("a legacy schema for 1.3.0") { |value| value["schemaVersion"] = 1 }
+reject.call("an unsupported schema") { |value| value["schemaVersion"] = 1 }
 reject.call("a missing iOS provenance") { |value| value.delete("buildProvenance") }
 reject.call("an unexpected top-level field") { |value| value["unverified"] = true }
 reject.call("an invalid source digest") do |value|
@@ -46,12 +52,16 @@ accepted_candidate = JSON.parse(JSON.generate(manifest))
 accepted_candidate.dig("buildProvenance", "iosXcframework")["sourceCommit"] = "c" * 40
 NativeReleaseManifest.validate!(accepted_candidate, plugin: "levixel", version: "1.3.0")
 
-legacy = JSON.parse(JSON.generate(manifest))
-legacy["schemaVersion"] = 1
-legacy["version"] = "1.2.0"
-legacy.delete("androidMavenSigned")
-legacy.delete("buildProvenance")
-legacy.fetch("artifacts").first["file"] = "levixel-1.2.0.aar"
-NativeReleaseManifest.validate!(legacy, plugin: "levixel", version: "1.2.0")
+incomplete_manifest = JSON.parse(JSON.generate(manifest))
+incomplete_manifest["version"] = "1.2.0"
+incomplete_manifest.fetch("artifacts").first["file"] = "levixel-1.2.0.aar"
+incomplete_manifest.delete("androidMavenSigned")
+incomplete_manifest.delete("buildProvenance")
+begin
+  NativeReleaseManifest.validate!(incomplete_manifest, plugin: "levixel", version: "1.2.0")
+rescue NativeReleaseManifest::Error
+else
+  abort("Native manifest contract accepted a version-based provenance exemption")
+end
 
-puts "Verified versioned native release manifest contracts."
+puts "Verified the native release manifest contract."

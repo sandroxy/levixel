@@ -158,17 +158,10 @@ abort("Automated consumer acceptance did not pass") unless
   automated_checks.values.all? do |entry|
     entry.is_a?(Hash) && entry.keys.sort == %w[evidence status] && entry.fetch("status") == "passed"
   end
-if release_policy.fetch("acceptanceReceiptSchemaVersion") >= 3
-  abort("Manual device acceptance did not pass with evidence") unless
-    manual_checks.values.all? do |entry|
-      entry.is_a?(Hash) && entry.keys.sort == %w[evidence status] && entry.fetch("status") == "passed"
-    end
-else
-  abort("Manual device acceptance did not pass") unless
-    manual_checks.values.all? do |entry|
-      entry.is_a?(Hash) && entry.keys == ["status"] && entry.fetch("status") == "passed"
-    end
-end
+abort("Manual device acceptance did not pass with evidence") unless
+  manual_checks.values.all? do |entry|
+    entry.is_a?(Hash) && entry.keys.sort == %w[evidence status] && entry.fetch("status") == "passed"
+  end
 verifier = acceptance.fetch("verifier")
 abort("Acceptance verifier has unexpected fields") unless
   verifier.is_a?(Hash) && verifier.keys.sort == %w[commit dirty repository]
@@ -218,47 +211,45 @@ automated_checks.each do |target, entry|
   abort("Automated evidence time range differs: #{target}") if completed_at < started_at
 end
 
-if release_policy.fetch("acceptanceReceiptSchemaVersion") >= 3
-  manual_checks.each do |target, entry|
-    evidence = entry.fetch("evidence")
-    expected_evidence_fields = %w[
-      artifactSetSha256 candidateId candidateManifestSha256 environment kind notes plugin
-      recordedAt runSha256 scenarios schemaVersion status target verifier version
-    ]
-    abort("Manual evidence has unexpected fields: #{target}") unless
-      evidence.is_a?(Hash) && evidence.keys.sort == expected_evidence_fields.sort
-    abort("Manual evidence schema differs: #{target}") unless
-      evidence.fetch("schemaVersion") == 1 &&
-        evidence.fetch("kind") == "plugin-candidate-manual-run" &&
-        evidence.fetch("status") == "passed"
-    abort("Manual evidence target differs: #{target}") unless evidence.fetch("target") == target
-    abort("Manual evidence candidate differs: #{target}") unless
-      evidence.fetch("plugin") == plugin && evidence.fetch("version") == version &&
-        evidence.fetch("candidateId") == expected_candidate_id &&
-        evidence.fetch("artifactSetSha256") == artifact_set_sha256 &&
-        evidence.fetch("candidateManifestSha256") == candidate_manifest_sha256
-    environment = evidence.fetch("environment")
-    abort("Manual evidence environment differs: #{target}") unless
-      environment.is_a?(Hash) && environment.keys.sort == %w[deviceModel operatingSystem runtime] &&
-        environment.values.all? { |value| value.is_a?(String) && !value.strip.empty? }
-    abort("Manual evidence scenarios differ: #{target}") unless
-      evidence.fetch("scenarios") == acceptance_requirements.fetch("manualScenarios")
-    abort("Manual evidence notes are invalid: #{target}") unless evidence.fetch("notes").is_a?(String)
-    evidence_verifier = evidence.fetch("verifier")
-    abort("Manual evidence verifier fields differ: #{target}") unless
-      evidence_verifier.is_a?(Hash) && evidence_verifier.keys.sort == %w[commit dirty repository]
-    abort("Manual evidence verifier differs: #{target}") unless
-      evidence_verifier.fetch("repository") == verifier.fetch("repository") &&
-        evidence_verifier.fetch("commit") == verifier.fetch("commit") &&
-        evidence_verifier.fetch("dirty") == false
-    run_sha256 = evidence.fetch("runSha256")
-    abort("Manual evidence digest is invalid: #{target}") unless run_sha256.match?(/\A[0-9a-f]{64}\z/)
-    original_run = evidence.reject { |key, _value| key == "runSha256" }
-    abort("Manual evidence digest differs: #{target}") unless
-      Digest::SHA256.hexdigest(JSON.pretty_generate(original_run) + "\n") == run_sha256
-    manual_recorded_at = Time.iso8601(evidence.fetch("recordedAt"))
-    abort("Manual evidence was recorded after its receipt: #{target}") if manual_recorded_at > recorded_at
-  end
+manual_checks.each do |target, entry|
+  evidence = entry.fetch("evidence")
+  expected_evidence_fields = %w[
+    artifactSetSha256 candidateId candidateManifestSha256 environment kind notes plugin
+    recordedAt runSha256 scenarios schemaVersion status target verifier version
+  ]
+  abort("Manual evidence has unexpected fields: #{target}") unless
+    evidence.is_a?(Hash) && evidence.keys.sort == expected_evidence_fields.sort
+  abort("Manual evidence schema differs: #{target}") unless
+    evidence.fetch("schemaVersion") == 1 &&
+      evidence.fetch("kind") == "plugin-candidate-manual-run" &&
+      evidence.fetch("status") == "passed"
+  abort("Manual evidence target differs: #{target}") unless evidence.fetch("target") == target
+  abort("Manual evidence candidate differs: #{target}") unless
+    evidence.fetch("plugin") == plugin && evidence.fetch("version") == version &&
+      evidence.fetch("candidateId") == expected_candidate_id &&
+      evidence.fetch("artifactSetSha256") == artifact_set_sha256 &&
+      evidence.fetch("candidateManifestSha256") == candidate_manifest_sha256
+  environment = evidence.fetch("environment")
+  abort("Manual evidence environment differs: #{target}") unless
+    environment.is_a?(Hash) && environment.keys.sort == %w[deviceModel operatingSystem runtime] &&
+      environment.values.all? { |value| value.is_a?(String) && !value.strip.empty? }
+  abort("Manual evidence scenarios differ: #{target}") unless
+    evidence.fetch("scenarios") == acceptance_requirements.fetch("manualScenarios")
+  abort("Manual evidence notes are invalid: #{target}") unless evidence.fetch("notes").is_a?(String)
+  evidence_verifier = evidence.fetch("verifier")
+  abort("Manual evidence verifier fields differ: #{target}") unless
+    evidence_verifier.is_a?(Hash) && evidence_verifier.keys.sort == %w[commit dirty repository]
+  abort("Manual evidence verifier differs: #{target}") unless
+    evidence_verifier.fetch("repository") == verifier.fetch("repository") &&
+      evidence_verifier.fetch("commit") == verifier.fetch("commit") &&
+      evidence_verifier.fetch("dirty") == false
+  run_sha256 = evidence.fetch("runSha256")
+  abort("Manual evidence digest is invalid: #{target}") unless run_sha256.match?(/\A[0-9a-f]{64}\z/)
+  original_run = evidence.reject { |key, _value| key == "runSha256" }
+  abort("Manual evidence digest differs: #{target}") unless
+    Digest::SHA256.hexdigest(JSON.pretty_generate(original_run) + "\n") == run_sha256
+  manual_recorded_at = Time.iso8601(evidence.fetch("recordedAt"))
+  abort("Manual evidence was recorded after its receipt: #{target}") if manual_recorded_at > recorded_at
 end
 
 head, status = Open3.capture2("git", "-C", root.to_s, "rev-parse", "HEAD")
