@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const registryKey = '__sandrox_levixel_saved_previews_v1__'
+const defaultPreviewBytes = 256 * 1024
 let measuredRects = []
 let nativeOpenOptions
 let nativeEventCallback
@@ -21,6 +22,8 @@ const removedSavedFiles = []
 const convertedLocalPaths = []
 const forcedDownloadFailures = new Set()
 const downloadedPathOverrides = new Map()
+const previewDownloadSizes = new Map()
+const savedPreviewSizes = new Map()
 const forcedSaveFailures = new Set()
 const storage = new Map([[registryKey, ['/_doc/uniapp_save/stale.preview']]])
 
@@ -89,8 +92,9 @@ function completePreviewDownload(request) {
     request.callback({ filename }, 500)
     return
   }
-  downloadedPreviews.push({ owner: request.url, savedFilePath: filename })
-  request.callback({ filename }, 200)
+  const bytes = previewDownloadSizes.get(request.url) || defaultPreviewBytes
+  downloadedPreviews.push({ owner: request.url, savedFilePath: filename, bytes })
+  request.callback({ filename, downloadedSize: bytes, totalSize: bytes }, 200)
 }
 
 globalThis.uni = {
@@ -115,9 +119,15 @@ globalThis.uni = {
         return
       }
       const savedFilePath = `/_doc/uniapp_save/${encodeURIComponent(owner)}-${savedPreviews.length + 1}.preview`
-      savedPreviews.push({ owner, savedFilePath })
+      const bytes = previewDownloadSizes.get(owner) || defaultPreviewBytes
+      savedPreviewSizes.set(savedFilePath, bytes)
+      savedPreviews.push({ owner, savedFilePath, bytes })
       success({ savedFilePath })
     })
+  },
+  getSavedFileInfo({ filePath, success, fail }) {
+    const size = savedPreviewSizes.get(filePath)
+    queueMicrotask(() => size ? success({ size }) : fail({ errMsg: 'getSavedFileInfo:fail missing file' }))
   },
   removeSavedFile({ filePath }) {
     removedSavedFiles.push(filePath)
@@ -184,6 +194,20 @@ await Promise.all([
   sdk.warmupLevixelItem(items[1], { detail: { width: 800, height: 450 } }),
 ])
 assert.deepEqual(imageInfoRequests, [])
+assert.deepEqual(previewDownloadRequests, [])
+assert.equal(removedSavedFiles.includes('/_doc/uniapp_save/stale.preview'), false)
+
+const noEventWarmupItem = {
+  id: 'no-event-warmup',
+  type: 'image',
+  url: 'https://example.com/no-event-warmup.jpg',
+}
+await sdk.warmupLevixelItem(noEventWarmupItem)
+assert.deepEqual(imageInfoRequests, [])
+assert.deepEqual(previewDownloadRequests, [])
+assert.deepEqual(savedPreviews, [])
+
+await Promise.all(items.map(item => sdk.prepareLevixelItem(item)))
 assert.deepEqual(previewDownloadRequests, [
   'https://example.com/thumb.jpg',
   'https://example.com/poster.jpg',
@@ -322,18 +346,26 @@ const priorityOpen = sdk.openLevixelFromSelector({
   index: 2,
   sourceSelector: '.source',
 })
-await priorityOpen
+const priorityOpenFinishedPromptly = await Promise.race([
+  priorityOpen.then(() => true),
+  new Promise(resolve => setTimeout(() => resolve(false), 500)),
+])
+if (!priorityOpenFinishedPromptly && heldPreviewDownload) {
+  completePreviewDownload(heldPreviewDownload)
+  heldPreviewDownload = undefined
+}
+assert.equal(priorityOpenFinishedPromptly, true, 'Opening must not wait for a long preview download')
 assert.ok(heldPreviewDownload)
+assert.equal(nativeOpenOptions.items[2].thumbnailUrl, undefined)
 completePreviewDownload(heldPreviewDownload)
 heldPreviewDownload = undefined
 await Promise.all(priorityWarmups)
+const preparedPriorityItem = await sdk.prepareLevixelItem(priorityItems[2])
 assert.deepEqual(previewDownloadRequests.slice(priorityRequestStart), [
-  'https://example.com/priority-a.jpg',
   'https://example.com/priority-c.jpg',
-  'https://example.com/priority-b.jpg',
 ])
-assert.equal(maxActivePreviewDownloads, 2)
-assert.ok(nativeOpenOptions.items[2].thumbnailUrl.startsWith('file:///native/_doc/sandrox_levixel_previews/'))
+assert.equal(maxActivePreviewDownloads, 1)
+assert.ok(preparedPriorityItem.src.startsWith('_doc/sandrox_levixel_previews/'))
 
 const failedURL = 'https://example.com/save-failure.jpg'
 const failedItem = { id: 'save-failure', type: 'image', url: failedURL }
@@ -363,11 +395,56 @@ const evictionItems = Array.from({ length: 82 }, (_, index) => ({
   type: 'image',
   url: `https://example.com/eviction-${index}.jpg`,
 }))
-await Promise.all(evictionItems.map(item => sdk.warmupLevixelItem(item, {
-  detail: { width: 400, height: 600 },
-})))
+await Promise.all(evictionItems.map(item => sdk.prepareLevixelItem(item)))
 assert.ok(removedSavedFiles.some(path => path !== '/_doc/uniapp_save/stale.preview'))
 assert.ok(storage.get(registryKey).length <= 80)
+
+const budgetSdk = await import(
+  `data:text/javascript;base64,${Buffer.from(sdkSource).toString('base64')}#managed-preview-budget`
+)
+const budgetItems = Array.from({ length: 6 }, (_, index) => ({
+  id: `budget-${index}`,
+  type: 'image',
+  url: `https://example.com/budget-${index}.jpg`,
+}))
+budgetItems.forEach(item => previewDownloadSizes.set(item.url, 12 * 1024 * 1024))
+const budgetPreviews = await Promise.all(
+  budgetItems.map(item => budgetSdk.prepareLevixelItem(item)),
+)
+assert.equal(budgetPreviews.filter(Boolean).length, budgetItems.length)
+assert.equal(storage.get(registryKey).length, 5)
+
+const oversizedItem = {
+  id: 'oversized-preview',
+  type: 'image',
+  url: 'https://example.com/oversized-preview.jpg',
+}
+previewDownloadSizes.set(oversizedItem.url, 17 * 1024 * 1024)
+assert.equal(await budgetSdk.prepareLevixelItem(oversizedItem), undefined)
+const oversizedPreviewPath = downloadedPreviews.at(-1).savedFilePath
+assert.equal(downloadedPreviews.at(-1).owner, oversizedItem.url)
+assert.ok(removedSavedFiles.includes(oversizedPreviewPath))
+
+const shortIdleTtlSource = sdkSource.replace(
+  'const MANAGED_PREVIEW_IDLE_TTL_MS = 30 * 60 * 1000',
+  'const MANAGED_PREVIEW_IDLE_TTL_MS = 1',
+)
+assert.notEqual(shortIdleTtlSource, sdkSource)
+const shortIdleTtlSdk = await import(
+  `data:text/javascript;base64,${Buffer.from(shortIdleTtlSource).toString('base64')}#managed-preview-idle-ttl`
+)
+const expiringItem = {
+  id: 'expiring-preview',
+  type: 'image',
+  url: 'https://example.com/expiring-preview.jpg',
+}
+const expiringDownloadStart = downloadedPreviews.length
+await shortIdleTtlSdk.prepareLevixelItem(expiringItem)
+const firstExpiringPath = downloadedPreviews.at(-1).savedFilePath
+await new Promise(resolve => setTimeout(resolve, 20))
+await shortIdleTtlSdk.prepareLevixelItem(expiringItem)
+assert.equal(downloadedPreviews.length, expiringDownloadStart + 2)
+assert.ok(removedSavedFiles.includes(firstExpiringPath))
 
 await sdk.closeLevixel()
 
@@ -500,8 +577,12 @@ globalThis.uni = {
     return {
       saveFile({ tempFilePath, filePath, success }) {
         const savedFilePath = filePath || 'unifile://uni-store/default.preview'
-        vaporSavedFiles.push({ tempFilePath, filePath, savedFilePath })
+        vaporSavedFiles.push({ tempFilePath, filePath, savedFilePath, bytes: defaultPreviewBytes })
         success({ savedFilePath })
+      },
+      getFileInfo({ filePath, success, fail }) {
+        const saved = vaporSavedFiles.find(candidate => candidate.savedFilePath === filePath)
+        saved ? success({ size: saved.bytes }) : fail({ errMsg: 'getFileInfo:fail missing file' })
       },
       removeSavedFile({ filePath }) {
         vaporRemovedSavedFiles.push(filePath)

@@ -2,6 +2,8 @@
 
 ## 1.3.0 - 2026-08-31
 
+- Restored UniApp iOS return transitions by keeping synthetic-anchor hosts registry-visible while hiding only the generated anchor views.
+- Made UniApp warmup dimension-only, bounded click-time preview waiting, and constrained managed previews by per-file size, total bytes, entry count, and idle lifetime.
 - Rebound React Native iOS Fabric source views after component mounting and reuse so recycled list cells remain valid open and return-transition targets.
 - Made Android shared-element names collision-safe across galleries and between stable item identities and legacy indices.
 - Rejected detached, hidden, and fully clipped iOS and Web source views so unavailable transition targets fall back cleanly instead of animating from stale geometry.

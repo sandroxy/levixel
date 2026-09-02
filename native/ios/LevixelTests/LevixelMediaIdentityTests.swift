@@ -246,6 +246,69 @@ final class LevixelMediaIdentityTests: XCTestCase {
         )
     }
 
+    func testRegistryKeepsATransparentSourceInsideAVisibleHostResolvable() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let host = UIView(frame: window.bounds)
+        host.backgroundColor = .clear
+        let imageView = UIImageView(frame: CGRect(x: 20, y: 20, width: 80, height: 80))
+        imageView.alpha = 0
+        window.addSubview(host)
+        host.addSubview(imageView)
+        LevixelSourceViewRegistry.shared.register(
+            imageView,
+            galleryId: galleryId,
+            itemIdentifier: "synthetic-anchor"
+        )
+        defer {
+            LevixelSourceViewRegistry.shared.unregister(
+                imageView,
+                galleryId: galleryId,
+                itemIdentifier: "synthetic-anchor"
+            )
+            window.isHidden = true
+        }
+
+        XCTAssertTrue(
+            LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                itemIdentifier: "synthetic-anchor"
+            ) === imageView
+        )
+    }
+
+    func testRegistryRejectsATransparentSourceHost() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let host = UIView(frame: window.bounds)
+        host.alpha = 0
+        let imageView = UIImageView(frame: CGRect(x: 20, y: 20, width: 80, height: 80))
+        window.addSubview(host)
+        host.addSubview(imageView)
+        LevixelSourceViewRegistry.shared.register(
+            imageView,
+            galleryId: galleryId,
+            itemIdentifier: "transparent-host"
+        )
+        defer {
+            LevixelSourceViewRegistry.shared.unregister(
+                imageView,
+                galleryId: galleryId,
+                itemIdentifier: "transparent-host"
+            )
+            window.isHidden = true
+        }
+
+        XCTAssertNil(
+            LevixelSourceViewRegistry.shared.sourceView(
+                for: galleryId,
+                itemIdentifier: "transparent-host"
+            )
+        )
+    }
+
     func testRegistryRejectsAHiddenAncestor() {
         let galleryId = "test-\(UUID().uuidString)"
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))

@@ -226,5 +226,6 @@ node --input-type=module --check < "${source_root}/js_sdk/canonical.js"
 LEVIXEL_UNIAPP_SDK_PATH="${package_root}/js_sdk/canonical.js" \
   node "${plugin_dir}/adapters/uniapp/js_sdk/index.test.mjs"
 bash "${plugin_dir}/adapters/uniapp/ios/verify-event-relay.sh"
+bash "${plugin_dir}/adapters/uniapp/ios/verify-synthetic-anchor-visibility.sh"
 
 printf 'Verified %s\n' "${archive_path}"

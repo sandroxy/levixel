@@ -325,6 +325,7 @@ public final class LevixelUniPresenter: NSObject {
         }
 
         let fallbackAnchor = UIImageView(frame: .zero)
+        fallbackAnchor.alpha = LevixelUniSyntheticAnchorVisibility.anchorAlpha
         fallbackAnchor.isUserInteractionEnabled = false
         host.addSubview(fallbackAnchor)
         let initialAnchor = anchors[request.initialIndex] ?? fallbackAnchor
@@ -447,7 +448,7 @@ public final class LevixelUniPresenter: NSObject {
         let host = UIView(frame: window.bounds)
         host.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         host.backgroundColor = .clear
-        host.alpha = 0
+        host.alpha = LevixelUniSyntheticAnchorVisibility.hostAlpha
         host.clipsToBounds = false
         host.isUserInteractionEnabled = false
         window.addSubview(host)
@@ -468,6 +469,7 @@ public final class LevixelUniPresenter: NSObject {
 
         let anchor = UIImageView(frame: host.convert(frameInWindow, from: nil))
         anchor.image = image
+        anchor.alpha = LevixelUniSyntheticAnchorVisibility.anchorAlpha
         anchor.contentMode = hint.objectFit.contentMode
         anchor.clipsToBounds = true
         anchor.layer.cornerRadius = hint.cornerRadius * hint.rectScale

@@ -78,7 +78,7 @@ const items = [
 ## 接入原则
 
 1. 可见源元素的选择器和顺序必须与 `items` 一致。
-2. `prepareLevixelItem` 与 `warmupLevixelItem` 用于改善源图和加载交接，但**不是打开前置条件**。
+2. `prepareLevixelItem` 用于显式准备稳定的本地转场预览；`warmupLevixelItem` 只记录已经解码的源图尺寸。两者都**不是打开前置条件**。
 3. 即使缩略图尚未显示，点击后也应调用 `openLevixelFromSelector`；查看器会进入无共享源转场的原生加载状态，不要在业务层因 `ready` 状态而拦截。
 4. 大列表准备预览时应限制为 2–3 个并发任务，避免集中占用 JS 与网络资源。
 5. 原图和视频由原生查看器在打开时按需加载；列表只需渲染缩略图或视频封面。
@@ -122,7 +122,7 @@ export default {
     }
   },
   onReady() {
-    this.items.forEach(item => this.preparePreview(item))
+    this.items.slice(0, 3).forEach(item => this.preparePreview(item))
   },
   methods: {
     sourceFor(item) {
@@ -236,7 +236,7 @@ async function openViewer(index: number) {
   })
 }
 
-items.value.forEach((item, index) => preparePreview(item, index))
+items.value.slice(0, 3).forEach((item, index) => preparePreview(item, index))
 </script>
 
 <style>
@@ -252,7 +252,11 @@ items.value.forEach((item, index) => preparePreview(item, index))
 
 ## 加载与源图交接
 
-`prepareLevixelItem` 会为共享转场准备稳定预览；`warmupLevixelItem` 在图片完成解码后记录可用的源图信息。准备失败或缩略图尚未加载时，查看器仍会按媒体 URL 打开并显示原生加载状态。
+`prepareLevixelItem` 会发起明确的预览准备任务，并将成功结果保存为 Levixel 自有的稳定本地文件。只应为当前可见或即将进入视口的少量媒体预取；大列表不要一次准备全部项目。
+
+`warmupLevixelItem` 在图片完成解码后记录可用尺寸，不会再次下载或保存媒体。点击打开只会短暂等待已经在途的选中项准备任务；未及时就绪时立即交给原生查看器显示加载状态，不会为了共享转场长时间阻塞用户操作。
+
+受管预览同时受单文件大小、缓存总字节数、条目数和空闲时间约束；淘汰项会立即删除，上次运行意外遗留的文件会在下次初始化时清理。准备失败或缩略图尚未加载时，查看器仍会按媒体 URL 正常打开。
 
 `sourceVisibility` 默认且建议保持 `visible`。经典 uni-app 与 x Vapor 均使用该源图交接策略，避免关闭转场最后阶段出现源图纹理闪烁。只有页面完整处理 `sourceVisibilityChange`，并确认所有目标平台的开关场交接都符合预期时，才应显式传入 `hidden`；否则源位置可能在关闭末帧短暂留空或闪烁。
 

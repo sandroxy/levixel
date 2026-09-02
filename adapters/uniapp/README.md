@@ -32,18 +32,18 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-每个渲染源元素必须与 `items` 使用相同的选择器和顺序。为获得确定的共享转场，应先准备每个媒体项，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。批量准备应限制并发；示例宿主使用三个 worker，并传入 `priority: true`。
+每个渲染源元素必须与 `items` 使用相同的选择器和顺序。为获得确定的共享转场，可提前准备当前可见或即将进入视口的媒体，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。大列表不得一次准备全部项目；批量准备应限制并发，选中项可传入 `priority: true`。
 
 部分 UniApp runtime 会为不同 `getImageInfo` 请求复用同一个临时路径，因此 SDK 会把远程预览保存为各自独立的受管文件。经典分支沿用 `uni.saveFile`；x 分支使用 `uni.getFileSystemManager().saveFile` / `removeSavedFile`。保存失败时只保留可靠的宽高信息，不缓存、传递或清理该非自有临时路径；查看器仍可按正式媒体 URL 进入原生加载态，避免跨媒体复用临时路径造成错图。JS→UTS transport 会收集并去重 `url`、`thumbnailUrl`、`posterUrl` 中的本地路径，再通过一次批量调用解析；HTTP(S)、`data:` 和已经是 `file:` 的 URL 原样保留。Android 对代码包 `static/` 与 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其余本地路径使用 `convert2AbsFullPath`；iOS 使用 `UTSiOS.convert2AbsFullPath`。单项解析异常会回退原值，且 native `open` 始终只调用一次。
 
-保存的预览采用 LRU 上限，异常终止遗留文件会在下次启动清理。Android CSS 像素通过显式 `rectScale` 转为原生窗口像素；不会为 HTML/Vapor 源图额外创建隐藏的原生图片视图。
+受管预览采用 LRU，并同时限制单文件大小、总字节数、条目数和空闲时间；异常终止遗留文件会在下次启动清理。Android CSS 像素通过显式 `rectScale` 转为原生窗口像素；UniApp iOS 仅创建不可见的合成转场锚点，不会在 HTML/Vapor 源图上方额外绘制内容。
 
 ```js
 const prepared = await prepareLevixelItem(item, { priority: true })
 if (prepared)
   previewSources[item.id] = prepared.src
 
-// 在本地 image 的 load 回调中调用，记录源图已经完成解码。
+// 在本地 image 的 load 回调中调用；只记录尺寸，不触发下载或落盘。
 warmupLevixelItem(item, loadEvent)
 
 await openLevixelFromSelector({

@@ -1,7 +1,9 @@
 const PLUGIN_NAME = 'Sandrox-Levixel'
 const INITIAL_PREVIEW_TIMEOUT_MS = 120
-const LOADED_SOURCE_PREVIEW_TIMEOUT_MS = 1200
 const MAX_IMAGE_INFO_CACHE_SIZE = 80
+const MAX_MANAGED_PREVIEW_BYTES = 16 * 1024 * 1024
+const MAX_MANAGED_PREVIEW_CACHE_BYTES = 64 * 1024 * 1024
+const MANAGED_PREVIEW_IDLE_TTL_MS = 30 * 60 * 1000
 const SAVED_PREVIEW_REGISTRY_KEY = '__sandrox_levixel_saved_previews_v1__'
 const DOWNLOADED_PREVIEW_DIRECTORY = '_doc/sandrox_levixel_previews/'
 const FILE_SYSTEM_PREVIEW_DIRECTORY = 'sandrox-levixel-previews'
@@ -35,7 +37,7 @@ const eventListeners = new Set()
 const imageInfoCache = new Map()
 const previewJobs = new Map()
 const previewQueue = []
-const ownedPreviewPaths = new Set()
+const ownedPreviewBytesByPath = new Map()
 let activePreviewJob = null
 let savedPreviewRegistryInitialized = false
 let previewPathSequence = 0
@@ -391,7 +393,7 @@ function persistOwnedPreviewPaths() {
   if (typeof uni === 'undefined' || typeof uni.setStorageSync !== 'function')
     return
   try {
-    uni.setStorageSync(SAVED_PREVIEW_REGISTRY_KEY, Array.from(ownedPreviewPaths))
+    uni.setStorageSync(SAVED_PREVIEW_REGISTRY_KEY, Array.from(ownedPreviewBytesByPath.keys()))
   }
   catch (_) {}
 }
@@ -421,18 +423,167 @@ function initializeSavedPreviewRegistry() {
   stalePaths.forEach(requestRemoveSavedPreview)
 }
 
-function registerOwnedPreview(path) {
-  if (!path)
-    return
-  ownedPreviewPaths.add(path)
+function normalizeFileSize(value) {
+  const size = Number(value)
+  return Number.isFinite(size) && size > 0 ? size : undefined
+}
+
+function readManagedPreviewSize(path, knownSize) {
+  const normalizedKnownSize = normalizeFileSize(knownSize)
+  if (normalizedKnownSize)
+    return Promise.resolve(normalizedKnownSize)
+
+  const readers = []
+  const fileSystemManager = getFileSystemManager()
+  if (typeof fileSystemManager?.getFileInfo === 'function') {
+    readers.push((resolve, next) => {
+      try {
+        fileSystemManager.getFileInfo({
+          filePath: path,
+          success(result) {
+            const size = normalizeFileSize(result && result.size)
+            size ? resolve(size) : next()
+          },
+          fail: next,
+        })
+      }
+      catch (_) {
+        next()
+      }
+    })
+  }
+  if (typeof uni !== 'undefined' && typeof uni.getSavedFileInfo === 'function') {
+    readers.push((resolve, next) => {
+      try {
+        uni.getSavedFileInfo({
+          filePath: path,
+          success(result) {
+            const size = normalizeFileSize(result && result.size)
+            size ? resolve(size) : next()
+          },
+          fail: next,
+        })
+      }
+      catch (_) {
+        next()
+      }
+    })
+  }
+  const resolveLocalFileSystemURL = typeof plus !== 'undefined'
+    && plus.io
+    && plus.io.resolveLocalFileSystemURL
+  if (typeof resolveLocalFileSystemURL === 'function') {
+    readers.push((resolve, next) => {
+      try {
+        resolveLocalFileSystemURL(path, (entry) => {
+          if (!entry || typeof entry.file !== 'function') {
+            next()
+            return
+          }
+          entry.file((file) => {
+            const size = normalizeFileSize(file && file.size)
+            size ? resolve(size) : next()
+          }, next)
+        }, next)
+      }
+      catch (_) {
+        next()
+      }
+    })
+  }
+
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (size) => {
+      if (settled)
+        return
+      settled = true
+      resolve(size)
+    }
+    const attempt = (index) => {
+      const reader = readers[index]
+      if (!reader) {
+        finish(undefined)
+        return
+      }
+      let advanced = false
+      reader(finish, () => {
+        if (advanced || settled)
+          return
+        advanced = true
+        attempt(index + 1)
+      })
+    }
+    attempt(0)
+  })
+}
+
+function registerOwnedPreview(path, bytes) {
+  const normalizedBytes = normalizeFileSize(bytes)
+  if (!path || !normalizedBytes)
+    return false
+  ownedPreviewBytesByPath.set(path, normalizedBytes)
   persistOwnedPreviewPaths()
+  return true
 }
 
 function releaseOwnedPreview(path) {
-  if (!path || !ownedPreviewPaths.delete(path))
+  if (!path || !ownedPreviewBytesByPath.delete(path))
     return
   persistOwnedPreviewPaths()
   requestRemoveSavedPreview(path)
+}
+
+async function acceptManagedPreview(path, knownSize) {
+  const bytes = await readManagedPreviewSize(path, knownSize)
+  if (!bytes || bytes > MAX_MANAGED_PREVIEW_BYTES) {
+    requestRemoveSavedPreview(path)
+    return false
+  }
+  return registerOwnedPreview(path, bytes)
+}
+
+function removeCachedImageInfo(key) {
+  const cached = imageInfoCache.get(key)
+  imageInfoCache.delete(key)
+  if (cached && cached.ownedPreview)
+    releaseOwnedPreview(cached.savedFilePath)
+}
+
+function managedPreviewCacheBytes() {
+  let total = 0
+  ownedPreviewBytesByPath.forEach((bytes) => {
+    total += bytes
+  })
+  return total
+}
+
+function enforceImageInfoCacheLimits(now = Date.now()) {
+  imageInfoCache.forEach((cached, key) => {
+    if (cached.ownedPreview
+      && now - cached.lastAccessedAt > MANAGED_PREVIEW_IDLE_TTL_MS)
+      removeCachedImageInfo(key)
+  })
+
+  while (imageInfoCache.size > MAX_IMAGE_INFO_CACHE_SIZE) {
+    const firstKey = imageInfoCache.keys().next().value
+    if (!firstKey)
+      break
+    removeCachedImageInfo(firstKey)
+  }
+
+  while (managedPreviewCacheBytes() > MAX_MANAGED_PREVIEW_CACHE_BYTES) {
+    let oldestOwnedPreviewKey
+    for (const [key, cached] of imageInfoCache) {
+      if (cached.ownedPreview) {
+        oldestOwnedPreviewKey = key
+        break
+      }
+    }
+    if (!oldestOwnedPreviewKey)
+      break
+    removeCachedImageInfo(oldestOwnedPreviewKey)
+  }
 }
 
 function cacheImageInfo(url, info) {
@@ -466,26 +617,20 @@ function cacheImageInfo(url, info) {
     nextInfo.ownedPreview = true
   if (sourceLoaded)
     nextInfo.sourceLoaded = true
+  nextInfo.lastAccessedAt = Date.now()
   imageInfoCache.delete(normalizedURL)
   imageInfoCache.set(normalizedURL, nextInfo)
-
-  while (imageInfoCache.size > MAX_IMAGE_INFO_CACHE_SIZE) {
-    const firstKey = imageInfoCache.keys().next().value
-    if (!firstKey)
-      break
-    const evicted = imageInfoCache.get(firstKey)
-    imageInfoCache.delete(firstKey)
-    if (evicted && evicted.ownedPreview)
-      releaseOwnedPreview(evicted.savedFilePath)
-  }
-  return nextInfo
+  enforceImageInfoCacheLimits(nextInfo.lastAccessedAt)
+  return imageInfoCache.get(normalizedURL)
 }
 
 function getCachedImageInfo(url) {
   const normalizedURL = normalizeURL(url)
+  enforceImageInfoCacheLimits()
   const cached = normalizedURL ? imageInfoCache.get(normalizedURL) : undefined
   if (!cached)
     return undefined
+  cached.lastAccessedAt = Date.now()
   imageInfoCache.delete(normalizedURL)
   imageInfoCache.set(normalizedURL, cached)
   return cached
@@ -564,8 +709,18 @@ function downloadStablePreview(url) {
           finish(undefined)
           return
         }
-        registerOwnedPreview(downloadedPath)
-        finish({ path, savedFilePath: downloadedPath })
+        const knownSize = normalizeFileSize(download && download.downloadedSize)
+          || normalizeFileSize(download && download.totalSize)
+        void acceptManagedPreview(downloadedPath, knownSize).then((accepted) => {
+          if (!accepted) {
+            finish(undefined)
+            return
+          }
+          finish({ path, savedFilePath: downloadedPath })
+        }).catch(() => {
+          requestRemoveSavedPreview(downloadedPath)
+          finish(undefined)
+        })
       })
       if (!task || typeof task.start !== 'function') {
         finish(undefined)
@@ -623,28 +778,43 @@ function saveStablePreview(tempFilePath) {
 
   initializeSavedPreviewRegistry()
   return new Promise((resolve) => {
+    let settled = false
+    const finish = (preview) => {
+      if (settled)
+        return
+      settled = true
+      resolve(preview)
+    }
     try {
       const saveOptions = {
         tempFilePath: normalizedPath,
         success(result) {
           const savedFilePath = normalizeURL(result && result.savedFilePath)
           if (!savedFilePath) {
-            resolve(undefined)
+            finish(undefined)
             return
           }
 
           const path = nativeFileURL(savedFilePath)
           if (!path) {
             requestRemoveSavedPreview(savedFilePath)
-            resolve(undefined)
+            finish(undefined)
             return
           }
 
-          registerOwnedPreview(savedFilePath)
-          resolve({ path, savedFilePath })
+          void acceptManagedPreview(savedFilePath, result && result.size).then((accepted) => {
+            if (!accepted) {
+              finish(undefined)
+              return
+            }
+            finish({ path, savedFilePath })
+          }).catch(() => {
+            requestRemoveSavedPreview(savedFilePath)
+            finish(undefined)
+          })
         },
         fail() {
-          resolve(undefined)
+          finish(undefined)
         },
       }
       const filePath = useFileSystemManager
@@ -655,7 +825,7 @@ function saveStablePreview(tempFilePath) {
       saveFile(saveOptions)
     }
     catch (_) {
-      resolve(undefined)
+      finish(undefined)
     }
   })
 }
@@ -959,9 +1129,11 @@ export function warmupLevixelItem(item, loadEvent) {
     return Promise.resolve()
 
   const loadedInfo = imageInfoFromLoadEvent(loadEvent)
+  // Warmup only records dimensions supplied by a completed source-image load.
+  // Stable local previews are created exclusively by prepareLevixelItem.
   if (loadedInfo)
     cacheImageInfo(url, loadedInfo)
-  return ensureStableImageInfo(url).then(() => undefined)
+  return Promise.resolve()
 }
 
 export async function openLevixelFromSelector(options) {
@@ -985,20 +1157,14 @@ export async function openLevixelFromSelector(options) {
   const rectScale = readSourceRectScale()
   const previewURLs = items.map(transitionURL)
   const selectedPreviewURL = previewURLs[index]
-  const selectedCachedInfo = selectedPreviewURL
-    ? getCachedImageInfo(selectedPreviewURL)
-    : undefined
   const selectedPreviewPromise = selectedPreviewURL
     ? ensureStableImageInfo(selectedPreviewURL, true)
     : Promise.resolve(undefined)
-  const previewTimeout = selectedCachedInfo && selectedCachedInfo.sourceLoaded
-    ? LOADED_SOURCE_PREVIEW_TIMEOUT_MS
-    : INITIAL_PREVIEW_TIMEOUT_MS
 
   const [rects, initialInfo] = await Promise.all([
     measureSources(options.sourceSelector, items.length),
     selectedPreviewURL
-      ? withTimeout(selectedPreviewPromise, previewTimeout)
+      ? withTimeout(selectedPreviewPromise, INITIAL_PREVIEW_TIMEOUT_MS)
       : Promise.resolve(undefined),
   ])
   const previewInfos = previewURLs.map(url => url ? getCachedImageInfo(url) : undefined)
