@@ -38,8 +38,8 @@ if [[ "${actual_checksum}" != "${expected_checksum}" ]]; then
 fi
 
 if grep -Eq '@VERSION@|@NATIVE_VERSION@|@CHECKSUM@' "${marketplace_path}" || \
-   ! grep -Eq "${actual_checksum}" "${marketplace_path}" || \
-   ! grep -Eq "native release manifest.*${native_version}|${native_version}.*native release manifest" "${marketplace_path}"; then
+   ! grep -Fq "${actual_checksum}" "${marketplace_path}" || \
+   ! grep -Fq -- "- 原生核心版本：\`${native_version}\`" "${marketplace_path}"; then
   echo "UniApp marketplace material does not match the candidate" >&2
   exit 1
 fi

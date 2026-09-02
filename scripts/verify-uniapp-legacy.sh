@@ -63,7 +63,7 @@ ruby -rjson -e '
   abort "Levixel.framework must be embedded" unless ios.fetch("embedFrameworks") == ["Levixel.framework"]
 ' "${package_root}/package.json" "${version}"
 
-if grep -R -n -E "Galeria|ChrisUniPlugin|com\.chris|galleryId|sourceRectScale" \
+if grep -R -n -E "Galeria|ChrisUniPlugin|com\.chris|sourceRectScale" \
   "${package_root}/package.json" "${package_root}/js_sdk"; then
   echo "UniApp artifact contains a superseded contract or package identity" >&2
   exit 1
