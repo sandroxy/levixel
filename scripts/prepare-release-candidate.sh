@@ -223,6 +223,7 @@ snapshot_arguments=(
   --manual-target web-browser
   --manual-scenario dismiss-when-current-source-is-offscreen
   --manual-scenario double-tap-zoom-and-pan
+  --manual-scenario open-after-host-list-update-by-stable-id
   --manual-scenario open-page-and-dismiss-to-new-visible-source
   --manual-scenario open-placeholder-before-preview-loads
   --manual-scenario open-visible-source-and-dismiss-to-same-source

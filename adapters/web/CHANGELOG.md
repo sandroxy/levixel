@@ -3,6 +3,9 @@
 ## 1.3.0
 
 - Rejected duplicate media ids so each request has an unambiguous stable identity.
+- Added stable ID `initialItemId` and sparse `sourceBindings` for prepended,
+  appended, reordered, paginated, and virtualized DOM galleries.
+- Added `itemId` to open results and index/source-visibility events.
 
 ## 1.2.0
 

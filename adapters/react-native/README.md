@@ -25,7 +25,7 @@ npx expo prebuild
 
 ```tsx
 import { Levixel, type LevixelMediaItem } from '@sandrox/levixel';
-import { Image, StyleSheet } from 'react-native';
+import { FlatList, Image, StyleSheet } from 'react-native';
 
 const items: LevixelMediaItem[] = [
   {
@@ -50,30 +50,43 @@ const styles = StyleSheet.create({
 });
 
 <Levixel items={items} theme="dark">
-  {items.map((item, index) => (
-    <Levixel.Source key={item.id} index={index} style={styles.tile}>
-      <Image
-        source={{ uri: sourceFor(item) }}
-        style={StyleSheet.absoluteFill}
-      />
-    </Levixel.Source>
-  ))}
+  <FlatList
+    data={items}
+    keyExtractor={item => item.id}
+    renderItem={({ item }) => (
+      <Levixel.Source itemId={item.id} style={styles.tile}>
+        <Image
+          source={{ uri: sourceFor(item) }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Levixel.Source>
+    )}
+  />
 </Levixel>
 ```
 
-Keep `items` in the same order as the rendered sources. Each `Levixel.Source`
-accepts exactly one React element and its `index` must identify the matching
-item. Wrapping the visible source lets Levixel use the real native view as the
-opening and return anchor.
+Each `Levixel.Source` accepts exactly one React element. Prefer `itemId` for
+lists that can prepend, append, reorder, paginate, or virtualize: the source is
+resolved against the current `items` by stable media identity on every render.
+An `index` may be used instead for a fixed, fully rendered gallery. The two
+properties are mutually exclusive and an unknown identity fails immediately.
+
+Render `Levixel.Source` only for currently mounted list cells. `items` may
+contain additional loaded media that is not on screen; those entries remain
+pageable in the viewer but have no source-anchored return transition while
+unmounted. One open viewer uses the current `items` as its session snapshot;
+loading another page in the host affects the next open rather than mutating the
+active viewer.
 
 Every item `id` must be non-empty and unique within the gallery. `Levixel`
 itself accepts an empty `items` array while asynchronous data is loading; render
 no `Levixel.Source` until the corresponding item exists.
 
 `galleryId` is optional and is generated automatically; provide one only when
-the host needs to assign a stable identity to the gallery. Use `onIndexChange`
-when the host needs to observe the currently visible item. Video items should
-provide `posterUrl` or `thumbnailUrl` for a source-anchored opening transition.
+the host needs to assign a stable identity to the gallery. `onIndexChange`
+receives both the session index and stable `itemId`; use the id when host data
+can change while the viewer is open. Video items should provide `posterUrl` or
+`thumbnailUrl` for a source-anchored opening transition.
 
 ## Requirements
 

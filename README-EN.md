@@ -71,8 +71,9 @@ LevixelMediaItem item = new LevixelMediaItem(
 );
 
 List<LevixelMediaItem> items = Collections.singletonList(item);
+String galleryId = "article-gallery";
 LevixelSourceViewRegistry.register(
-        LevixelSharedElementNames.forItem(item),
+        LevixelSharedElementNames.forItem(galleryId, item),
         sourceImageView
 );
 
@@ -81,11 +82,19 @@ LevixelViewerOverlayView viewer = new LevixelViewerOverlayView(
         items,
         0,
         false,
-        null,
+        galleryId,
         null
 );
 rootView.addView(viewer);
 ```
+
+In a dynamic or reusable list, keep every media `id` unique and stable, and
+register each currently visible `ImageView` under the same `galleryId`. Before
+rebinding a cell, call `LevixelSourceViewRegistry.unregisterView(imageView)`,
+then register it for the new media identity. The viewer copies the media array
+it opens with as its session snapshot; dismissal resolves the latest visible
+registered source by stable ID and fades when that source is unmounted instead
+of returning to a different cell at the same index.
 
 For complete system-bar transitions, use an edge-to-edge host and route system back events to `viewer.requestClose()`.
 
@@ -109,7 +118,10 @@ let items: [LevixelMediaItem] = [
     .video(url: videoURL, poster: posterURL)
 ]
 
-let dataSource = LevixelArrayDataSource(items: items)
+let dataSource = LevixelArrayDataSource(
+    items: items,
+    itemIdentifiers: ["cover", "video"]
+)
 imageView.setupLevixelViewer(
     dataSource: dataSource,
     initialIndex: 0,
@@ -118,7 +130,7 @@ imageView.setupLevixelViewer(
 )
 ```
 
-For a multi-item list, configure every currently visible source `UIImageView` with the same `dataSource` and `galleryId`, using that source's own `initialIndex`. Call `removeLevixelViewerInteraction()` before a reusable cell is rebound to different content.
+For a multi-item list, configure every currently visible source `UIImageView` with the same `dataSource` and `galleryId`, using that source's own `initialIndex`. Stable `itemIdentifiers` keep return anchors correct across prepends, removals, and reordering; reconfigure visible cells from the latest snapshot when data order changes. Call `removeLevixelViewerInteraction()` before a reusable cell is rebound to different content.
 
 The Swift Package verifies the downloaded XCFramework against the checksum recorded in `Package.swift`.
 
@@ -143,11 +155,11 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-The package includes the React Native integration and the required Android/iOS native runtimes, so the native core does not need to be integrated separately. See the [React Native adapter guide](adapters/react-native/README.md) for the component API and host requirements.
+The package includes the React Native integration and the required Android/iOS native runtimes, so the native core does not need to be integrated separately. Dynamic, paginated, and virtualized lists bind mounted cells by stable media identity with `Levixel.Source itemId`. See the [React Native adapter guide](adapters/react-native/README.md) for the component API and host requirements.
 
 ## UniApp
 
-For new projects, install the plugin from the [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394). The UTS plugin supports classic uni-app Vue 2 / Vue 3 App pages and uni-app x Vapor Android/iOS Apps; x VDOM is not supported. Both paths share one public JavaScript API and the same platform runtimes. `sourceVisibility` remains `visible` by default to prevent a last-frame source flash during WebView/Vapor close handoff.
+For new projects, install the plugin from the [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394). The UTS plugin supports classic uni-app Vue 2 / Vue 3 App pages and uni-app x Vapor Android/iOS Apps; x VDOM is not supported. Both paths share one public JavaScript API and the same platform runtimes. Dynamic lists can bind only mounted sources with `initialItemId + sourceBindings`. `sourceVisibility` remains `visible` by default to prevent a last-frame source flash during WebView/Vapor close handoff.
 
 See the [UniApp guide](uni_modules/Sandrox-Levixel/readme.md) for the complete compatibility boundary, loading-state integration, and examples. Matching GitHub Releases also provide the UTS ZIP and checksum for direct downloads and offline archives.
 
@@ -159,7 +171,7 @@ Classic uni-app Android/iOS projects that choose the App native-plugin workflow 
 pnpm add @sandrox/levixel-web
 ```
 
-The Web package uses the browser DOM, Pointer Events, the Web Animations API, and native media elements for shared transitions, paging, zoom, pan, drag dismissal, and video controls. It defaults to `sourceVisibility: hidden` without changing UniApp's platform-specific `visible` default.
+The Web package uses the browser DOM, Pointer Events, the Web Animations API, and native media elements for shared transitions, paging, zoom, pan, drag dismissal, and video controls, including sparse stable-id bindings for virtualized sources. It defaults to `sourceVisibility: hidden` without changing UniApp's platform-specific `visible` default.
 
 The verified browser matrix covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. See the [Web guide](adapters/web/README.md) for the API, browser boundary, and accessibility behavior.
 

@@ -22,14 +22,16 @@ import {
   openLevixel,
   openLevixelFromSelector,
   prepareLevixelItem,
+  type LevixelMediaItem,
   warmupLevixelItem,
 } from '@sandrox/levixel-web';
 ```
 
-For a DOM gallery, keep the source elements in the same order as `items` and call the selector helper:
+For a list that can paginate, reorder, or virtualize, bind only the currently
+mounted source elements by stable media ID:
 
 ```ts
-const items = [
+const items: LevixelMediaItem[] = [
   {
     id: 'coast',
     type: 'image',
@@ -41,26 +43,66 @@ const items = [
   },
 ];
 
-const sourceStyles = items.map(() => ({ objectFit: 'cover', cornerRadius: 12 }));
-const disposers = [...document.querySelectorAll<HTMLElement>('.gallery-source')].map(
-  (source, index) => onLevixelSourceActivate(source, () => {
+const mountedSources = () =>
+  [...document.querySelectorAll<HTMLElement>('[data-levixel-item-id]')];
+
+const sourceBindings = () => mountedSources().map(source => ({
+  itemId: source.dataset.levixelItemId!,
+  selector: `#${source.id}`,
+  objectFit: 'cover' as const,
+  cornerRadius: 12,
+}));
+
+const bindLevixelSource = (source: HTMLElement) =>
+  onLevixelSourceActivate(source, () => {
+    const itemId = source.dataset.levixelItemId!;
     void openLevixelFromSelector({
       items,
-      index,
-      sourceSelector: '.gallery-source',
-      sourceStyles,
+      initialItemId: itemId,
+      sourceBindings: sourceBindings(),
     });
-  }),
-);
+  });
 
-const disposeGalleryActivation = () => disposers.forEach(dispose => dispose());
 ```
+
+Call `bindLevixelSource` from the list cell's mount hook and call its returned
+disposer from the matching unmount hook. Newly virtualized cells therefore get
+their own activation handler without retaining detached elements.
+
+Every bound selector must identify at most one element. Bindings may be sparse
+and in any order; `itemId` maps each mounted source to the current `items`
+snapshot. Unknown or repeated ids, repeated selectors, and mixing
+`sourceBindings` with `sourceSelector`/`sourceStyles` are rejected instead of
+being guessed. In the example, every mounted source therefore needs its own
+non-empty DOM `id`. A source that unmounts before return simply uses a fade for
+that item. If a virtual list reuses the same DOM node for another media ID,
+Levixel rejects that stale return target and fades instead of transitioning to
+the recycled cell.
 
 `onLevixelSourceActivate` preserves ordinary click activation for mouse, keyboard, and assistive input. On touch devices it recognizes a primary, movement-bounded tap from Pointer Events, so a source remains immediately responsive after vertical drag dismissal even when the browser suppresses the follow-up compatibility `click`. Scrolling or a cancelled pointer does not activate the source.
 
-If the selector is omitted, does not match exactly one element per item, or the selected source has no usable geometry, Levixel opens with its native-style fade/loading fallback rather than guessing the wrong source rectangle.
+For a fixed gallery whose source elements are all mounted in exactly the same
+order as `items`, the concise static mode remains available:
+
+```ts
+void openLevixelFromSelector({
+  items,
+  index: 0,
+  sourceSelector: '.gallery-source',
+  sourceStyles: items.map(() => ({ objectFit: 'cover', cornerRadius: 12 })),
+});
+```
+
+In static mode, omitting the selector, returning a count different from
+`items.length`, or measuring unusable geometry produces an all-null source
+snapshot. The viewer still opens without a shared source transition rather
+than guessing a wrong item.
 
 Each media `id` must be non-empty and unique within one open request. The shared Levixel contract treats it as stable media identity, so the Web runtime rejects duplicates instead of accepting a request that other adapters cannot anchor unambiguously.
+
+One viewer session pages through the loaded `items` captured by that open call.
+Appending or prepending host data is supported on the next open; Levixel does
+not fetch another host page from inside an already open viewer.
 
 `openLevixel` accepts already measured `sourceHints` for hosts that own their DOM geometry. `prepareLevixelItem` preloads the transition preview (thumbnail or poster, falling back to the image URL), while `warmupLevixelItem` first reuses dimensions from an already loaded source element and otherwise preloads the same preview. Neither function runs automatically merely because the host renders a thumbnail list.
 
@@ -77,7 +119,7 @@ Web defaults `sourceVisibility` to `hidden`, matching the standalone Android/iOS
 
 ## Lifecycle
 
-Only one Web viewer session can exist. Opening again atomically replaces the previous session, restores its source element, and does not emit a duplicate `dismiss` event. `sourceVisibilityChange`, `indexChange`, and `dismiss` use the shared Levixel event JSON shape and timestamp semantics.
+Only one Web viewer session can exist. Opening again atomically replaces the previous session, restores its source element, and does not emit a duplicate `dismiss` event. Open results, `sourceVisibilityChange`, and `indexChange` expose both the session index and stable `itemId`; use the id when host data can change. Events retain the shared Levixel JSON shape and timestamp semantics.
 
 Backgrounding a page pauses active video without clearing subscriptions or closing the viewer. Resize and `visualViewport` changes re-fit unzoomed media and preserve zoomed viewport state.
 

@@ -51,7 +51,7 @@ private enum LevixelUniJSONEventRelayTests {
         ]
         let secondSessionEvents = [
             "{\"type\":\"ready\",\"payload\":{},\"time\":3}",
-            "{\"type\":\"indexChange\",\"payload\":{\"currentIndex\":1},\"time\":4}",
+            "{\"type\":\"indexChange\",\"payload\":{\"currentIndex\":1,\"itemId\":\"video-1\"},\"time\":4}",
             "{\"type\":\"dismiss\",\"payload\":{},\"time\":5}",
         ]
 
@@ -68,7 +68,7 @@ private enum LevixelUniJSONEventRelayTests {
         let relay = LevixelUniJSONEventRelay()
         var received = ""
         relay.replaceHandler { received = $0 }
-        let eventJSON = "{\"type\":\"sourceVisibilityChange\",\"payload\":{\"hidden\":false,\"index\":0,\"galleryId\":\"gallery\"},\"time\":5}"
+        let eventJSON = "{\"type\":\"sourceVisibilityChange\",\"payload\":{\"hidden\":false,\"index\":0,\"itemId\":\"image-1\",\"galleryId\":\"gallery\"},\"time\":5}"
 
         relay.emit(eventJSON)
 

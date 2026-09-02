@@ -206,7 +206,7 @@ The packaging script verifies the supplied SHA-256, embedded framework version, 
 
 1. Confirm the `@sandrox` scope and publisher access.
 2. Build and inspect `dist/native-harmonyos/levixel-<version>.har` once.
-3. Install that HAR in an artifact-only consumer and complete the HarmonyOS hand verification.
+3. Install that HAR in an artifact-only consumer and complete the HarmonyOS hand verification. While the viewer is open, prepend, append, and reorder the host `items`; confirm the active media remains on its opening snapshot and dismissal returns by stable id to the latest visible source, or fades when that source is absent.
 4. Publish the accepted HAR to OHPM without rebuilding.
 5. Install the public package in a clean consumer and run a smoke test.
 6. Run the `Mirror HarmonyOS HAR` workflow for the approved version. It verifies the OHPM SHA-512 integrity and package metadata, mirrors the exact HAR and SHA-256 file to the matching GitHub Release, and reconciles the HAR entry in the native release manifest.
@@ -255,7 +255,7 @@ The npm product embeds the native artifacts recorded in `dist/native-release/lev
    rehearsal only. `--replace` may replace a rejected untagged local candidate;
    the version guard cannot be bypassed after a tag exists.
 
-2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior.
+2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior. Prepend, append, and reorder loaded items; recycle visible cells; then confirm `itemId` sources still open and return to the matching media.
 3. Confirm the shared canonical `<version>` tag points to the accepted release
    commit. Do not create a React Native-specific tag.
 
@@ -309,7 +309,7 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
      ./scripts/verify-uniapp-uts-compiler.sh
    ```
 
-3. The Marketplace ZIP root must directly contain `package.json` and `utssdk/`; DCloud rejects an archive wrapped in a `Sandrox-Levixel/` directory. For artifact-only consumer verification, extract the same ZIP into separate classic and x Vapor hosts. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, scroll offsets, rapid open/close, and source return behavior on Android and iOS devices. Use HBuilderX standard run/custom base/cloud packaging for Vapor; SDK typecheck is not an offline Vapor App build.
+3. The Marketplace ZIP root must directly contain `package.json` and `utssdk/`; DCloud rejects an archive wrapped in a `Sandrox-Levixel/` directory. For artifact-only consumer verification, extract the same ZIP into separate classic and x Vapor hosts. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, scroll offsets, rapid open/close, and source return behavior on Android and iOS devices. Include prepend-style history loading, append-style pagination, sparse virtualized sources, out-of-order bindings, and per-cell component query contexts. Use HBuilderX standard run/custom base/cloud packaging for Vapor; SDK typecheck is not an offline Vapor App build.
 4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
 5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the final version was explicitly chosen, both classic/x applicable matrices passed, and the ZIP checksum still matches the accepted candidate.
 6. Import the public Marketplace version into a clean classic uni-app consumer and rerun the production build. DCloud may add a `name` field equal to `displayName` and reformat `package.json`; all other JSON values and every other payload file must still match the accepted ZIP.
@@ -350,7 +350,7 @@ The Web package is ESM-only, has no runtime dependencies, and publishes as `@san
    ./scripts/verify-web-package.sh
    ```
 
-2. Install `dist/web/levixel-web-<version>.tgz` in artifact-only consumers. Complete the declared desktop/mobile matrix without importing `adapters/web/src` or rebuilding the tarball.
+2. Install `dist/web/levixel-web-<version>.tgz` in artifact-only consumers. Complete the declared desktop/mobile matrix without importing `adapters/web/src` or rebuilding the tarball. Exercise prepended and appended items, sparse and out-of-order mounted bindings, ambiguous-selector rejection, source removal before return, and reuse of a connected source node for another stable ID.
 3. Record the accepted SHA-256 from `dist/web/levixel-web-<version>.tgz.sha256`.
 4. Create the canonical `<version>` tag and GitHub Release only when the declared release scope is approved. Attach these exact files without repacking:
 

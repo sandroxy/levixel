@@ -317,7 +317,10 @@ public final class LevixelUniPresenter: NSObject {
                 self.emitSourceVisibility(hidden: false, index: previousIndex, session: session)
                 self.emitSourceVisibility(hidden: true, index: index, session: session)
             }
-            self.emit(type: "indexChange", payload: ["currentIndex": index])
+            self.emit(type: "indexChange", payload: [
+                "currentIndex": index,
+                "itemId": session.request.items[index].id,
+            ])
         }
         configuration.onDismiss = { [weak self, weak session] in
             guard let self, let session else { return }
@@ -351,6 +354,7 @@ public final class LevixelUniPresenter: NSObject {
                 self.pendingOpenID = nil
                 completion(self.ok(data: [
                     "index": request.initialIndex,
+                    "itemId": request.items[request.initialIndex].id,
                     "count": request.items.count,
                     "galleryId": galleryId,
                 ]))
@@ -511,6 +515,7 @@ public final class LevixelUniPresenter: NSObject {
         emit(type: "sourceVisibilityChange", payload: [
             "hidden": hidden,
             "index": index,
+            "itemId": session.request.items[index].id,
             "galleryId": session.galleryId,
         ])
     }

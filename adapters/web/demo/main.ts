@@ -36,7 +36,9 @@ items.forEach((item, index) => {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'card levixel-demo-source';
+  card.id = `levixel-demo-source-${index}`;
   card.dataset.index = String(index);
+  card.dataset.itemId = item.id;
   card.setAttribute('aria-label', `Open ${item.alt ?? item.id}`);
   const image = document.createElement('img');
   image.src = item.type === 'video'
@@ -61,9 +63,14 @@ items.forEach((item, index) => {
     try {
       const result = await openLevixelFromSelector({
         items,
-        index,
-        sourceSelector: '.levixel-demo-source',
-        sourceStyles: items.map(() => ({ objectFit: 'cover', cornerRadius: 14 })),
+        initialItemId: item.id,
+        sourceBindings: [...gallery.querySelectorAll<HTMLElement>('.levixel-demo-source')]
+          .map(source => ({
+            itemId: source.dataset.itemId!,
+            selector: `#${source.id}`,
+            objectFit: 'cover',
+            cornerRadius: 14,
+          })),
       });
       status.textContent = `Opened ${result.index + 1} of ${result.count}`;
     }

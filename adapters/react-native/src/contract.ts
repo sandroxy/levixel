@@ -74,6 +74,42 @@ export function normalizeMediaItems(
   });
 }
 
+export function resolveSourceIndex(
+  items: readonly NativeLevixelMediaItem[],
+  selection: { readonly index?: unknown; readonly itemId?: unknown },
+): number {
+  const hasIndex = selection.index !== undefined;
+  const hasItemId = selection.itemId !== undefined;
+  if (hasIndex === hasItemId) {
+    throw new TypeError(
+      '[Levixel] Levixel.Source requires exactly one of index or itemId.',
+    );
+  }
+
+  if (hasItemId) {
+    if (typeof selection.itemId !== 'string' || selection.itemId.trim().length === 0) {
+      throw new TypeError('[Levixel] Levixel.Source itemId must be a non-empty string.');
+    }
+    const resolvedIndex = items.findIndex(item => item.id === selection.itemId);
+    if (resolvedIndex < 0) {
+      throw new RangeError(
+        '[Levixel] Levixel.Source itemId does not reference an item in the items array.',
+      );
+    }
+    return resolvedIndex;
+  }
+
+  if (
+    typeof selection.index !== 'number'
+    || !Number.isInteger(selection.index)
+    || selection.index < 0
+    || selection.index >= items.length
+  ) {
+    throw new RangeError('[Levixel] Levixel.Source index is outside the items array.');
+  }
+  return selection.index;
+}
+
 function requireRecord(value: unknown, path: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new TypeError(`[Levixel] ${path} must be an object.`);

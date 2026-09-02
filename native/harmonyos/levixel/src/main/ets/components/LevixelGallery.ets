@@ -66,6 +66,7 @@ export struct LevixelGallery {
   @State rootHeight: number = 720;
   @State rootLeft: number = 0;
   @State rootTop: number = 0;
+  @State sessionItems: LevixelMediaItem[] = [];
   @State currentIndex: number = 0;
   @State viewerOpen: boolean = false;
   @State contentVisible: boolean = false;
@@ -274,7 +275,7 @@ export struct LevixelGallery {
       if (this.contentVisible) {
         Stack({ alignContent: Alignment.TopStart }) {
           Swiper() {
-            ForEach(this.items, (item: LevixelMediaItem) => {
+            ForEach(this.sessionItems, (item: LevixelMediaItem) => {
               this.ViewerPage(item)
             }, (item: LevixelMediaItem) => item.id)
           }
@@ -397,12 +398,17 @@ export struct LevixelGallery {
   }
 
   private async openViewer(index: number): Promise<void> {
-    if (index < 0 || index >= this.items.length || this.transitionActive) {
+    if (this.transitionActive) {
+      return;
+    }
+    const sessionItems: LevixelMediaItem[] = this.snapshotItems();
+    if (index < 0 || index >= sessionItems.length) {
       return;
     }
 
     const token: number = this.beginTransition();
-    const item: LevixelMediaItem = this.items[index];
+    const item: LevixelMediaItem = sessionItems[index];
+    this.sessionItems = sessionItems;
     const sourceState: SharedElementState | null = await this.captureSourceState(item, index);
     if (!this.isActiveTransition(token)) {
       return;
@@ -459,7 +465,7 @@ export struct LevixelGallery {
     });
     setTimeout(() => {
       if (this.isActiveTransition(token)) {
-        this.hiddenSourceId = this.items[index].id;
+        this.hiddenSourceId = this.sessionItems[index].id;
         this.finishOpenTransition(index);
       }
     }, OPEN_CONTENT_FADE_DURATION_MS + 20);
@@ -467,7 +473,7 @@ export struct LevixelGallery {
 
   private finishOpenTransition(index: number): void {
     if (index === this.currentIndex) {
-      this.hiddenSourceId = this.items[index].id;
+      this.hiddenSourceId = this.sessionItems[index].id;
     }
     this.snapshotVisible = false;
     this.snapshotPixelMap = null;
@@ -482,7 +488,7 @@ export struct LevixelGallery {
     }
 
     const token: number = this.beginTransition();
-    const item: LevixelMediaItem = this.items[this.currentIndex];
+    const item: LevixelMediaItem = this.sessionItems[this.currentIndex];
     const pageState: SharedElementState | null = await this.captureViewerState(item);
     if (!this.isActiveTransition(token)) {
       return;
@@ -543,6 +549,7 @@ export struct LevixelGallery {
     this.snapshotPixelMap = null;
     this.viewerPreviewItemId = '';
     this.viewerPreviewPixelMap = null;
+    this.sessionItems = [];
     this.transitionActive = false;
     this.hiddenSourceId = '';
     this.hiddenViewerMediaId = '';
@@ -863,11 +870,11 @@ export struct LevixelGallery {
   }
 
   private syncHiddenSourceToCurrentItem(): void {
-    if (!this.viewerOpen || this.currentIndex < 0 || this.currentIndex >= this.items.length) {
+    if (!this.viewerOpen || this.currentIndex < 0 || this.currentIndex >= this.sessionItems.length) {
       this.hiddenSourceId = '';
       return;
     }
-    this.hiddenSourceId = this.items[this.currentIndex].id;
+    this.hiddenSourceId = this.sessionItems[this.currentIndex].id;
   }
 
   private sourceRectFor(item: LevixelMediaItem, index: number): RectMetrics {
@@ -891,7 +898,8 @@ export struct LevixelGallery {
   }
 
   private closeTargetRectFor(item: LevixelMediaItem): RectMetrics | null {
-    if (!this.visibleSourceIds.has(item.id)) {
+    if (!this.items.some((candidate: LevixelMediaItem): boolean => candidate.id === item.id) ||
+      !this.visibleSourceIds.has(item.id)) {
       return null;
     }
     const measured: RectMetrics | null = this.measuredSourceRectFor(item);
@@ -995,7 +1003,7 @@ export struct LevixelGallery {
     }
     const token: number = this.openingTransitionToken;
     const index: number = this.openingIndex;
-    if (!this.isActiveTransition(token) || index < 0 || index >= this.items.length) {
+    if (!this.isActiveTransition(token) || index < 0 || index >= this.sessionItems.length) {
       return;
     }
 
@@ -1036,10 +1044,35 @@ export struct LevixelGallery {
     if (item.mediaType !== LevixelMediaType.VIDEO || this.transitionActive || !this.viewerOpen) {
       return false;
     }
-    if (this.currentIndex < 0 || this.currentIndex >= this.items.length) {
+    if (this.currentIndex < 0 || this.currentIndex >= this.sessionItems.length) {
       return false;
     }
-    return this.items[this.currentIndex].id === item.id;
+    return this.sessionItems[this.currentIndex].id === item.id;
+  }
+
+  private snapshotItems(): LevixelMediaItem[] {
+    const itemIds: Set<string> = new Set<string>();
+    const snapshot: LevixelMediaItem[] = [];
+    for (let index: number = 0; index < this.items.length; index += 1) {
+      const item: LevixelMediaItem = this.items[index];
+      if (item.id.trim().length === 0) {
+        throw new Error(`Levixel items[${index}].id must be a non-empty string.`);
+      }
+      if (itemIds.has(item.id)) {
+        throw new Error(`Levixel items[${index}].id must be unique within items.`);
+      }
+      itemIds.add(item.id);
+      snapshot.push({
+        id: item.id,
+        mediaType: item.mediaType,
+        sourceUrl: item.sourceUrl,
+        thumbnailUrl: item.thumbnailUrl,
+        title: item.title,
+        aspectWidth: item.aspectWidth,
+        aspectHeight: item.aspectHeight
+      });
+    }
+    return snapshot;
   }
 
   private asPositionNumber(value: Length | undefined, fallback: number): number {

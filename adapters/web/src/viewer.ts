@@ -195,6 +195,7 @@ export class LevixelWebViewer {
     this.announceIndex();
     return {
       index: this.currentIndex,
+      itemId: this.options.items[this.currentIndex]!.id,
       count: this.pages.length,
       galleryId: this.galleryId,
     };
@@ -250,8 +251,13 @@ export class LevixelWebViewer {
     }
     this.documentGuard.restore();
     this.host.remove();
-    if (emitDismiss)
-      this.emit('dismiss', {});
+    if (emitDismiss) {
+      this.callbacks.emit({
+        type: 'dismiss',
+        payload: {},
+        time: Date.now(),
+      });
+    }
   }
 
   private installListeners(): void {
@@ -645,7 +651,14 @@ export class LevixelWebViewer {
         this.sourceEventIndex = targetIndex;
         this.emitSourceVisibility(true, targetIndex);
       }
-      this.emit('indexChange', { currentIndex: targetIndex });
+      this.callbacks.emit({
+        type: 'indexChange',
+        payload: {
+          currentIndex: targetIndex,
+          itemId: this.options.items[targetIndex]!.id,
+        },
+        time: Date.now(),
+      });
       this.announceIndex();
       if (previousIndex !== targetIndex)
         this.pages[previousIndex]?.setActive(false);
@@ -726,7 +739,7 @@ export class LevixelWebViewer {
 
   private transitionSource(index: number): string | undefined {
     const binding = this.bindings[index];
-    return imageInfoFromElement(binding?.element ?? null)?.src
+    return imageInfoFromElement(this.sourceElement(index))?.src
       ?? binding?.preview?.src
       ?? peekImage(transitionURL(this.options.items[index]!))?.src;
   }
@@ -738,14 +751,17 @@ export class LevixelWebViewer {
       return null;
     let hint = binding.hint;
     let sourceClippingRect: LevixelRect | undefined;
-    if (binding.element) {
+    const element = this.sourceElement(index);
+    if (binding.element && !element)
+      return null;
+    if (element) {
       const liveLayout = resolveElementSourceLayout(
-        binding.element,
-        this.hiddenSource?.element === binding.element,
+        element,
+        this.hiddenSource?.element === element,
       );
       if (!liveLayout || !hint)
         return null;
-      const livePreview = imageInfoFromElement(binding.element) ?? binding.preview;
+      const livePreview = imageInfoFromElement(element) ?? binding.preview;
       hint = {
         ...hint,
         rect: liveLayout.rect,
@@ -766,11 +782,22 @@ export class LevixelWebViewer {
 
   private hideSourceElement(index: number): void {
     this.restoreSourceElement();
-    const element = this.bindings[index]?.element;
-    if (!element?.isConnected)
+    const element = this.sourceElement(index);
+    if (!element)
       return;
     this.hiddenSource = { element, visibility: element.style.visibility, index };
     element.style.visibility = 'hidden';
+  }
+
+  private sourceElement(index: number): HTMLElement | null {
+    const binding = this.bindings[index];
+    const element = binding?.element;
+    if (!element?.isConnected)
+      return null;
+    const identitySelector = binding?.identitySelector;
+    if (identitySelector && !element.matches(identitySelector))
+      return null;
+    return element;
   }
 
   private restoreSourceElement(): void {
@@ -943,11 +970,16 @@ export class LevixelWebViewer {
   }
 
   private emitSourceVisibility(hidden: boolean, index: number): void {
-    this.emit('sourceVisibilityChange', { hidden, index, galleryId: this.galleryId });
-  }
-
-  private emit(type: LevixelEvent['type'], payload: Record<string, unknown>): void {
-    this.callbacks.emit({ type, payload, time: Date.now() });
+    this.callbacks.emit({
+      type: 'sourceVisibilityChange',
+      payload: {
+        hidden,
+        index,
+        itemId: this.options.items[index]!.id,
+        galleryId: this.galleryId,
+      },
+      time: Date.now(),
+    });
   }
 
   private assertAlive(): void {

@@ -118,10 +118,11 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             return;
         }
         if (session.hidesHtmlSource()) {
-            emitSourceVisibility(true, session.currentIndex(), session.galleryId());
+            emitSourceVisibility(true, session.currentIndex(), session);
         }
         Map<String, Object> data = new HashMap<>();
         data.put("index", session.currentIndex());
+        data.put("itemId", session.itemIdAt(session.currentIndex()));
         data.put("count", session.itemCount());
         data.put("galleryId", session.galleryId());
         invoke(takeOpenCallback(), ok(data));
@@ -144,10 +145,13 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             return;
         }
         if (session.hidesHtmlSource()) {
-            emitSourceVisibility(false, previousIndex, session.galleryId());
-            emitSourceVisibility(true, currentIndex, session.galleryId());
+            emitSourceVisibility(false, previousIndex, session);
+            emitSourceVisibility(true, currentIndex, session);
         }
-        emit("indexChange", mapOf("currentIndex", currentIndex));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("currentIndex", currentIndex);
+        payload.put("itemId", session.itemIdAt(currentIndex));
+        emit("indexChange", payload);
     }
 
     @Override
@@ -157,7 +161,7 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         }
         activeSession = null;
         if (session.hidesHtmlSource()) {
-            emitSourceVisibility(false, session.currentIndex(), session.galleryId());
+            emitSourceVisibility(false, session.currentIndex(), session);
         }
         if (emitDismissEvent) {
             emit("dismiss", new HashMap<>());
@@ -218,11 +222,16 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         }
     }
 
-    private void emitSourceVisibility(boolean hidden, int index, @NonNull String galleryId) {
+    private void emitSourceVisibility(
+            boolean hidden,
+            int index,
+            @NonNull LevixelUniSession session
+    ) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("hidden", hidden);
         payload.put("index", index);
-        payload.put("galleryId", galleryId);
+        payload.put("itemId", session.itemIdAt(index));
+        payload.put("galleryId", session.galleryId());
         emit("sourceVisibilityChange", payload);
     }
 

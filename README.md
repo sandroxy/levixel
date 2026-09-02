@@ -71,8 +71,9 @@ LevixelMediaItem item = new LevixelMediaItem(
 );
 
 List<LevixelMediaItem> items = Collections.singletonList(item);
+String galleryId = "article-gallery";
 LevixelSourceViewRegistry.register(
-        LevixelSharedElementNames.forItem(item),
+        LevixelSharedElementNames.forItem(galleryId, item),
         sourceImageView
 );
 
@@ -81,11 +82,17 @@ LevixelViewerOverlayView viewer = new LevixelViewerOverlayView(
         items,
         0,
         false,
-        null,
+        galleryId,
         null
 );
 rootView.addView(viewer);
 ```
+
+动态或可复用列表中，每项都应保持唯一、稳定的媒体 `id`，并用同一个
+`galleryId` 注册当前可见的 `ImageView`。cell 重新绑定前先调用
+`LevixelSourceViewRegistry.unregisterView(imageView)`，再以新媒体身份注册。
+查看器会复制打开时的媒体数组作为会话快照；关闭时按稳定 ID 查找最新注册且
+可见的源视图，源已卸载时采用淡出，不会回到同下标的其他 cell。
 
 为获得完整的系统栏转场效果，宿主页面应采用 edge-to-edge，并将系统返回事件交给 `viewer.requestClose()`。
 
@@ -109,7 +116,10 @@ let items: [LevixelMediaItem] = [
     .video(url: videoURL, poster: posterURL)
 ]
 
-let dataSource = LevixelArrayDataSource(items: items)
+let dataSource = LevixelArrayDataSource(
+    items: items,
+    itemIdentifiers: ["cover", "video"]
+)
 imageView.setupLevixelViewer(
     dataSource: dataSource,
     initialIndex: 0,
@@ -118,7 +128,7 @@ imageView.setupLevixelViewer(
 )
 ```
 
-多项列表中，每个当前可见的源 `UIImageView` 都应使用同一个 `dataSource` 和 `galleryId`，并传入自身对应的 `initialIndex`。可复用 cell 在重新绑定内容前应调用 `removeLevixelViewerInteraction()`。
+多项列表中，每个当前可见的源 `UIImageView` 都应使用同一个 `dataSource` 和 `galleryId`，并传入自身对应的 `initialIndex`。稳定 `itemIdentifiers` 用于在前插、删除或重排后找到正确回场源；数据顺序变化时应以最新快照重新配置当前可见 cell。可复用 cell 在重新绑定内容前应调用 `removeLevixelViewerInteraction()`。
 
 Swift Package 会验证下载的 XCFramework 与 `Package.swift` 中记录的 checksum 一致。
 
@@ -143,11 +153,11 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-该包同时提供 React Native 集成层和所需的 Android/iOS 原生运行时，无需再单独接入原生核心。组件接口与宿主要求见 [React Native 适配器文档](adapters/react-native/README.md)。
+该包同时提供 React Native 集成层和所需的 Android/iOS 原生运行时，无需再单独接入原生核心。动态、分页或虚拟列表使用 `Levixel.Source itemId` 按稳定媒体身份绑定当前已挂载 cell；组件接口与宿主要求见 [React Native 适配器文档](adapters/react-native/README.md)。
 
 ## UniApp
 
-推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
+推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。动态列表可用 `initialItemId + sourceBindings` 只绑定当前已挂载源。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
 
 完整兼容范围、加载态接入和示例见 [UniApp 使用说明](uni_modules/Sandrox-Levixel/readme.md)。对应版本的 GitHub Release 也提供 UTS ZIP 与校验和，供直接下载和离线归档。
 
@@ -159,7 +169,7 @@ npx expo prebuild
 pnpm add @sandrox/levixel-web
 ```
 
-Web 包使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制。它默认使用 `sourceVisibility: hidden`，不会改变 UniApp 专属的 `visible` 默认值。
+Web 包使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体元素实现共享转场、分页、缩放、平移、竖拖关闭和视频控制，并支持按稳定 ID 绑定稀疏虚拟列表源。它默认使用 `sourceVisibility: hidden`，不会改变 UniApp 专属的 `visible` 默认值。
 
 已验证的浏览器范围包括 macOS Chrome、macOS Safari、Android Chrome 与 iOS Safari。API、浏览器边界和无障碍行为见 [Web 使用说明](adapters/web/README.md)。
 

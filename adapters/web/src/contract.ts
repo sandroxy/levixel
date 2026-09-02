@@ -4,6 +4,7 @@ import type {
   LevixelOpenOptions,
   LevixelRect,
   LevixelSelectorOpenOptions,
+  LevixelSelectorSourceBinding,
   LevixelSelectorSourceStyle,
   LevixelSize,
   LevixelSourceHint,
@@ -23,10 +24,12 @@ const OPEN_KEYS = new Set([
 const SELECTOR_KEYS = new Set([
   'items',
   'index',
+  'initialItemId',
   'theme',
   'sourceVisibility',
   'sourceSelector',
   'sourceStyles',
+  'sourceBindings',
 ]);
 const ITEM_KEYS = new Set([
   'id',
@@ -49,6 +52,7 @@ const HINT_KEYS = new Set([
 const RECT_KEYS = new Set(['left', 'top', 'width', 'height']);
 const SIZE_KEYS = new Set(['width', 'height']);
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius']);
+const SOURCE_BINDING_KEYS = new Set(['itemId', 'selector', 'objectFit', 'cornerRadius']);
 
 export class LevixelContractError extends Error {
   readonly code: string;
@@ -88,7 +92,7 @@ function rejectUnknownKeys(
 }
 
 function requireNonEmptyString(value: unknown, path: string): string {
-  if (typeof value !== 'string' || value.length === 0)
+  if (typeof value !== 'string' || value.trim().length === 0)
     contractError(path, `${path} must be a non-empty string`);
   return value;
 }
@@ -177,6 +181,32 @@ function normalizeIndex(value: unknown, itemCount: number): number {
   const index = value === undefined ? 0 : value;
   if (!Number.isInteger(index) || typeof index !== 'number' || index < 0 || index >= itemCount)
     contractError('$.index', '$.index must reference an item in $.items');
+  return index;
+}
+
+function normalizeInitialIndex(
+  indexValue: unknown,
+  initialItemIdValue: unknown,
+  items: readonly LevixelMediaItem[],
+): number {
+  if (indexValue !== undefined && initialItemIdValue !== undefined) {
+    contractError(
+      '$.initialItemId',
+      '$.initialItemId cannot be combined with $.index',
+    );
+  }
+  if (initialItemIdValue === undefined)
+    return normalizeIndex(indexValue, items.length);
+
+  const initialItemId = requireNonEmptyString(initialItemIdValue, '$.initialItemId');
+  const index = items.findIndex(item => item.id === initialItemId);
+  if (index < 0) {
+    contractError(
+      '$.initialItemId',
+      '$.initialItemId must reference an item in $.items',
+      'INVALID_VALUE',
+    );
+  }
   return index;
 }
 
@@ -321,23 +351,108 @@ function normalizeSourceStyles(value: unknown, itemCount: number): LevixelSelect
   });
 }
 
+function normalizeSourceBindings(
+  value: unknown,
+  items: readonly LevixelMediaItem[],
+): Array<LevixelSelectorSourceBinding & { itemIndex: number; objectFit: LevixelObjectFit; cornerRadius: number }> | undefined {
+  if (value === undefined)
+    return undefined;
+  if (!Array.isArray(value))
+    contractError('$.sourceBindings', '$.sourceBindings must be an array');
+
+  const itemIndexes = new Map(items.map((item, index) => [item.id, index]));
+  const itemIds = new Set<string>();
+  const selectors = new Set<string>();
+  return value.map((entry, index) => {
+    const path = `$.sourceBindings[${index}]`;
+    const record = requireRecord(entry, path);
+    rejectUnknownKeys(record, SOURCE_BINDING_KEYS, path);
+    const itemId = requireNonEmptyString(record.itemId, `${path}.itemId`);
+    const itemIndex = itemIndexes.get(itemId);
+    if (itemIndex === undefined) {
+      contractError(
+        `${path}.itemId`,
+        `${path}.itemId must reference an item in $.items`,
+        'INVALID_VALUE',
+      );
+    }
+    if (itemIds.has(itemId)) {
+      contractError(
+        `${path}.itemId`,
+        `${path}.itemId must be unique within $.sourceBindings`,
+        'INVALID_VALUE',
+      );
+    }
+    itemIds.add(itemId);
+
+    const selector = requireNonEmptyString(record.selector, `${path}.selector`).trim();
+    if (!selector)
+      contractError(`${path}.selector`, `${path}.selector must be a non-empty string`);
+    if (selectors.has(selector)) {
+      contractError(
+        `${path}.selector`,
+        `${path}.selector must be unique within $.sourceBindings`,
+        'INVALID_VALUE',
+      );
+    }
+    selectors.add(selector);
+    return {
+      itemId,
+      itemIndex,
+      selector,
+      objectFit: objectFit(record.objectFit, `${path}.objectFit`, 'cover'),
+      cornerRadius: nonNegativeNumber(record.cornerRadius, `${path}.cornerRadius`, 0),
+    };
+  });
+}
+
 export function normalizeSelectorOpenOptions(
   value: LevixelSelectorOpenOptions | unknown,
 ): NormalizedSelectorOpenOptions {
   const record = requireRecord(value, '$');
   rejectUnknownKeys(record, SELECTOR_KEYS, '$');
   const items = sanitizeItems(record.items);
-  if (record.sourceSelector !== undefined && typeof record.sourceSelector !== 'string')
-    contractError('$.sourceSelector', '$.sourceSelector must be a string');
-  const normalized: NormalizedSelectorOpenOptions = {
+  if (
+    record.sourceBindings !== undefined
+    && (record.sourceSelector !== undefined || record.sourceStyles !== undefined)
+  ) {
+    contractError(
+      '$.sourceBindings',
+      '$.sourceBindings cannot be combined with $.sourceSelector or $.sourceStyles',
+    );
+  }
+  const sourceSelector = record.sourceSelector === undefined
+    ? undefined
+    : requireNonEmptyString(record.sourceSelector, '$.sourceSelector').trim();
+  if (record.sourceStyles !== undefined && sourceSelector === undefined) {
+    contractError(
+      '$.sourceStyles',
+      '$.sourceStyles requires $.sourceSelector',
+      'INVALID_VALUE',
+    );
+  }
+  const normalizedBase = {
     items,
-    index: normalizeIndex(record.index, items.length),
+    index: normalizeInitialIndex(record.index, record.initialItemId, items),
     theme: normalizeTheme(record.theme),
     sourceVisibility: normalizeSourceVisibility(record.sourceVisibility),
+  };
+  const sourceBindings = normalizeSourceBindings(record.sourceBindings, items);
+  if (sourceBindings !== undefined) {
+    return {
+      ...normalizedBase,
+      sourceMode: 'identified',
+      sourceBindings,
+    };
+  }
+
+  const normalized: NormalizedSelectorOpenOptions = {
+    ...normalizedBase,
+    sourceMode: 'positional',
     sourceStyles: normalizeSourceStyles(record.sourceStyles, items.length),
   };
-  if (typeof record.sourceSelector === 'string')
-    normalized.sourceSelector = record.sourceSelector;
+  if (sourceSelector !== undefined)
+    normalized.sourceSelector = sourceSelector;
   return normalized;
 }
 

@@ -129,7 +129,10 @@ class LevixelView(context: Context) : ViewGroup(context) {
                 }
 
                 override fun onOverlayIndexChange(index: Int) {
-                    onIndexChange(mapOf("currentIndex" to index))
+                    onIndexChange(mapOf(
+                        "currentIndex" to index,
+                        "itemId" to mediaItems[index].id
+                    ))
                 }
             }
         )

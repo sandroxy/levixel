@@ -44,10 +44,62 @@
         results.push(result);
         return result;
       };
+      const openIdentifiedPrepend = async () => {
+        const prepended = {
+          id: 'prepended',
+          type: 'image',
+          url: svg(1200, 800, '#596b42', 'PREPENDED'),
+          width: 1200,
+          height: 800,
+          alt: 'Prepended item without a mounted source',
+        };
+        const result = await openLevixelFromSelector({
+          items: [prepended, ...items],
+          initialItemId: 'wide',
+          sourceBindings: [
+            { itemId: 'video', selector: '[data-item-id="video"]', cornerRadius: 12 },
+            { itemId: 'wide', selector: '[data-item-id="wide"]', cornerRadius: 12 },
+          ],
+        });
+        results.push(result);
+        return result;
+      };
+      const openIdentifiedAppend = async () => {
+        const appended = {
+          id: 'appended',
+          type: 'image',
+          url: svg(1200, 800, '#76547d', 'APPENDED'),
+          thumbnailUrl: svg(300, 200, '#76547d', 'APPENDED'),
+          width: 1200,
+          height: 800,
+          alt: 'Appended item',
+        };
+        let source = document.querySelector('[data-item-id="appended"]');
+        if (!source) {
+          source = document.createElement('button');
+          source.className = 'appended-source';
+          source.dataset.itemId = appended.id;
+          const image = document.createElement('img');
+          image.src = appended.thumbnailUrl;
+          image.alt = appended.alt;
+          source.append(image);
+          sources.append(source);
+        }
+        const result = await openLevixelFromSelector({
+          items: [...items, appended],
+          initialItemId: appended.id,
+          sourceBindings: [
+            { itemId: appended.id, selector: '[data-item-id="appended"]', cornerRadius: 12 },
+          ],
+        });
+        results.push(result);
+        return result;
+      };
       items.forEach((item, index) => {
         const button = document.createElement('button');
         button.className = 'source';
         button.dataset.index = String(index);
+        button.dataset.itemId = item.id;
         const image = document.createElement('img');
         image.src = item.thumbnailUrl;
         image.alt = item.alt;
@@ -55,7 +107,17 @@
         onLevixelSourceActivate(button, () => void open(index));
         sources.append(button);
       });
-      window.levixelFixture = { events, results, closeLevixel, openLevixel, open, items };
+      window.levixelFixture = {
+        events,
+        results,
+        closeLevixel,
+        openLevixel,
+        openLevixelFromSelector,
+        open,
+        openIdentifiedAppend,
+        openIdentifiedPrepend,
+        items,
+      };
     </script>
   </body>
 </html>

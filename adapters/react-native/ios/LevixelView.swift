@@ -87,7 +87,10 @@ final class LevixelView: ExpoView {
         let safeIndex = min(max(0, initialIndex), media.items.count - 1)
         var configuration = LevixelViewerConfiguration(theme: theme.viewerTheme)
         configuration.onIndexChange = { [weak self] index in
-            self?.onIndexChange(["currentIndex": index])
+            self?.onIndexChange([
+                "currentIndex": index,
+                "itemId": media.itemIdentifiers[index],
+            ])
         }
         imageView.setupLevixelViewer(
             dataSource: LevixelArrayDataSource(

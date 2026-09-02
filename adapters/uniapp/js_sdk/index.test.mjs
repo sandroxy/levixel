@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises'
 const registryKey = '__sandrox_levixel_saved_previews_v1__'
 const defaultPreviewBytes = 256 * 1024
 let measuredRects = []
+const measuredRectsBySelector = new Map()
+const measuredRectsByQueryContext = new Map()
+const selectorQueryContexts = []
 let nativeOpenOptions
 let nativeEventCallback
 let activeImageInfoRequests = 0
@@ -60,7 +63,16 @@ globalThis.plus = {
 const nativePlugin = {
   open(options, callback) {
     nativeOpenOptions = options
-    callback({ ok: true, data: { index: options.index ?? 0, count: options.items.length } })
+    const index = options.index ?? 0
+    callback({
+      ok: true,
+      data: {
+        index,
+        itemId: options.items[index].id,
+        count: options.items.length,
+        galleryId: 'test-gallery',
+      },
+    })
   },
   close(_options, callback) {
     callback({ ok: true, data: { closed: true } })
@@ -143,17 +155,39 @@ globalThis.uni = {
     return { platform: 'android', pixelRatio: 3 }
   },
   createSelectorQuery() {
+    const measurements = []
+    let queryContext
     return {
+      in(context) {
+        if (context.rejectSelectorQuery)
+          throw new Error('invalid component instance')
+        if (context.returnUndefinedSelectorQuery)
+          return undefined
+        queryContext = context
+        selectorQueryContexts.push(context)
+        return this
+      },
       selectAll(selector) {
-        assert.equal(selector, '.source')
+        if (selector === '[')
+          throw new Error('invalid selector')
+        this.selector = selector
         return this
       },
       boundingClientRect(callback) {
-        this.rectCallback = callback
+        measurements.push({ selector: this.selector, callback })
         return this
       },
-      exec() {
-        this.rectCallback(measuredRects)
+      exec(callback) {
+        measurements.forEach((measurement) => {
+          const contextMeasurements = measuredRectsByQueryContext.get(queryContext)
+          const rects = contextMeasurements?.get(measurement.selector)
+            || (measurement.selector === '.source'
+              ? measuredRects
+              : (measuredRectsBySelector.get(measurement.selector) || []))
+          measurement.callback(rects)
+        })
+        if (callback)
+          callback(measurements.map(measurement => measuredRectsBySelector.get(measurement.selector) || []))
       },
     }
   },
@@ -245,7 +279,7 @@ const result = await sdk.openLevixelFromSelector({
   ],
 })
 
-assert.deepEqual(result, { index: 1, count: 2 })
+assert.deepEqual(result, { index: 1, itemId: 'video-1', count: 2, galleryId: 'test-gallery' })
 assert.equal(imageInfoRequests.length, 0)
 assert.equal(nativeOpenOptions.items[0].thumbnailUrl, `file:///native/${downloadedPreviews[0].savedFilePath}`)
 assert.equal(nativeOpenOptions.items[1].posterUrl, `file:///native/${downloadedPreviews[1].savedFilePath}`)
@@ -309,10 +343,209 @@ await assert.rejects(
   }),
   /\$\.items\[1\]\.id must be unique within \$\.items/,
 )
+await assert.rejects(
+  sdk.openLevixelFromSelector({
+    items: [{ ...items[0], id: '   ' }],
+    sourceSelector: '.source',
+  }),
+  /\$\.items\[0\]\.id must be a non-empty string/,
+)
 
 measuredRects = [measuredRects[0]]
 await sdk.openLevixelFromSelector({ items, sourceSelector: '.source' })
 assert.deepEqual(nativeOpenOptions.sourceHints, [null, null])
+
+const prependedItem = {
+  id: 'prepended-image',
+  type: 'image',
+  url: 'https://example.com/prepended-image.jpg',
+}
+const dynamicItems = [prependedItem, ...items]
+measuredRectsBySelector.set('#image-source', [
+  { left: 14, top: 50, width: 100, height: 150 },
+])
+measuredRectsBySelector.set('#video-source', [
+  { left: 130, top: 50, width: 160, height: 90 },
+])
+await sdk.openLevixelFromSelector({
+  items: dynamicItems,
+  initialItemId: items[1].id,
+  sourceBindings: [
+    { itemId: items[1].id, selector: '#video-source', objectFit: 'contain' },
+    { itemId: items[0].id, selector: '#image-source', cornerRadius: 8 },
+  ],
+})
+assert.equal(nativeOpenOptions.index, 2)
+assert.equal(nativeOpenOptions.sourceHints.length, 3)
+assert.equal(nativeOpenOptions.sourceHints[0], null)
+assert.deepEqual(nativeOpenOptions.sourceHints[1].rect, measuredRectsBySelector.get('#image-source')[0])
+assert.equal(nativeOpenOptions.sourceHints[1].cornerRadius, 8)
+assert.deepEqual(nativeOpenOptions.sourceHints[2].rect, measuredRectsBySelector.get('#video-source')[0])
+assert.equal(nativeOpenOptions.sourceHints[2].objectFit, 'contain')
+
+await sdk.openLevixelFromSelector({
+  items,
+  initialItemId: items[0].id,
+  sourceBindings: [],
+})
+assert.equal(nativeOpenOptions.index, 0)
+assert.deepEqual(nativeOpenOptions.sourceHints, [null, null])
+
+measuredRectsBySelector.set('#unmounted', [])
+await sdk.openLevixelFromSelector({
+  items: [items[0], prependedItem, items[1]],
+  initialItemId: items[1].id,
+  sourceBindings: [
+    { itemId: prependedItem.id, selector: '#unmounted' },
+    { itemId: items[1].id, selector: '#video-source' },
+  ],
+})
+assert.equal(nativeOpenOptions.index, 2)
+assert.deepEqual(nativeOpenOptions.sourceHints.map(Boolean), [false, false, true])
+
+const imageCellContext = {}
+const videoCellContext = {}
+measuredRectsByQueryContext.set(imageCellContext, new Map([
+  ['.cell-source', [{ left: 20, top: 70, width: 80, height: 120 }]],
+]))
+measuredRectsByQueryContext.set(videoCellContext, new Map([
+  ['.cell-source', [{ left: 120, top: 70, width: 140, height: 80 }]],
+]))
+await sdk.openLevixelFromSelector({
+  items,
+  initialItemId: items[0].id,
+  sourceBindings: [
+    { itemId: items[0].id, selector: '.cell-source', queryContext: imageCellContext },
+    { itemId: items[1].id, selector: '.cell-source', queryContext: videoCellContext },
+  ],
+})
+assert.deepEqual(nativeOpenOptions.sourceHints[0].rect, measuredRectsByQueryContext.get(imageCellContext).get('.cell-source')[0])
+assert.deepEqual(nativeOpenOptions.sourceHints[1].rect, measuredRectsByQueryContext.get(videoCellContext).get('.cell-source')[0])
+assert.ok(selectorQueryContexts.includes(imageCellContext))
+assert.ok(selectorQueryContexts.includes(videoCellContext))
+
+const galleryComponentContext = {}
+measuredRectsByQueryContext.set(galleryComponentContext, new Map([
+  ['.source', [
+    { left: 12, top: 40, width: 120, height: 180 },
+    { left: 144, top: 40, width: 180, height: 120 },
+  ]],
+]))
+await sdk.openLevixelFromSelector({
+  items,
+  index: 0,
+  sourceSelector: '.source',
+  queryContext: galleryComponentContext,
+})
+assert.equal(selectorQueryContexts.at(-1), galleryComponentContext)
+assert.deepEqual(nativeOpenOptions.sourceHints.map(Boolean), [true, true])
+
+for (const [options, pattern] of [
+  [
+    { items, index: 0, initialItemId: items[0].id },
+    /initialItemId cannot be combined with \$\.index/,
+  ],
+  [
+    { items, initialItemId: 'missing' },
+    /initialItemId must reference an item/,
+  ],
+  [
+    {
+      items,
+      sourceSelector: '.source',
+      sourceBindings: [{ itemId: items[0].id, selector: '#image-source' }],
+    },
+    /sourceBindings cannot be combined with sourceSelector or sourceStyles/,
+  ],
+  [
+    { items, sourceStyles: [{}] },
+    /sourceStyles requires \$\.sourceSelector/,
+  ],
+  [
+    { items, sourceSelector: '   ' },
+    /sourceSelector must be a non-empty string/,
+  ],
+  [
+    { items, sourceSelector: '[' },
+    /sourceSelector is not valid/,
+  ],
+  [
+    {
+      items,
+      sourceBindings: [{ itemId: 'missing', selector: '#image-source' }],
+    },
+    /sourceBindings\[0\]\.itemId must reference an item/,
+  ],
+  [
+    {
+      items,
+      sourceBindings: [
+        { itemId: items[0].id, selector: '#image-source' },
+        { itemId: items[0].id, selector: '#other-source' },
+      ],
+    },
+    /sourceBindings\[1\]\.itemId must be unique/,
+  ],
+  [
+    {
+      items,
+      sourceBindings: [
+        { itemId: items[0].id, selector: '#shared-source' },
+        { itemId: items[1].id, selector: '#shared-source' },
+      ],
+    },
+    /sourceBindings\[1\]\.selector must be unique/,
+  ],
+  [
+    { items, queryContext: 'component' },
+    /queryContext requires \$\.sourceSelector or \$\.sourceBindings/,
+  ],
+  [
+    { items, sourceSelector: '.source', queryContext: 'component' },
+    /queryContext must be a component instance/,
+  ],
+  [
+    { items, sourceSelector: '.source', queryContext: [] },
+    /queryContext must be a component instance/,
+  ],
+  [
+    { items, sourceSelector: '.source', queryContext: () => {} },
+    /queryContext must be a component instance/,
+  ],
+  [
+    {
+      items,
+      sourceBindings: [{
+        itemId: items[0].id,
+        selector: '.cell-source',
+        queryContext: { rejectSelectorQuery: true },
+      }],
+    },
+    /sourceBindings\[0\]\.queryContext is not a valid selector query context/,
+  ],
+  [
+    {
+      items,
+      sourceBindings: [{
+        itemId: items[0].id,
+        selector: '.cell-source',
+        queryContext: { returnUndefinedSelectorQuery: true },
+      }],
+    },
+    /sourceBindings\[0\]\.queryContext is not a valid selector query context/,
+  ],
+]) {
+  await assert.rejects(sdk.openLevixelFromSelector(options), pattern)
+}
+
+measuredRectsBySelector.set('#ambiguous-source', [measuredRects[0], measuredRects[0]])
+await assert.rejects(
+  sdk.openLevixelFromSelector({
+    items,
+    sourceBindings: [{ itemId: items[0].id, selector: '#ambiguous-source' }],
+  }),
+  /sourceBindings\[0\]\.selector must match at most one element/,
+)
 
 let receivedEvent
 const removeListener = sdk.onLevixelEvent((event) => {
@@ -322,7 +555,11 @@ nativeEventCallback({ type: 'dismiss', payload: {}, time: 1 })
 assert.deepEqual(receivedEvent, { type: 'dismiss', payload: {}, time: 1 })
 removeListener()
 receivedEvent = undefined
-nativeEventCallback({ type: 'indexChange', payload: { currentIndex: 1 }, time: 2 })
+nativeEventCallback({
+  type: 'indexChange',
+  payload: { currentIndex: 1, itemId: 'video-1' },
+  time: 2,
+})
 assert.equal(receivedEvent, undefined)
 
 const priorityItems = ['a', 'b', 'c'].map(id => ({
@@ -457,9 +694,15 @@ utsSdk.__setLevixelNativeTransport({
   invoke(method, options) {
     injectedCalls.push({ method, options })
     if (method === 'open') {
+      const index = options.index ?? 0
       return Promise.resolve({
         ok: true,
-        data: { index: options.index ?? 0, count: options.items.length },
+        data: {
+          index,
+          itemId: options.items[index].id,
+          count: options.items.length,
+          galleryId: 'test-gallery',
+        },
       })
     }
     return Promise.resolve({ ok: true, data: { closed: true } })
@@ -470,11 +713,16 @@ utsSdk.__setLevixelNativeTransport({
   },
 })
 
-const legacyInjectedOptions = { items, index: 1 }
-assert.deepEqual(await utsSdk.openLevixel(legacyInjectedOptions), { index: 1, count: 2 })
+const injectedOptions = { items, index: 1 }
+assert.deepEqual(await utsSdk.openLevixel(injectedOptions), {
+  index: 1,
+  itemId: 'video-1',
+  count: 2,
+  galleryId: 'test-gallery',
+})
 assert.deepEqual(await utsSdk.closeLevixel(), { closed: true })
 assert.deepEqual(injectedCalls.map(call => call.method), ['open', 'close'])
-assert.equal(injectedCalls[0].options, legacyInjectedOptions)
+assert.equal(injectedCalls[0].options, injectedOptions)
 
 let injectedEvent
 const removeInjectedListener = utsSdk.onLevixelEvent((event) => {
@@ -610,9 +858,15 @@ vaporSdk.__setLevixelNativeTransport({
   invoke(method, options) {
     vaporNativeCalls.push({ method, options })
     if (method === 'open') {
+      const index = options.index ?? 0
       return {
         ok: true,
-        data: { index: options.index ?? 0, count: options.items.length },
+        data: {
+          index,
+          itemId: options.items[index].id,
+          count: options.items.length,
+          galleryId: 'test-gallery',
+        },
       }
     }
     return { ok: true, data: { closed: true } }
@@ -701,7 +955,12 @@ const directVaporOptions = Object.freeze({
 })
 const directVaporSnapshot = JSON.parse(JSON.stringify(directVaporOptions))
 const directCallStart = vaporNativeCalls.length
-assert.deepEqual(await vaporSdk.openLevixel(directVaporOptions), { index: 0, count: 3 })
+assert.deepEqual(await vaporSdk.openLevixel(directVaporOptions), {
+  index: 0,
+  itemId: 'local-paths',
+  count: 3,
+  galleryId: 'test-gallery',
+})
 assert.equal(vaporNativeCalls.length, directCallStart + 1)
 const directVaporCall = vaporNativeCalls.at(-1)
 assert.deepEqual(directVaporOptions, directVaporSnapshot)
@@ -739,7 +998,12 @@ const batchItems = Array.from({ length: 18 }, (_, index) => ({
   thumbnailUrl: '/static/shared-thumbnail.jpg',
 }))
 const batchStart = vaporResolveBatches.length
-assert.deepEqual(await vaporSdk.openLevixel({ items: batchItems }), { index: 0, count: 18 })
+assert.deepEqual(await vaporSdk.openLevixel({ items: batchItems }), {
+  index: 0,
+  itemId: 'batch-0',
+  count: 18,
+  galleryId: 'test-gallery',
+})
 assert.equal(vaporResolveBatches.length, batchStart + 1)
 assert.equal(vaporResolveBatches.at(-1).length, 19)
 assert.equal(vaporResolveBatches.at(-1).filter(path => path === '/static/shared-thumbnail.jpg').length, 1)
@@ -785,9 +1049,17 @@ let failedVaporNativeOptions
 failedVaporSdk.__setLevixelNativeTransport({
   invoke(method, options) {
     failedVaporNativeOptions = options
+    const index = options.index ?? 0
     return {
       ok: true,
-      data: method === 'open' ? { index: 0, count: options.items.length } : { closed: true },
+      data: method === 'open'
+        ? {
+            index,
+            itemId: options.items[index].id,
+            count: options.items.length,
+            galleryId: 'test-gallery',
+          }
+        : { closed: true },
     }
   },
   resolvePaths(paths) {
@@ -946,10 +1218,13 @@ await executableUtsWrapper.warmupLevixelItem(
 await executableUtsWrapper.openLevixelFromSelector({
   items: [utsTypedImage],
   index: null,
+  initialItemId: null,
   theme: null,
   sourceVisibility: null,
   sourceSelector: null,
-  sourceStyles: [{ objectFit: null, cornerRadius: null }],
+  sourceStyles: null,
+  sourceBindings: null,
+  queryContext: null,
 })
 const normalizedUtsTypedSelectorOpen = globalThis.__levixelWrapperNativeCalls[3]
 assert.equal(normalizedUtsTypedSelectorOpen.items[0].posterUrl, undefined)
@@ -960,6 +1235,48 @@ assert.equal(normalizedUtsTypedSelectorOpen.index, 0)
 assert.equal(normalizedUtsTypedSelectorOpen.theme, 'dark')
 assert.equal(normalizedUtsTypedSelectorOpen.sourceVisibility, 'visible')
 assert.deepEqual(normalizedUtsTypedSelectorOpen.sourceHints, [null])
+
+globalThis.uni.createSelectorQuery = () => {
+  let measurement
+  return {
+    selectAll(selector) {
+      assert.equal(selector, '.source')
+      return this
+    },
+    boundingClientRect(callback) {
+      measurement = callback
+      return this
+    },
+    exec(callback) {
+      measurement([{ left: 10, top: 20, width: 120, height: 160 }])
+      callback()
+    },
+  }
+}
+await executableUtsWrapper.openLevixelFromSelector({
+  items: [utsTypedImage],
+  initialItemId: utsTypedImage.id,
+  sourceBindings: [{
+    itemId: utsTypedImage.id,
+    selector: '.source',
+    objectFit: null,
+    cornerRadius: null,
+    queryContext: null,
+  }],
+  queryContext: null,
+})
+const normalizedUtsTypedBindingOpen = globalThis.__levixelWrapperNativeCalls[4]
+assert.equal(normalizedUtsTypedBindingOpen.index, 0)
+assert.equal(normalizedUtsTypedBindingOpen.sourceHints[0].objectFit, 'cover')
+assert.equal(normalizedUtsTypedBindingOpen.sourceHints[0].cornerRadius, 0)
+assert.deepEqual(normalizedUtsTypedBindingOpen.sourceHints[0].rect, {
+  left: 10,
+  top: 20,
+  width: 120,
+  height: 160,
+})
+assert.equal('sourceBindings' in normalizedUtsTypedBindingOpen, false)
+assert.equal('queryContext' in normalizedUtsTypedBindingOpen, false)
 assert.throws(
   () => executableUtsWrapper.warmupLevixelItem({
     ...utsTypedImage,

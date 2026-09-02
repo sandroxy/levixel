@@ -90,6 +90,24 @@ for public_api in \
   fi
 done
 
+for dynamic_api in initialItemId sourceBindings queryContext; do
+  if ! grep -Fq "${dynamic_api}" "${marketplace_readme}"; then
+    echo "UniApp user documentation is missing dynamic-list API ${dynamic_api}." >&2
+    exit 1
+  fi
+done
+
+if ! grep -Eq '<Levixel\.Source[^>]*itemId=' "${plugin_dir}/adapters/react-native/README.md"; then
+  echo "React Native documentation must recommend stable itemId source binding." >&2
+  exit 1
+fi
+for dynamic_api in initialItemId sourceBindings; do
+  if ! grep -Fq "${dynamic_api}" "${plugin_dir}/adapters/web/README.md"; then
+    echo "Web documentation is missing dynamic-list API ${dynamic_api}." >&2
+    exit 1
+  fi
+done
+
 if grep -Fq "readyItems" "${marketplace_readme}"; then
   echo "UniApp examples must not gate opening on thumbnail readiness." >&2
   exit 1

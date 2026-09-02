@@ -32,7 +32,7 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-每个渲染源元素必须与 `items` 使用相同的选择器和顺序。为获得确定的共享转场，可提前准备当前可见或即将进入视口的媒体，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。大列表不得一次准备全部项目；批量准备应限制并发，选中项可传入 `priority: true`。
+动态、分页或虚拟列表应使用 `initialItemId` 和 `sourceBindings`，只描述当前已挂载源；SDK 按稳定媒体 ID 将稀疏、乱序绑定转换为与 `items` 等长的严格 `sourceHints` 快照。页面源不需要查询上下文；整体自定义组件可传顶层 `queryContext`，分散在多个 cell 组件时可为每个 binding 指定各自上下文。固定且完整渲染的画廊仍可使用 `sourceSelector` 与 `sourceStyles`。初始媒体的 `index`/`initialItemId` 选择和源映射方式彼此独立，但各组内部严格互斥。为获得确定的共享转场，可提前准备当前可见或即将进入视口的媒体，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。大列表不得一次准备全部项目；批量准备应限制并发，选中项可传入 `priority: true`。
 
 部分 UniApp runtime 会为不同 `getImageInfo` 请求复用同一个临时路径，因此 SDK 会把远程预览保存为各自独立的受管文件。经典分支沿用 `uni.saveFile`；x 分支使用 `uni.getFileSystemManager().saveFile` / `removeSavedFile`。保存失败时只保留可靠的宽高信息，不缓存、传递或清理该非自有临时路径；查看器仍可按正式媒体 URL 进入原生加载态，避免跨媒体复用临时路径造成错图。JS→UTS transport 会收集并去重 `url`、`thumbnailUrl`、`posterUrl` 中的本地路径，再通过一次批量调用解析；HTTP(S)、`data:` 和已经是 `file:` 的 URL 原样保留。Android 对代码包 `static/` 与 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其余本地路径使用 `convert2AbsFullPath`；iOS 使用 `UTSiOS.convert2AbsFullPath`。单项解析异常会回退原值，且 native `open` 始终只调用一次。
 
@@ -48,11 +48,17 @@ warmupLevixelItem(item, loadEvent)
 
 await openLevixelFromSelector({
   items,
-  index,
-  sourceSelector: '.levixel-source',
-  sourceStyles: items.map(() => ({ objectFit: 'cover', cornerRadius: 6 })),
+  initialItemId: selectedItem.id,
+  sourceBindings: mountedItems.map(item => ({
+    itemId: item.id,
+    selector: `#levixel-source-${item.id}`,
+    objectFit: 'cover',
+    cornerRadius: 6,
+  })),
 })
 ```
+
+一次打开使用当时已加载的 `items` 作为不可变会话快照。宿主随后前插或后追加的数据会在下一次打开时生效；查看器不会在全屏会话内部代替业务层请求下一页。绑定不存在或源已卸载时只让对应项取消源转场，不能回退到同下标的其他 cell。
 
 在 uni-app x App Vapor 中，可见源元素应使用与上例数值一致的 `border-radius: 6px`。当前 Vapor 的 `border-radius` 不支持 `rpx`；使用 `rpx` 会让源视图在转场期间失去圆角，而 native hint 仍按数值插值，形成短暂的直角闪变。经典 uni-app 的 CSS 处理不受此限制。
 

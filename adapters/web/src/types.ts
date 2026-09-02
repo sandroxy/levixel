@@ -51,6 +51,11 @@ export interface LevixelSelectorSourceStyle {
   cornerRadius?: number;
 }
 
+export interface LevixelSelectorSourceBinding extends LevixelSelectorSourceStyle {
+  itemId: string;
+  selector: string;
+}
+
 export interface LevixelPrepareOptions {
   priority?: boolean;
 }
@@ -61,23 +66,62 @@ export interface LevixelPreparedPreview {
   height: number;
 }
 
-export interface LevixelSelectorOpenOptions {
+interface LevixelSelectorOpenOptionsBase {
   items: LevixelMediaItem[];
-  index?: number;
   theme?: LevixelTheme;
   sourceVisibility?: LevixelSourceVisibility;
-  sourceSelector?: string;
-  sourceStyles?: LevixelSelectorSourceStyle[];
 }
 
-export interface LevixelEvent {
-  type: 'ready' | 'indexChange' | 'sourceVisibilityChange' | 'dismiss';
-  payload: Record<string, unknown>;
-  time: number;
-}
+type LevixelSelectorInitialSelection =
+  | { index?: number; initialItemId?: never }
+  | { index?: never; initialItemId: string };
+
+type LevixelSelectorSources =
+  | {
+      sourceSelector?: never;
+      sourceStyles?: never;
+      sourceBindings?: never;
+    }
+  | {
+      sourceSelector: string;
+      sourceStyles?: LevixelSelectorSourceStyle[];
+      sourceBindings?: never;
+    }
+  | {
+      sourceSelector?: never;
+      sourceStyles?: never;
+      sourceBindings: LevixelSelectorSourceBinding[];
+    };
+
+export type LevixelSelectorOpenOptions = LevixelSelectorOpenOptionsBase
+  & LevixelSelectorInitialSelection
+  & LevixelSelectorSources;
+
+export type LevixelEvent =
+  | {
+      type: 'ready';
+      payload: Record<string, unknown>;
+      time: number;
+    }
+  | {
+      type: 'indexChange';
+      payload: { currentIndex: number; itemId: string };
+      time: number;
+    }
+  | {
+      type: 'sourceVisibilityChange';
+      payload: { hidden: boolean; index: number; itemId: string; galleryId: string };
+      time: number;
+    }
+  | {
+      type: 'dismiss';
+      payload: Record<string, never>;
+      time: number;
+    };
 
 export interface LevixelOpenResult {
   index: number;
+  itemId: string;
   count: number;
   galleryId: string;
 }
@@ -94,13 +138,33 @@ export interface NormalizedOpenOptions {
   sourceVisibility: LevixelSourceVisibility;
 }
 
-export interface NormalizedSelectorOpenOptions {
+interface NormalizedSelectorOpenOptionsBase {
   items: LevixelMediaItem[];
   index: number;
   theme: LevixelTheme;
   sourceVisibility: LevixelSourceVisibility;
-  sourceSelector?: string;
-  sourceStyles: LevixelSelectorSourceStyle[];
+}
+
+export type NormalizedSelectorOpenOptions =
+  | (NormalizedSelectorOpenOptionsBase & {
+      sourceMode: 'positional';
+      sourceSelector?: string;
+      sourceStyles: LevixelSelectorSourceStyle[];
+      sourceBindings?: never;
+    })
+  | (NormalizedSelectorOpenOptionsBase & {
+      sourceMode: 'identified';
+      sourceSelector?: never;
+      sourceStyles?: never;
+      sourceBindings: NormalizedSelectorSourceBinding[];
+    });
+
+export interface NormalizedSelectorSourceBinding {
+  itemId: string;
+  itemIndex: number;
+  selector: string;
+  objectFit: LevixelObjectFit;
+  cornerRadius: number;
 }
 
 export interface ImageInfo extends LevixelPreparedPreview {}
@@ -109,4 +173,5 @@ export interface SourceBinding {
   element: HTMLElement | null;
   hint: LevixelSourceHint | null;
   preview?: ImageInfo;
+  identitySelector?: string;
 }

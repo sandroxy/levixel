@@ -19,16 +19,28 @@ const ITEM_KEYS = new Set([
   'alt',
 ])
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius'])
+const SOURCE_BINDING_KEYS = new Set([
+  'itemId',
+  'selector',
+  'objectFit',
+  'cornerRadius',
+  'queryContext',
+])
 const PREPARE_ITEM_KEYS = new Set(['priority'])
 const NATIVE_MEDIA_PATH_KEYS = ['url', 'thumbnailUrl', 'posterUrl']
 const SELECTOR_OPEN_KEYS = new Set([
   'items',
   'index',
+  'initialItemId',
   'theme',
   'sourceVisibility',
   'sourceSelector',
   'sourceStyles',
+  'sourceBindings',
+  'queryContext',
 ])
+
+const ROOT_QUERY_CONTEXT = {}
 
 let nativePlugin
 let injectedNativeTransport
@@ -252,7 +264,7 @@ function webFileURL(info) {
 }
 
 function requireNonEmptyString(value, path) {
-  if (typeof value !== 'string' || value.length === 0)
+  if (typeof value !== 'string' || value.trim().length === 0)
     throw new Error(`${path} must be a non-empty string`)
   return value
 }
@@ -1004,13 +1016,35 @@ function readSourceRectScale() {
   }
 }
 
-function measureSources(selector, itemCount) {
+function selectorQuery(queryContext) {
+  const query = uni.createSelectorQuery()
+  if (queryContext === undefined)
+    return query
+  const scopedQuery = query.in(queryContext)
+  if (!scopedQuery)
+    throw new Error('selector query context was rejected')
+  return scopedQuery
+}
+
+function measureSources(selector, itemCount, queryContext) {
   if (!selector)
     return Promise.resolve(Array(itemCount).fill(null))
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    let query
     try {
-      uni.createSelectorQuery()
+      query = selectorQuery(queryContext)
+    }
+    catch (_) {
+      if (queryContext !== undefined) {
+        reject(new Error('$.queryContext is not a valid selector query context'))
+        return
+      }
+      reject(new Error('$.sourceSelector could not create its selector query'))
+      return
+    }
+    try {
+      query
         .selectAll(selector)
         .boundingClientRect((values) => {
           if (!Array.isArray(values) || values.length !== itemCount) {
@@ -1022,9 +1056,89 @@ function measureSources(selector, itemCount) {
         .exec()
     }
     catch (_) {
-      resolve(Array(itemCount).fill(null))
+      reject(new Error('$.sourceSelector is not valid'))
     }
   })
+}
+
+function measureSourceBindings(sourceBindings, itemCount) {
+  const rects = Array(itemCount).fill(null)
+  if (sourceBindings.length === 0)
+    return Promise.resolve(rects)
+
+  const groupsByContext = new Map()
+  sourceBindings.forEach((binding, bindingIndex) => {
+    const contextKey = binding.queryContext === undefined
+      ? ROOT_QUERY_CONTEXT
+      : binding.queryContext
+    let group = groupsByContext.get(contextKey)
+    if (!group) {
+      group = {
+        queryContext: binding.queryContext,
+        queryContextPath: binding.queryContextPath,
+        bindings: [],
+      }
+      groupsByContext.set(contextKey, group)
+    }
+    group.bindings.push({ binding, bindingIndex })
+  })
+
+  const measurements = [...groupsByContext.values()].map(group => new Promise((resolve, reject) => {
+    let settled = false
+    const fail = (error) => {
+      if (settled)
+        return
+      settled = true
+      reject(error)
+    }
+    let query
+    try {
+      query = selectorQuery(group.queryContext)
+    }
+    catch (_) {
+      fail(new Error(`${group.queryContextPath} is not a valid selector query context`))
+      return
+    }
+    group.bindings.forEach(({ binding, bindingIndex }) => {
+      if (settled)
+        return
+      try {
+        const path = `$.sourceBindings[${bindingIndex}].selector`
+        query
+          .selectAll(binding.selector)
+          .boundingClientRect((values) => {
+            if (settled)
+              return
+            if (!Array.isArray(values)) {
+              fail(new Error(`${path} returned an invalid selector result`))
+              return
+            }
+            if (values.length > 1) {
+              fail(new Error(`${path} must match at most one element`))
+              return
+            }
+            rects[binding.itemIndex] = values.length === 1 ? normalizeRect(values[0]) : null
+          })
+      }
+      catch (_) {
+        fail(new Error(`$.sourceBindings[${bindingIndex}].selector is not valid`))
+      }
+    })
+    if (settled)
+      return
+    try {
+      query.exec(() => {
+        if (settled)
+          return
+        settled = true
+        resolve()
+      })
+    }
+    catch (_) {
+      fail(new Error('$.sourceBindings could not execute its selector query'))
+    }
+  }))
+  return Promise.all(measurements).then(() => rects)
 }
 
 function normalizeSourceStyles(rawStyles, itemCount) {
@@ -1046,6 +1160,92 @@ function normalizeSourceStyles(rawStyles, itemCount) {
       throw new Error(`${path}.cornerRadius must be a non-negative finite number`)
     return { objectFit, cornerRadius }
   })
+}
+
+function normalizeQueryContext(value, path) {
+  if (value === undefined)
+    return undefined
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new Error(`${path} must be a component instance`)
+  return value
+}
+
+function normalizeSourceBindings(rawBindings, items, defaultQueryContext) {
+  if (rawBindings === undefined)
+    return undefined
+  if (!Array.isArray(rawBindings))
+    throw new Error('$.sourceBindings must be an array')
+
+  const itemIndexes = new Map(items.map((item, index) => [item.id, index]))
+  const itemIds = new Set()
+  const selectorsByContext = new Map()
+  return rawBindings.map((value, index) => {
+    const path = `$.sourceBindings[${index}]`
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error(`${path} must be an object`)
+    rejectUnknownKeys(value, SOURCE_BINDING_KEYS, path)
+
+    const itemId = requireNonEmptyString(value.itemId, `${path}.itemId`)
+    const itemIndex = itemIndexes.get(itemId)
+    if (itemIndex === undefined)
+      throw new Error(`${path}.itemId must reference an item in $.items`)
+    if (itemIds.has(itemId))
+      throw new Error(`${path}.itemId must be unique within $.sourceBindings`)
+    itemIds.add(itemId)
+
+    const rawSelector = requireNonEmptyString(value.selector, `${path}.selector`)
+    const selector = rawSelector.trim()
+    if (!selector)
+      throw new Error(`${path}.selector must be a non-empty string`)
+    const queryContext = value.queryContext === undefined
+      ? defaultQueryContext
+      : normalizeQueryContext(value.queryContext, `${path}.queryContext`)
+    const queryContextPath = value.queryContext === undefined
+      ? '$.queryContext'
+      : `${path}.queryContext`
+    const contextKey = queryContext === undefined ? ROOT_QUERY_CONTEXT : queryContext
+    let selectors = selectorsByContext.get(contextKey)
+    if (!selectors) {
+      selectors = new Set()
+      selectorsByContext.set(contextKey, selectors)
+    }
+    if (selectors.has(selector))
+      throw new Error(`${path}.selector must be unique within $.sourceBindings`)
+    selectors.add(selector)
+
+    const objectFit = value.objectFit === undefined ? 'cover' : value.objectFit
+    if (!['contain', 'cover', 'fill'].includes(objectFit))
+      throw new Error(`${path}.objectFit contains an unsupported value`)
+    const cornerRadius = value.cornerRadius === undefined ? 0 : value.cornerRadius
+    if (typeof cornerRadius !== 'number' || !Number.isFinite(cornerRadius) || cornerRadius < 0)
+      throw new Error(`${path}.cornerRadius must be a non-negative finite number`)
+    return {
+      itemId,
+      itemIndex,
+      selector,
+      objectFit,
+      cornerRadius,
+      queryContext,
+      queryContextPath,
+    }
+  })
+}
+
+function normalizeInitialIndex(options, items) {
+  if (options.index !== undefined && options.initialItemId !== undefined)
+    throw new Error('$.initialItemId cannot be combined with $.index')
+  if (options.initialItemId === undefined) {
+    const index = options.index === undefined ? 0 : options.index
+    if (!Number.isInteger(index) || index < 0 || index >= items.length)
+      throw new Error('$.index must reference an item in $.items')
+    return index
+  }
+
+  const initialItemId = requireNonEmptyString(options.initialItemId, '$.initialItemId')
+  const index = items.findIndex(item => item.id === initialItemId)
+  if (index < 0)
+    throw new Error('$.initialItemId must reference an item in $.items')
+  return index
 }
 
 function applyLocalPreview(item, info) {
@@ -1141,19 +1341,38 @@ export async function openLevixelFromSelector(options) {
     throw new Error('$ must be an object')
   rejectUnknownKeys(options, SELECTOR_OPEN_KEYS, '$')
   const items = sanitizeItems(options.items)
-  const index = options.index === undefined ? 0 : options.index
-  if (!Number.isInteger(index) || index < 0 || index >= items.length)
-    throw new Error('$.index must reference an item in $.items')
+  const index = normalizeInitialIndex(options, items)
   const theme = options.theme === undefined ? 'dark' : options.theme
   if (theme !== 'dark' && theme !== 'light')
     throw new Error('$.theme contains an unsupported value')
   const sourceVisibility = options.sourceVisibility === undefined ? 'visible' : options.sourceVisibility
   if (sourceVisibility !== 'visible' && sourceVisibility !== 'hidden')
     throw new Error('$.sourceVisibility contains an unsupported value')
-  if (options.sourceSelector !== undefined && typeof options.sourceSelector !== 'string')
-    throw new Error('$.sourceSelector must be a string')
+  if (options.sourceBindings !== undefined
+    && (options.sourceSelector !== undefined || options.sourceStyles !== undefined))
+    throw new Error('$.sourceBindings cannot be combined with sourceSelector or sourceStyles')
 
-  const sourceStyles = normalizeSourceStyles(options.sourceStyles, items.length)
+  const sourceSelector = options.sourceSelector === undefined
+    ? undefined
+    : requireNonEmptyString(options.sourceSelector, '$.sourceSelector').trim()
+  if (options.sourceStyles !== undefined && sourceSelector === undefined)
+    throw new Error('$.sourceStyles requires $.sourceSelector')
+  if (options.queryContext !== undefined
+    && sourceSelector === undefined
+    && options.sourceBindings === undefined)
+    throw new Error('$.queryContext requires $.sourceSelector or $.sourceBindings')
+
+  const queryContext = normalizeQueryContext(options.queryContext, '$.queryContext')
+  const sourceBindings = normalizeSourceBindings(options.sourceBindings, items, queryContext)
+  const sourceStyles = sourceBindings === undefined
+    ? normalizeSourceStyles(options.sourceStyles, items.length)
+    : Array.from({ length: items.length }, () => ({ objectFit: 'cover', cornerRadius: 0 }))
+  sourceBindings?.forEach((binding) => {
+    sourceStyles[binding.itemIndex] = {
+      objectFit: binding.objectFit,
+      cornerRadius: binding.cornerRadius,
+    }
+  })
   const rectScale = readSourceRectScale()
   const previewURLs = items.map(transitionURL)
   const selectedPreviewURL = previewURLs[index]
@@ -1162,7 +1381,9 @@ export async function openLevixelFromSelector(options) {
     : Promise.resolve(undefined)
 
   const [rects, initialInfo] = await Promise.all([
-    measureSources(options.sourceSelector, items.length),
+    sourceBindings === undefined
+      ? measureSources(sourceSelector, items.length, queryContext)
+      : measureSourceBindings(sourceBindings, items.length),
     selectedPreviewURL
       ? withTimeout(selectedPreviewPromise, INITIAL_PREVIEW_TIMEOUT_MS)
       : Promise.resolve(undefined),

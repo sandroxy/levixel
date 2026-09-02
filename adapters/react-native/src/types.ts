@@ -29,16 +29,22 @@ export interface LevixelProps {
   children: ReactNode;
   galleryId?: string;
   theme?: LevixelTheme;
-  onIndexChange?: (index: number) => void;
+  onIndexChange?: (index: number, itemId: string) => void;
 }
 
-export interface LevixelSourceProps extends Pick<ViewProps, 'style'> {
-  index: number;
+interface LevixelSourcePropsBase extends Pick<ViewProps, 'style'> {
   children: ReactElement;
 }
 
+type LevixelSourceSelection =
+  | { index: number; itemId?: never }
+  | { index?: never; itemId: string };
+
+export type LevixelSourceProps = LevixelSourcePropsBase & LevixelSourceSelection;
+
 export interface LevixelIndexChangePayload {
   currentIndex: number;
+  itemId: string;
 }
 
 export interface NativeLevixelMediaItem {

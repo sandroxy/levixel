@@ -26,6 +26,7 @@ import type {
   LevixelPrepareOptions,
   LevixelPreparedPreview,
   LevixelSelectorOpenOptions,
+  LevixelSelectorSourceStyle,
   NormalizedOpenOptions,
   NormalizedSelectorOpenOptions,
   SourceBinding,
@@ -43,6 +44,7 @@ export type {
   LevixelPreparedPreview,
   LevixelRect,
   LevixelSelectorOpenOptions,
+  LevixelSelectorSourceBinding,
   LevixelSelectorSourceStyle,
   LevixelSize,
   LevixelSourceHint,
@@ -202,6 +204,30 @@ async function resolveInitialPreviews(
 }
 
 function bindingsFromSelector(options: NormalizedSelectorOpenOptions): SourceBinding[] {
+  if (options.sourceMode === 'identified') {
+    const bindings = options.items.map((): SourceBinding => ({ element: null, hint: null }));
+    const boundElements = new Set<HTMLElement>();
+    options.sourceBindings.forEach((sourceBinding, bindingIndex) => {
+      const path = `$.sourceBindings[${bindingIndex}].selector`;
+      const element = uniqueSelectorElement(sourceBinding.selector, path);
+      if (element && boundElements.has(element)) {
+        throw new LevixelContractError(
+          'INVALID_VALUE',
+          path,
+          `${path} must resolve to a different element from every other binding`,
+        );
+      }
+      if (element)
+        boundElements.add(element);
+      bindings[sourceBinding.itemIndex] = bindingFromElement(
+        options.items[sourceBinding.itemIndex]!,
+        element,
+        sourceBinding,
+        sourceBinding.selector,
+      );
+    });
+    return bindings;
+  }
   if (!options.sourceSelector)
     return options.items.map(() => ({ element: null, hint: null }));
   let matches: Element[];
@@ -218,43 +244,74 @@ function bindingsFromSelector(options: NormalizedSelectorOpenOptions): SourceBin
   if (matches.length !== options.items.length)
     return options.items.map(() => ({ element: null, hint: null }));
 
-  return options.items.map((item, index) => {
-    const candidate = matches[index];
-    const element = candidate instanceof HTMLElement ? candidate : null;
-    if (!element)
-      return { element: null, hint: null };
-    const rect = element.getBoundingClientRect();
-    const normalizedRect = {
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-    };
-    if (!isUsableRect(normalizedRect))
-      return { element, hint: null };
-    const preview = imageInfoFromElement(element);
-    const transition = transitionURL(item);
-    if (preview && transition)
-      rememberImage(transition, preview);
-    const style = options.sourceStyles[index]!;
-    const imageSize = preview
-      ? { width: preview.width, height: preview.height }
-      : (item.width && item.height ? { width: item.width, height: item.height } : undefined);
-    const binding: SourceBinding = {
-      element,
-      hint: {
-        rect: normalizedRect,
-        objectFit: style.objectFit ?? 'cover',
-        coordinateSpace: 'viewport' as const,
-        rectScale: 1,
-        cornerRadius: style.cornerRadius ?? 0,
-        ...(imageSize ? { imageSize } : {}),
-      },
-    };
-    if (preview)
-      binding.preview = preview;
-    return binding;
-  });
+  return options.items.map((item, index) => bindingFromElement(
+    item,
+    matches[index] instanceof HTMLElement ? matches[index] : null,
+    options.sourceStyles[index]!,
+  ));
+}
+
+function uniqueSelectorElement(selector: string, path: string): HTMLElement | null {
+  let matches: Element[];
+  try {
+    matches = [...document.querySelectorAll(selector)];
+  }
+  catch (_) {
+    throw new LevixelContractError(
+      'INVALID_REQUEST',
+      path,
+      `${path} must be a valid CSS selector`,
+    );
+  }
+  if (matches.length > 1) {
+    throw new LevixelContractError(
+      'INVALID_VALUE',
+      path,
+      `${path} must match at most one element`,
+    );
+  }
+  return matches[0] instanceof HTMLElement ? matches[0] : null;
+}
+
+function bindingFromElement(
+  item: LevixelMediaItem,
+  element: HTMLElement | null,
+  style: LevixelSelectorSourceStyle,
+  identitySelector?: string,
+): SourceBinding {
+  if (!element)
+    return { element: null, hint: null };
+  const rect = element.getBoundingClientRect();
+  const normalizedRect = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+  if (!isUsableRect(normalizedRect))
+    return { element, hint: null };
+  const preview = imageInfoFromElement(element);
+  const transition = transitionURL(item);
+  if (preview && transition)
+    rememberImage(transition, preview);
+  const imageSize = preview
+    ? { width: preview.width, height: preview.height }
+    : (item.width && item.height ? { width: item.width, height: item.height } : undefined);
+  const binding: SourceBinding = {
+    element,
+    hint: {
+      rect: normalizedRect,
+      objectFit: style.objectFit ?? 'cover',
+      coordinateSpace: 'viewport' as const,
+      rectScale: 1,
+      cornerRadius: style.cornerRadius ?? 0,
+      ...(imageSize ? { imageSize } : {}),
+    },
+    ...(identitySelector ? { identitySelector } : {}),
+  };
+  if (preview)
+    binding.preview = preview;
+  return binding;
 }
 
 function emit(event: LevixelEvent): void {

@@ -125,6 +125,7 @@ try {
   const openingEvents = await page.evaluate(() => window.levixelFixture.events);
   assert.deepEqual(openingEvents.map(event => event.type), ['ready', 'sourceVisibilityChange']);
   assert.equal(openingEvents[1].payload.hidden, true);
+  assert.equal(openingEvents[1].payload.itemId, 'portrait');
   assert.equal(typeof openingEvents[1].time, 'number');
 
   await page.mouse.move(300, 422);
@@ -132,7 +133,9 @@ try {
   await page.mouse.move(70, 422, { steps: 8 });
   await page.mouse.up();
   await page.waitForFunction(() => window.levixelFixture.events.some(
-    event => event.type === 'indexChange' && event.payload.currentIndex === 1,
+    event => event.type === 'indexChange'
+      && event.payload.currentIndex === 1
+      && event.payload.itemId === 'wide',
   ));
   const pagedSources = await page.evaluate(() => ({
     first: document.querySelector('.source[data-index="0"]').style.visibility,
@@ -178,6 +181,7 @@ try {
     'dismiss',
   ]);
   assert.equal(closedState.events.at(-2).payload.hidden, false);
+  assert.equal(closedState.events.at(-2).payload.itemId, 'portrait');
   assert.deepEqual(closedState.events.at(-1).payload, {});
 
   await page.locator('.source').nth(1).click();
@@ -416,6 +420,7 @@ try {
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   await verifyLiveSourceGeometry(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifyDynamicListBindings(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
@@ -499,6 +504,99 @@ async function verifyLiveSourceGeometry(targetBrowser, fixtureURL) {
   }
   finally {
     await geometryPage.close();
+  }
+}
+
+async function verifyDynamicListBindings(targetBrowser, fixtureURL) {
+  const dynamicPage = await targetBrowser.newPage({ viewport: { width: 390, height: 844 } });
+  const errors = [];
+  dynamicPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await dynamicPage.goto(fixtureURL);
+    await dynamicPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+
+    const prependedResult = await dynamicPage.evaluate(
+      () => window.levixelFixture.openIdentifiedPrepend(),
+    );
+    assert.equal(prependedResult.index, 2);
+    assert.equal(prependedResult.itemId, 'wide');
+    assert.equal(prependedResult.count, 4);
+    assert.deepEqual(await dynamicPage.evaluate(() => ({
+      portrait: document.querySelector('[data-item-id="portrait"]').style.visibility,
+      wide: document.querySelector('[data-item-id="wide"]').style.visibility,
+      video: document.querySelector('[data-item-id="video"]').style.visibility,
+    })), {
+      portrait: '',
+      wide: 'hidden',
+      video: '',
+    }, 'prepend must resolve the selected and mounted source by item id, not DOM order');
+    await dynamicPage.evaluate(() => window.levixelFixture.closeLevixel());
+    await dynamicPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+
+    await dynamicPage.evaluate(() => window.levixelFixture.openIdentifiedPrepend());
+    const recycledClose = await dynamicPage.evaluate(async () => {
+      const source = document.querySelector('[data-item-id="wide"]');
+      source.dataset.itemId = 'recycled';
+      const closing = window.levixelFixture.closeLevixel();
+      const host = document.querySelector('[data-levixel-web-root]');
+      const usedRecycledSource = Boolean(host?.shadowRoot.querySelector('.snapshot'));
+      await closing;
+      source.dataset.itemId = 'wide';
+      return usedRecycledSource;
+    });
+    assert.equal(
+      recycledClose,
+      false,
+      'a virtualized node reused for another item must not become the old item return target',
+    );
+    await dynamicPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+
+    const appendedResult = await dynamicPage.evaluate(
+      () => window.levixelFixture.openIdentifiedAppend(),
+    );
+    assert.equal(appendedResult.index, 3);
+    assert.equal(appendedResult.itemId, 'appended');
+    assert.equal(appendedResult.count, 4);
+    assert.equal(
+      await dynamicPage.locator('[data-item-id="appended"]').evaluate(
+        element => element.style.visibility,
+      ),
+      'hidden',
+      'an appended mounted source must map to its stable item id',
+    );
+    await dynamicPage.evaluate(() => window.levixelFixture.closeLevixel());
+    await dynamicPage.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
+
+    const bindingErrors = await dynamicPage.evaluate(async () => {
+      const { items, openLevixelFromSelector } = window.levixelFixture;
+      const capture = async sourceBindings => {
+        try {
+          await openLevixelFromSelector({ items, sourceBindings });
+          return null;
+        }
+        catch (error) {
+          return { path: error.path, message: error.message };
+        }
+      };
+      return {
+        ambiguous: await capture([{ itemId: 'portrait', selector: '.source' }]),
+        invalid: await capture([{ itemId: 'portrait', selector: '[' }]),
+        sameElement: await capture([
+          { itemId: 'portrait', selector: '[data-index="0"]' },
+          { itemId: 'wide', selector: '[data-item-id="portrait"]' },
+        ]),
+      };
+    });
+    assert.equal(bindingErrors.ambiguous.path, '$.sourceBindings[0].selector');
+    assert.match(bindingErrors.ambiguous.message, /must match at most one element/);
+    assert.equal(bindingErrors.invalid.path, '$.sourceBindings[0].selector');
+    assert.match(bindingErrors.invalid.message, /valid CSS selector/);
+    assert.equal(bindingErrors.sameElement.path, '$.sourceBindings[1].selector');
+    assert.match(bindingErrors.sameElement.message, /different element/);
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await dynamicPage.close();
   }
 }
 

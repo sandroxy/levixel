@@ -99,6 +99,11 @@ final class LevixelUniSession {
         return request.items.size();
     }
 
+    @NonNull
+    String itemIdAt(int index) {
+        return request.items.get(index).id;
+    }
+
     boolean hidesHtmlSource() {
         return request.hidesHtmlSource;
     }

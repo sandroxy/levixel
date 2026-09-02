@@ -9,9 +9,17 @@
 - Rejected detached, hidden, and fully clipped iOS and Web source views so unavailable transition targets fall back cleanly instead of animating from stale geometry.
 - Prevented Android video posters from flashing after progress-bar seeks by making the decoded-frame handoff idempotent across renderer callbacks, page reactivation, and cancelled dismiss gestures.
 - Accepted empty asynchronous `items` state in the React Native provider while keeping every rendered source index strict, and removed stale Android/iOS source bindings when media becomes empty or the wrapped image changes.
-- Added backward-compatible stable item identities to the iOS native data source and transition registry, then carried them through the React Native and UniApp iOS bridges so reordered lists return to the correct source.
-- Required media ids to be unique within each request across React Native, UniApp Android/iOS, and Web contract validation.
+- Added stable item identities to the iOS native data source and transition registry, then carried them through the React Native and UniApp iOS bridges so reordered lists return to the correct source.
+- Required non-empty, unique stable IDs wherever identity-backed return is used: native Android and HarmonyOS sessions, native iOS identified data sources, and React Native, UniApp, and Web adapter contracts.
 - Ensured the iOS image viewport completes its first nested layout before calculating fit scale, including pages configured before valid bounds exist.
+- Added stable ID entry points for dynamic React Native, UniApp, and Web lists;
+  sparse mounted sources now map deterministically across prepend, append,
+  reorder, pagination, virtualization, and UniApp component query scopes
+  without weakening native contracts.
+- Added stable media ids to adapter index-change/open-result payloads so host
+  list updates cannot make a session index identify the wrong item.
+- Isolated each open HarmonyOS viewer from later host list updates while still
+  resolving its return target against the latest visible source by stable ID.
 
 ## 1.2.0 - 2026-08-28
 

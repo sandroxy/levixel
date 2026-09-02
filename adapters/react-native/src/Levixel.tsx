@@ -3,7 +3,7 @@ import * as React from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 import type { NativeSyntheticEvent, ViewProps } from 'react-native';
 
-import { normalizeMediaItems } from './contract';
+import { normalizeMediaItems, resolveSourceIndex } from './contract';
 import type {
   LevixelIndexChangePayload,
   LevixelProps,
@@ -16,7 +16,7 @@ interface LevixelContextValue {
   galleryId: string;
   items: NativeLevixelMediaItem[];
   theme: LevixelTheme;
-  onIndexChange?: (index: number) => void;
+  onIndexChange?: (index: number, itemId: string) => void;
 }
 
 interface NativeLevixelSourceProps extends ViewProps {
@@ -56,7 +56,7 @@ function LevixelProvider({
       galleryId: resolvedGalleryId,
       items: normalizedItems,
       theme,
-      onIndexChange,
+      ...(onIndexChange === undefined ? {} : { onIndexChange }),
     }),
     [normalizedItems, onIndexChange, resolvedGalleryId, theme],
   );
@@ -66,14 +66,13 @@ function LevixelProvider({
   );
 }
 
-function LevixelSource({ index, children, style }: LevixelSourceProps) {
+function LevixelSource(props: LevixelSourceProps) {
   const context = useContext(LevixelContext);
   if (context === null) {
     throw new Error('[Levixel] Levixel.Source must be rendered inside Levixel.');
   }
-  if (!Number.isInteger(index) || index < 0 || index >= context.items.length) {
-    throw new RangeError('[Levixel] Levixel.Source index is outside the items array.');
-  }
+  const { children, style } = props;
+  const index = resolveSourceIndex(context.items, props);
 
   return (
     <NativeLevixelSource
@@ -82,7 +81,10 @@ function LevixelSource({ index, children, style }: LevixelSourceProps) {
       index={index}
       items={context.items}
       onIndexChange={(event) => {
-        context.onIndexChange?.(event.nativeEvent.currentIndex);
+        context.onIndexChange?.(
+          event.nativeEvent.currentIndex,
+          event.nativeEvent.itemId,
+        );
       }}
       style={style}
       theme={context.theme}

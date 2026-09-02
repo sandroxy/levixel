@@ -19,7 +19,9 @@ import androidx.annotation.Nullable;
 import androidx.viewpager2.widget.ViewPager2;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class LevixelViewerOverlayView extends FrameLayout implements LevixelViewerPageView.Listener {
     private static final long SOURCE_HINT_READY_TIMEOUT_MS = 180L;
@@ -110,7 +112,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             @Nullable Listener listener
     ) {
         super(context);
-        this.items = new ArrayList<>(sourceItems);
+        this.items = copyValidatedItems(sourceItems);
         this.sourceHints = sourceHints == null ? new ArrayList<>() : new ArrayList<>(sourceHints);
         this.currentIndex = Math.max(0, Math.min(startIndex, items.size() - 1));
         this.lightTheme = lightTheme;
@@ -129,6 +131,34 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         setupUi();
         post(openTransitionReadyWatcher);
         requestFocus();
+    }
+
+    @NonNull
+    static List<LevixelMediaItem> copyValidatedItems(
+            @NonNull List<LevixelMediaItem> sourceItems
+    ) {
+        if (sourceItems.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Levixel sourceItems must contain at least one media item."
+            );
+        }
+        Set<String> itemIds = new HashSet<>(sourceItems.size());
+        List<LevixelMediaItem> snapshot = new ArrayList<>(sourceItems.size());
+        for (int index = 0; index < sourceItems.size(); index += 1) {
+            LevixelMediaItem item = sourceItems.get(index);
+            if (item == null || item.getId() == null || item.getId().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Levixel sourceItems[" + index + "].id must be non-empty."
+                );
+            }
+            if (!itemIds.add(item.getId())) {
+                throw new IllegalArgumentException(
+                        "Levixel sourceItems[" + index + "].id must be unique."
+                );
+            }
+            snapshot.add(item);
+        }
+        return snapshot;
     }
 
     public void requestClose() {

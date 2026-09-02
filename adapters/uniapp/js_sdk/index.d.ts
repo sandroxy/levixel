@@ -38,6 +38,12 @@ export interface LevixelSelectorSourceStyle {
   cornerRadius?: number
 }
 
+export interface LevixelSelectorSourceBinding extends LevixelSelectorSourceStyle {
+  itemId: string
+  selector: string
+  queryContext?: unknown
+}
+
 export interface LevixelPrepareOptions {
   priority?: boolean
 }
@@ -48,23 +54,67 @@ export interface LevixelPreparedPreview {
   height: number
 }
 
-export interface LevixelSelectorOpenOptions {
+export interface LevixelOpenResult {
+  index: number
+  itemId: string
+  count: number
+  galleryId: string
+}
+
+export interface LevixelCloseResult {
+  closed: true
+}
+
+interface LevixelSelectorOpenOptionsBase {
   items: LevixelMediaItem[]
-  index?: number
   theme?: LevixelTheme
   sourceVisibility?: LevixelSourceVisibility
-  sourceSelector?: string
-  sourceStyles?: LevixelSelectorSourceStyle[]
 }
 
-export interface LevixelEvent {
-  type: 'ready' | 'indexChange' | 'sourceVisibilityChange' | 'dismiss'
-  payload: Record<string, unknown>
-  time: number
-}
+type LevixelSelectorInitialSelection =
+  | { index?: number, initialItemId?: never }
+  | { index?: never, initialItemId: string }
 
-export function openLevixel(options: LevixelOpenOptions): Promise<Record<string, unknown>>
-export function closeLevixel(): Promise<Record<string, unknown>>
+type LevixelSelectorSources =
+  | {
+      sourceSelector?: never
+      sourceStyles?: never
+      sourceBindings?: never
+      queryContext?: never
+    }
+  | {
+      sourceSelector: string
+      sourceStyles?: LevixelSelectorSourceStyle[]
+      sourceBindings?: never
+      queryContext?: unknown
+    }
+  | {
+      sourceSelector?: never
+      sourceStyles?: never
+      sourceBindings: LevixelSelectorSourceBinding[]
+      queryContext?: unknown
+    }
+
+export type LevixelSelectorOpenOptions = LevixelSelectorOpenOptionsBase
+  & LevixelSelectorInitialSelection
+  & LevixelSelectorSources
+
+export type LevixelEvent =
+  | { type: 'ready', payload: Record<string, unknown>, time: number }
+  | {
+      type: 'indexChange'
+      payload: { currentIndex: number, itemId: string }
+      time: number
+    }
+  | {
+      type: 'sourceVisibilityChange'
+      payload: { hidden: boolean, index: number, itemId: string, galleryId: string }
+      time: number
+    }
+  | { type: 'dismiss', payload: Record<string, never>, time: number }
+
+export function openLevixel(options: LevixelOpenOptions): Promise<LevixelOpenResult>
+export function closeLevixel(): Promise<LevixelCloseResult>
 export function onLevixelEvent(listener: (event: LevixelEvent) => void): () => void
 export function prepareLevixelItem(
   item: LevixelMediaItem,
@@ -73,7 +123,7 @@ export function prepareLevixelItem(
 export function warmupLevixelItem(item: LevixelMediaItem, loadEvent?: unknown): Promise<void>
 export function openLevixelFromSelector(
   options: LevixelSelectorOpenOptions,
-): Promise<Record<string, unknown>>
+): Promise<LevixelOpenResult>
 
 declare const levixel: {
   open: typeof openLevixel

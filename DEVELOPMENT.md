@@ -47,6 +47,11 @@ historical XCFramework independently of newer source.
 
 Android requires the repository Gradle wrapper. iOS requires Xcode command-line tools. HarmonyOS requires DevEco Studio tooling and `ohpm`; custom locations can be supplied through `DEVECO_STUDIO_CONTENTS`, `DEVECO_SDK_HOME`, `HVIGORW`, and `OHPM` where used by the packaging scripts.
 
+HarmonyOS consumer coverage must update the host `items` while a viewer is
+open. The active viewer must retain its immutable opening snapshot, while its
+return transition resolves the latest visible grid source by stable media id
+and fades when that source is no longer mounted.
+
 The iOS source-only regression entry point is:
 
 ```sh
@@ -72,6 +77,9 @@ API surface is inspected portably when a release asset is verified on Linux.
 React Native packaging verifies its temporary candidate before installing it in
 `dist/` and refuses to replace different same-version bytes unless `--replace`
 is explicitly supplied for a rejected, still-untagged local candidate.
+Artifact-consumer coverage must render sources by `itemId`, then prepend,
+append, reorder, and recycle mounted cells before reopening. TypeScript
+component compilation is required in addition to the pure contract test.
 
 ## UniApp
 
@@ -99,6 +107,12 @@ The UTS package builds only the DCloud-independent shared runtimes and embeds th
 
 The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only the classic and uni-app x Vapor Android/iOS targets declared in the plugin metadata are supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported by the UniApp package.** Every release candidate must pass both classic/x Android/iOS device matrices against its recorded SHA-256 before publication.
 
+The consumer matrix must include a prepend-style chat list, an append-style
+paginated list, a sparse virtualized source set, out-of-order bindings, and
+component-scoped selector queries. The active viewer consumes the loaded item
+snapshot from one open call; host pagination inside an already open viewer is
+outside the public contract.
+
 The accepted App native-plugin bridge remains available for existing and offline consumers. It is built separately because it requires the DCloud legacy SDK and is not a Marketplace upload candidate:
 
 ```sh
@@ -124,6 +138,9 @@ npm run verify
 ```
 
 The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates the declared target package metadata, legal-file bytes, and npm payload allowlist. Manual interaction acceptance covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
+It must also exercise prepended and appended media, sparse mounted DOM sources,
+out-of-order bindings, source removal before dismissal, and a connected DOM
+node recycled to a different stable identity.
 
 Build and verify the exact npm candidate from a clean release commit:
 

@@ -72,6 +72,7 @@
     "manualScenarios": [
       "dismiss-when-current-source-is-offscreen",
       "double-tap-zoom-and-pan",
+      "open-after-host-list-update-by-stable-id",
       "open-page-and-dismiss-to-new-visible-source",
       "open-placeholder-before-preview-loads",
       "open-visible-source-and-dismiss-to-same-source",

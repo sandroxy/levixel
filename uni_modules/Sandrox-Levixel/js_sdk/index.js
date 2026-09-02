@@ -17,6 +17,7 @@ import {
 const OPTIONAL_ITEM_KEYS = ['thumbnailUrl', 'posterUrl', 'width', 'height', 'alt']
 const OPTIONAL_OPEN_KEYS = [
   'index',
+  'initialItemId',
   'theme',
   'sourceHints',
   'sourceVisibility',
@@ -24,9 +25,12 @@ const OPTIONAL_OPEN_KEYS = [
   'closeButton',
   'sourceSelector',
   'sourceStyles',
+  'sourceBindings',
+  'queryContext',
 ]
 const OPTIONAL_SOURCE_HINT_KEYS = ['imageSize', 'rectScale', 'cornerRadius']
 const OPTIONAL_SOURCE_STYLE_KEYS = ['objectFit', 'cornerRadius']
+const OPTIONAL_SOURCE_BINDING_KEYS = ['objectFit', 'cornerRadius', 'queryContext']
 const NATIVE_PATH_RESOLUTION_TIMEOUT_MS = 5000
 
 function omitNullOptionalFields(value, optionalKeys) {
@@ -72,6 +76,10 @@ function normalizeSourceStyle(style) {
   return omitNullOptionalFields(style, OPTIONAL_SOURCE_STYLE_KEYS)
 }
 
+function normalizeSourceBinding(binding) {
+  return omitNullOptionalFields(binding, OPTIONAL_SOURCE_BINDING_KEYS)
+}
+
 function normalizeOpenOptions(options) {
   let normalized = omitNullOptionalFields(options, OPTIONAL_OPEN_KEYS)
   if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized))
@@ -80,9 +88,11 @@ function normalizeOpenOptions(options) {
   const items = normalizeArrayEntries(normalized.items, normalizeMediaItem)
   const sourceHints = normalizeArrayEntries(normalized.sourceHints, normalizeSourceHint)
   const sourceStyles = normalizeArrayEntries(normalized.sourceStyles, normalizeSourceStyle)
+  const sourceBindings = normalizeArrayEntries(normalized.sourceBindings, normalizeSourceBinding)
   if (items === normalized.items
     && sourceHints === normalized.sourceHints
-    && sourceStyles === normalized.sourceStyles)
+    && sourceStyles === normalized.sourceStyles
+    && sourceBindings === normalized.sourceBindings)
     return normalized
 
   normalized = { ...normalized }
@@ -92,6 +102,8 @@ function normalizeOpenOptions(options) {
     normalized.sourceHints = sourceHints
   if (sourceStyles !== normalized.sourceStyles)
     normalized.sourceStyles = sourceStyles
+  if (sourceBindings !== normalized.sourceBindings)
+    normalized.sourceBindings = sourceBindings
   return normalized
 }
 

@@ -60,6 +60,13 @@ item. Every media item requires a stable `id`, a full-resolution `sourceUrl`, a
 values. For video items, set `mediaType` to `LevixelMediaType.VIDEO` and use the
 thumbnail as the poster shown before playback.
 
+The host may replace `items` after prepending history, appending a page, or
+reordering its data. Keep every media `id` stable and unique. An open viewer
+uses an immutable snapshot of the array it opened with; later host updates are
+shown by the grid and take effect the next time the viewer opens. If the
+current snapshot item no longer has a visible source in the updated grid,
+dismissal uses a fade instead of returning to a stale position.
+
 The navigation header is optional. When enabling it, provide
 `navigationTitle`, pass the host window's top safe-area inset through
 `navigationTopInset`, and handle `onNavigateBack` with the host application's
