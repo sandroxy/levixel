@@ -62,11 +62,11 @@ fi
 
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 bash "${script_dir}/verify-documentation.sh"
-provenance_arguments=()
 if [[ ${allow_dirty} -eq 1 ]]; then
-  provenance_arguments+=(--allow-dirty)
+  bash "${script_dir}/verify-uniapp-native-provenance.sh" --allow-dirty
+else
+  bash "${script_dir}/verify-uniapp-native-provenance.sh"
 fi
-bash "${script_dir}/verify-uniapp-native-provenance.sh" "${provenance_arguments[@]}"
 
 if [[ ! -f "${core_android_aar}" || ! -f "${core_ios_zip}" ]]; then
   echo "Canonical native artifacts for Levixel ${native_version} are missing" >&2
