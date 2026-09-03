@@ -1,17 +1,11 @@
 package com.sandrox.levixel.uniapp.runtime;
 
 import android.app.Activity;
-import android.graphics.Color;
 import android.graphics.RectF;
-import android.os.Build;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.sandrox.levixel.LevixelLayoutSupport;
 import com.sandrox.levixel.LevixelMediaItem;
@@ -33,28 +27,25 @@ final class LevixelUniSession {
     }
 
     @NonNull private final Activity activity;
-    @NonNull private final ViewGroup decorHost;
     @NonNull private final View viewportView;
     @NonNull private final LevixelUniContract.OpenRequest request;
     @NonNull private final Listener listener;
     @NonNull private final List<LevixelMediaItem> nativeItems;
     @NonNull private final String galleryId = "uni-levixel-" + UUID.randomUUID();
-    @NonNull private final WindowStyle windowStyle = new WindowStyle();
 
     @Nullable private LevixelViewerOverlayView overlayView;
+    @Nullable private LevixelUniViewerWindow viewerWindow;
     private int currentIndex;
     private boolean opened;
     private boolean finished;
 
     LevixelUniSession(
             @NonNull Activity activity,
-            @NonNull ViewGroup decorHost,
             @NonNull View viewportView,
             @NonNull LevixelUniContract.OpenRequest request,
             @NonNull Listener listener
     ) {
         this.activity = activity;
-        this.decorHost = decorHost;
         this.viewportView = viewportView;
         this.request = request;
         this.listener = listener;
@@ -66,8 +57,7 @@ final class LevixelUniSession {
         if (finished) {
             return;
         }
-        windowStyle.apply(activity.getWindow(), request.lightTheme);
-        decorHost.postOnAnimation(this::openOverlay);
+        viewportView.postOnAnimation(this::openOverlay);
     }
 
     void close(boolean animated) {
@@ -122,6 +112,29 @@ final class LevixelUniSession {
                 visibleViewportFrame,
                 fallbackRectScale
         );
+        LevixelUniViewerWindow window = new LevixelUniViewerWindow(
+                activity,
+                request.lightTheme,
+                new LevixelUniViewerWindow.Listener() {
+                    @Override
+                    public void onBackRequested() {
+                        close(true);
+                    }
+
+                    @Override
+                    public void onWindowDismissed() {
+                        viewerWindow = null;
+                        overlayView = null;
+                        finish(opened);
+                    }
+                }
+        );
+        viewerWindow = window;
+        if (!window.show()) {
+            viewerWindow = null;
+            finish(false);
+            return;
+        }
         LevixelViewerOverlayView overlay = new LevixelViewerOverlayView(
                 activity,
                 nativeItems,
@@ -148,8 +161,8 @@ final class LevixelUniSession {
                 }
         );
         overlayView = overlay;
+        window.setContent(overlay);
         opened = true;
-        decorHost.addView(overlay);
         listener.onOpened(this);
     }
 
@@ -158,67 +171,15 @@ final class LevixelUniSession {
             return;
         }
         finished = true;
-        windowStyle.restore();
+        LevixelUniViewerWindow window = viewerWindow;
+        viewerWindow = null;
+        if (window != null) {
+            window.dismiss();
+        }
 
         if (!opened) {
             listener.onOpenCancelled(this);
         }
         listener.onDismissed(this, emitDismissEvent && opened);
-    }
-
-    private static final class WindowStyle {
-        @Nullable private Window window;
-        private int statusBarColor;
-        private int navigationBarColor;
-        private int systemUiVisibility;
-        private boolean statusBarContrastEnforced;
-        private boolean navigationBarContrastEnforced;
-        private boolean applied;
-
-        void apply(@Nullable Window targetWindow, boolean lightTheme) {
-            if (targetWindow == null || applied) {
-                return;
-            }
-            window = targetWindow;
-            statusBarColor = targetWindow.getStatusBarColor();
-            navigationBarColor = targetWindow.getNavigationBarColor();
-            View decorView = targetWindow.getDecorView();
-            systemUiVisibility = decorView.getSystemUiVisibility();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                statusBarContrastEnforced = targetWindow.isStatusBarContrastEnforced();
-                navigationBarContrastEnforced = targetWindow.isNavigationBarContrastEnforced();
-                targetWindow.setStatusBarContrastEnforced(false);
-                targetWindow.setNavigationBarContrastEnforced(false);
-            }
-
-            targetWindow.setStatusBarColor(Color.TRANSPARENT);
-            targetWindow.setNavigationBarColor(Color.TRANSPARENT);
-            decorView.setSystemUiVisibility(systemUiVisibility
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-            WindowInsetsControllerCompat controller = ViewCompat.getWindowInsetsController(decorView);
-            if (controller != null) {
-                controller.setAppearanceLightStatusBars(lightTheme);
-                controller.setAppearanceLightNavigationBars(lightTheme);
-            }
-            applied = true;
-        }
-
-        void restore() {
-            Window targetWindow = window;
-            if (!applied || targetWindow == null) {
-                return;
-            }
-            targetWindow.setStatusBarColor(statusBarColor);
-            targetWindow.setNavigationBarColor(navigationBarColor);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                targetWindow.setStatusBarContrastEnforced(statusBarContrastEnforced);
-                targetWindow.setNavigationBarContrastEnforced(navigationBarContrastEnforced);
-            }
-            targetWindow.getDecorView().setSystemUiVisibility(systemUiVisibility);
-            applied = false;
-            window = null;
-        }
     }
 }

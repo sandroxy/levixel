@@ -182,9 +182,8 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         }
 
         View contentView = activity.findViewById(android.R.id.content);
-        View decorView = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
-        if (!(contentView instanceof ViewGroup) || !(decorView instanceof ViewGroup)) {
-            invoke(callback, error("NO_HOST", "$", "Unable to find the UniApp window host"));
+        if (!(contentView instanceof ViewGroup)) {
+            invoke(callback, error("NO_HOST", "$", "Unable to find the UniApp content host"));
             return;
         }
 
@@ -192,7 +191,6 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         pendingOpenCallback = callback;
         LevixelUniSession session = new LevixelUniSession(
                 activity,
-                (ViewGroup) decorView,
                 LevixelUniViewport.resolve(contentView),
                 request,
                 this

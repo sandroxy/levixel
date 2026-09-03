@@ -42,6 +42,7 @@ node -e '
 
 node "${script_dir}/verify-contract-schema.mjs"
 "${script_dir}/verify-react-native-ios-lifecycle.rb"
+"${script_dir}/verify-uniapp-android-window-isolation.rb"
 "${script_dir}/sync-uniapp-canonical-js.sh" --check
 bash "${plugin_dir}/adapters/uniapp/ios/verify-legacy-source-viewport.sh"
 bash "${script_dir}/verify-documentation.sh"
