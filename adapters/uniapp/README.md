@@ -32,7 +32,7 @@ import {
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
-动态、分页或虚拟列表应使用 `initialItemId` 和 `sourceBindings`，只描述当前已挂载源；SDK 按稳定媒体 ID 将稀疏、乱序绑定转换为与 `items` 等长的严格 `sourceHints` 快照。页面源不需要查询上下文；整体自定义组件可传顶层 `queryContext`，分散在多个 cell 组件时可为每个 binding 指定各自上下文。固定且完整渲染的画廊仍可使用 `sourceSelector` 与 `sourceStyles`。初始媒体的 `index`/`initialItemId` 选择和源映射方式彼此独立，但各组内部严格互斥。为获得确定的共享转场，可提前准备当前可见或即将进入视口的媒体，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。大列表不得一次准备全部项目；批量准备应限制并发，选中项可传入 `priority: true`。
+动态、分页或虚拟列表应使用 `initialItemId` 和 `sourceBindings`，描述当前已挂载源；不要用点击下标附近的固定数量猜测可视范围。SDK 按稳定媒体 ID 将稀疏、乱序绑定转换为与 `items` 等长的严格 `sourceHints` 快照。运行时以源矩形和有效页面视口是否存在正面积交集决定回场：哪怕只露出一小部分也使用共享转场，完全位于视口外或已经卸载才安全淡出。页面源不需要查询上下文；整体自定义组件可传顶层 `queryContext`，分散在多个 cell 组件时可为每个 binding 指定各自上下文。固定且完整渲染的画廊仍可使用 `sourceSelector` 与 `sourceStyles`。初始媒体的 `index`/`initialItemId` 选择和源映射方式彼此独立，但各组内部严格互斥。为获得确定的共享转场，可提前准备当前可见或即将进入视口的媒体，再把返回的本地 `src` 渲染到 HTML 图片中。该文件也会交给原生查看器，避免可点击源图仍等待第二次转场专用下载。大列表不得一次准备全部项目；批量准备应限制并发，选中项可传入 `priority: true`。
 
 部分 UniApp runtime 会为不同 `getImageInfo` 请求复用同一个临时路径，因此 SDK 会把远程预览保存为各自独立的受管文件。经典分支沿用 `uni.saveFile`；x 分支使用 `uni.getFileSystemManager().saveFile` / `removeSavedFile`。保存失败时只保留可靠的宽高信息，不缓存、传递或清理该非自有临时路径；查看器仍可按正式媒体 URL 进入原生加载态，避免跨媒体复用临时路径造成错图。JS→UTS transport 会收集并去重 `url`、`thumbnailUrl`、`posterUrl` 中的本地路径，再通过一次批量调用解析；HTTP(S)、`data:` 和已经是 `file:` 的 URL 原样保留。Android 对代码包 `static/` 与 `uni_modules/<id>/static/` 资源使用 `UTSAndroid.getResourcePath`，其余本地路径使用 `convert2AbsFullPath`；iOS 使用 `UTSiOS.convert2AbsFullPath`。单项解析异常会回退原值，且 native `open` 始终只调用一次。
 

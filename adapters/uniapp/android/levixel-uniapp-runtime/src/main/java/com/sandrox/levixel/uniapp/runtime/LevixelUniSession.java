@@ -113,11 +113,13 @@ final class LevixelUniSession {
             return;
         }
 
-        RectF viewportBounds = LevixelLayoutSupport.viewBoundsOnScreen(viewportView);
+        RectF viewportFrame = LevixelLayoutSupport.viewBoundsOnScreen(viewportView);
+        RectF visibleViewportFrame = LevixelUniViewport.visibleFrameInWindow(viewportView);
         float fallbackRectScale = activity.getResources().getDisplayMetrics().density;
         List<LevixelSourceHint> sourceHints = LevixelUniSourceHints.map(
                 request.sourceHints,
-                viewportBounds,
+                viewportFrame,
+                visibleViewportFrame,
                 fallbackRectScale
         );
         LevixelViewerOverlayView overlay = new LevixelViewerOverlayView(

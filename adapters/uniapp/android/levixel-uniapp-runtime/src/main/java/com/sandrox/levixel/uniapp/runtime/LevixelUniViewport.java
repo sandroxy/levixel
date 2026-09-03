@@ -1,6 +1,7 @@
 package com.sandrox.levixel.uniapp.runtime;
 
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
@@ -16,6 +17,15 @@ final class LevixelUniViewport {
     static View resolve(@NonNull View rootView) {
         Candidate candidate = findBestWebView(rootView, null);
         return candidate != null ? candidate.view : rootView;
+    }
+
+    @NonNull
+    static RectF visibleFrameInWindow(@NonNull View view) {
+        Rect visibleRect = new Rect();
+        if (!view.isShown() || !view.getGlobalVisibleRect(visibleRect) || visibleRect.isEmpty()) {
+            return new RectF();
+        }
+        return new RectF(visibleRect);
     }
 
     @Nullable
@@ -47,11 +57,8 @@ final class LevixelUniViewport {
     }
 
     private static long visibleArea(@NonNull View view) {
-        Rect visibleRect = new Rect();
-        if (!view.getGlobalVisibleRect(visibleRect) || visibleRect.isEmpty()) {
-            return 0L;
-        }
-        return (long) visibleRect.width() * visibleRect.height();
+        RectF visibleFrame = visibleFrameInWindow(view);
+        return (long) visibleFrame.width() * (long) visibleFrame.height();
     }
 
     private static final class Candidate {

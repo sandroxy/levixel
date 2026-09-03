@@ -17,17 +17,21 @@ final class LevixelUniSourceHints {
     @NonNull
     static List<LevixelSourceHint> map(
             @NonNull List<LevixelUniContract.SourceHint> hints,
-            @NonNull RectF viewportBoundsInWindow,
+            @NonNull RectF viewportFrameInWindow,
+            @NonNull RectF visibleViewportFrameInWindow,
             float fallbackRectScale
     ) {
         List<LevixelSourceHint> result = new ArrayList<>(hints.size());
-        boolean viewportUsable = viewportBoundsInWindow.width() > 1f
-                && viewportBoundsInWindow.height() > 1f;
+        boolean viewportUsable = viewportFrameInWindow.width() > 1f
+                && viewportFrameInWindow.height() > 1f
+                && visibleViewportFrameInWindow.width() > 0f
+                && visibleViewportFrameInWindow.height() > 0f;
         for (LevixelUniContract.SourceHint hint : hints) {
             result.add(map(
                     hint,
-                    viewportBoundsInWindow.left,
-                    viewportBoundsInWindow.top,
+                    viewportFrameInWindow.left,
+                    viewportFrameInWindow.top,
+                    visibleViewportFrameInWindow,
                     viewportUsable,
                     fallbackRectScale
             ));
@@ -40,6 +44,7 @@ final class LevixelUniSourceHints {
             @Nullable LevixelUniContract.SourceHint hint,
             float viewportLeftInWindow,
             float viewportTopInWindow,
+            @NonNull RectF visibleViewportFrameInWindow,
             boolean viewportUsable,
             float fallbackRectScale
     ) {
@@ -66,16 +71,50 @@ final class LevixelUniSourceHints {
 
         float imageWidth = hint.imageSize != null ? (float) hint.imageSize.width : 0f;
         float imageHeight = hint.imageSize != null ? (float) hint.imageSize.height : 0f;
+        float width = (float) hint.rect.width * scale;
+        float height = (float) hint.rect.height * scale;
+        if ("viewport".equals(hint.coordinateSpace)
+                && !hasPositiveIntersection(left, top, width, height, visibleViewportFrameInWindow)) {
+            return null;
+        }
+        RectF clippingFrameInWindow = "viewport".equals(hint.coordinateSpace)
+                ? visibleViewportFrameInWindow
+                : null;
         return new LevixelSourceHint(
-                left,
-                top,
-                (float) hint.rect.width * scale,
-                (float) hint.rect.height * scale,
+                rect(left, top, left + width, top + height),
+                clippingFrameInWindow,
                 imageWidth,
                 imageHeight,
                 objectFit(hint.objectFit),
                 (float) hint.cornerRadius * scale
         );
+    }
+
+    @NonNull
+    private static RectF rect(float left, float top, float right, float bottom) {
+        RectF rect = new RectF();
+        rect.left = left;
+        rect.top = top;
+        rect.right = right;
+        rect.bottom = bottom;
+        return rect;
+    }
+
+    private static boolean hasPositiveIntersection(
+            float left,
+            float top,
+            float width,
+            float height,
+            @NonNull RectF clippingFrame
+    ) {
+        float right = left + width;
+        float bottom = top + height;
+        return Float.isFinite(left)
+                && Float.isFinite(top)
+                && Float.isFinite(right)
+                && Float.isFinite(bottom)
+                && Math.min(right, clippingFrame.right) > Math.max(left, clippingFrame.left)
+                && Math.min(bottom, clippingFrame.bottom) > Math.max(top, clippingFrame.top);
     }
 
     @NonNull

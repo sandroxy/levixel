@@ -96,6 +96,14 @@ for dynamic_api in initialItemId sourceBindings queryContext; do
     exit 1
   fi
 done
+if ! grep -Fq "正面积交集" "${marketplace_readme}"; then
+  echo "UniApp user documentation must define return eligibility by positive viewport intersection." >&2
+  exit 1
+fi
+if ! grep -Fq "positive area" "${plugin_dir}/README-EN.md"; then
+  echo "English documentation must define return eligibility by positive viewport intersection." >&2
+  exit 1
+fi
 
 if ! grep -Eq '<Levixel\.Source[^>]*itemId=' "${plugin_dir}/adapters/react-native/README.md"; then
   echo "React Native documentation must recommend stable itemId source binding." >&2

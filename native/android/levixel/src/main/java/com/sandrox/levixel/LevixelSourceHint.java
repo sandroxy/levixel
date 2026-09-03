@@ -23,6 +23,11 @@ public final class LevixelSourceHint {
     @NonNull
     private final ObjectFit objectFit;
     private final float cornerRadius;
+    private final boolean hasClippingFrame;
+    private final float clippingLeftInWindow;
+    private final float clippingTopInWindow;
+    private final float clippingRightInWindow;
+    private final float clippingBottomInWindow;
 
     public LevixelSourceHint(
             @NonNull RectF sourceFrameInWindow,
@@ -32,14 +37,37 @@ public final class LevixelSourceHint {
             float cornerRadius
     ) {
         this(
-                sourceFrameInWindow.left,
-                sourceFrameInWindow.top,
-                sourceFrameInWindow.width(),
-                sourceFrameInWindow.height(),
+                sourceFrameInWindow,
+                null,
                 imageWidth,
                 imageHeight,
                 objectFit,
                 cornerRadius
+        );
+    }
+
+    /**
+     * Creates a source hint whose visible geometry is additionally clipped to a host viewport.
+     * The source frame remains unmodified so aspect-fill and aspect-fit crop offsets stay exact.
+     */
+    public LevixelSourceHint(
+            @NonNull RectF sourceFrameInWindow,
+            @Nullable RectF clippingFrameInWindow,
+            float imageWidth,
+            float imageHeight,
+            @NonNull ObjectFit objectFit,
+            float cornerRadius
+    ) {
+        this(
+                sourceFrameInWindow.left,
+                sourceFrameInWindow.top,
+                sourceFrameInWindow.right - sourceFrameInWindow.left,
+                sourceFrameInWindow.bottom - sourceFrameInWindow.top,
+                imageWidth,
+                imageHeight,
+                objectFit,
+                cornerRadius,
+                clippingFrameInWindow
         );
     }
 
@@ -53,6 +81,30 @@ public final class LevixelSourceHint {
             @NonNull ObjectFit objectFit,
             float cornerRadius
     ) {
+        this(
+                sourceLeftInWindow,
+                sourceTopInWindow,
+                sourceWidth,
+                sourceHeight,
+                imageWidth,
+                imageHeight,
+                objectFit,
+                cornerRadius,
+                null
+        );
+    }
+
+    private LevixelSourceHint(
+            float sourceLeftInWindow,
+            float sourceTopInWindow,
+            float sourceWidth,
+            float sourceHeight,
+            float imageWidth,
+            float imageHeight,
+            @NonNull ObjectFit objectFit,
+            float cornerRadius,
+            @Nullable RectF clippingFrameInWindow
+    ) {
         this.sourceLeftInWindow = sourceLeftInWindow;
         this.sourceTopInWindow = sourceTopInWindow;
         this.sourceWidth = sourceWidth;
@@ -61,6 +113,11 @@ public final class LevixelSourceHint {
         this.imageHeight = imageHeight;
         this.objectFit = objectFit;
         this.cornerRadius = Math.max(0f, cornerRadius);
+        hasClippingFrame = clippingFrameInWindow != null;
+        clippingLeftInWindow = hasClippingFrame ? clippingFrameInWindow.left : 0f;
+        clippingTopInWindow = hasClippingFrame ? clippingFrameInWindow.top : 0f;
+        clippingRightInWindow = hasClippingFrame ? clippingFrameInWindow.right : 0f;
+        clippingBottomInWindow = hasClippingFrame ? clippingFrameInWindow.bottom : 0f;
     }
 
     public float getSourceLeftInWindow() {
@@ -125,7 +182,7 @@ public final class LevixelSourceHint {
     ) {
         float sourceRight = sourceLeftInWindow + sourceWidth;
         float sourceBottom = sourceTopInWindow + sourceHeight;
-        if (!isUsable(sourceLeftInWindow, sourceTopInWindow, sourceRight, sourceBottom)) {
+        if (!hasUsableSourceSize(sourceLeftInWindow, sourceTopInWindow, sourceRight, sourceBottom)) {
             return null;
         }
 
@@ -133,7 +190,13 @@ public final class LevixelSourceHint {
         float clippedTop = Math.max(sourceTopInWindow, overlayTop);
         float clippedRight = Math.min(sourceRight, overlayRight);
         float clippedBottom = Math.min(sourceBottom, overlayBottom);
-        if (!isUsable(clippedLeft, clippedTop, clippedRight, clippedBottom)) {
+        if (hasClippingFrame) {
+            clippedLeft = Math.max(clippedLeft, clippingLeftInWindow);
+            clippedTop = Math.max(clippedTop, clippingTopInWindow);
+            clippedRight = Math.min(clippedRight, clippingRightInWindow);
+            clippedBottom = Math.min(clippedBottom, clippingBottomInWindow);
+        }
+        if (!hasPositiveArea(clippedLeft, clippedTop, clippedRight, clippedBottom)) {
             return null;
         }
 
@@ -166,7 +229,7 @@ public final class LevixelSourceHint {
         float visibleTop = Math.max(clippedTop, contentTop);
         float visibleRight = Math.min(clippedRight, contentRight);
         float visibleBottom = Math.min(clippedBottom, contentBottom);
-        if (!isUsable(visibleLeft, visibleTop, visibleRight, visibleBottom)) {
+        if (!hasPositiveArea(visibleLeft, visibleTop, visibleRight, visibleBottom)) {
             return null;
         }
 
@@ -187,13 +250,22 @@ public final class LevixelSourceHint {
         );
     }
 
-    private static boolean isUsable(float left, float top, float right, float bottom) {
+    private static boolean hasUsableSourceSize(float left, float top, float right, float bottom) {
         return Float.isFinite(left)
                 && Float.isFinite(top)
                 && Float.isFinite(right)
                 && Float.isFinite(bottom)
                 && right - left > 1f
                 && bottom - top > 1f;
+    }
+
+    private static boolean hasPositiveArea(float left, float top, float right, float bottom) {
+        return Float.isFinite(left)
+                && Float.isFinite(top)
+                && Float.isFinite(right)
+                && Float.isFinite(bottom)
+                && right > left
+                && bottom > top;
     }
 
     private static boolean approximatelyEqual(float first, float second) {

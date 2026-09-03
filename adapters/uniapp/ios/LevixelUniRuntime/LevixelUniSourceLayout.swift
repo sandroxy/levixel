@@ -2,12 +2,14 @@ import UIKit
 
 struct LevixelUniSourceViewport {
     let frameInWindow: CGRect
+    let visibleFrameInWindow: CGRect
     let sourceViewName: String
 
     static func resolve(rootView: UIView, window: UIWindow) -> LevixelUniSourceViewport {
         let viewportView = bestWebViewport(in: rootView, window: window) ?? rootView
         return LevixelUniSourceViewport(
             frameInWindow: viewportView.convert(viewportView.bounds, to: nil),
+            visibleFrameInWindow: visibleFrame(of: viewportView, in: window) ?? .null,
             sourceViewName: NSStringFromClass(type(of: viewportView))
         )
     }
@@ -24,6 +26,16 @@ struct LevixelUniSourceViewport {
             return rect.offsetBy(dx: frameInWindow.minX, dy: frameInWindow.minY)
         case .screen:
             return rect
+        }
+    }
+
+    func clippingFrameInWindow(for hint: LevixelUniSourceHint, window: UIWindow) -> CGRect? {
+        let windowFrame = window.convert(window.bounds, to: nil)
+        switch hint.coordinateSpace {
+        case .viewport:
+            return LevixelUniSourceGeometry.positiveIntersection(visibleFrameInWindow, windowFrame)
+        case .screen:
+            return windowFrame
         }
     }
 
@@ -45,6 +57,7 @@ struct LevixelUniSourceViewport {
                     && $0.alpha > 0.01
                     && $0.bounds.width > 1
                     && $0.bounds.height > 1
+                    && visibleArea(of: $0, in: window) > 0
             }
             .max {
                 visibleArea(of: $0, in: window) < visibleArea(of: $1, in: window)
@@ -52,19 +65,39 @@ struct LevixelUniSourceViewport {
     }
 
     private static func visibleArea(of view: UIView, in window: UIWindow) -> CGFloat {
-        let frame = view.convert(view.bounds, to: nil).intersection(window.bounds)
-        guard frame.isNull == false, frame.isEmpty == false else { return 0 }
+        guard let frame = visibleFrame(of: view, in: window) else { return 0 }
         return frame.width * frame.height
     }
-}
 
-extension CGRect {
-    var isLevixelUniUsable: Bool {
-        minX.isFinite
-            && minY.isFinite
-            && width.isFinite
-            && height.isFinite
-            && width > 1
-            && height > 1
+    private static func visibleFrame(of view: UIView, in window: UIWindow) -> CGRect? {
+        guard view.window === window else { return nil }
+
+        var current: UIView? = view
+        while let candidate = current {
+            guard candidate.isHidden == false, candidate.alpha > 0.01 else { return nil }
+            current = candidate.superview
+        }
+
+        guard var visibleFrame = LevixelUniSourceGeometry.positiveIntersection(
+            view.convert(view.bounds, to: nil),
+            window.convert(window.bounds, to: nil)
+        ) else {
+            return nil
+        }
+
+        current = view.superview
+        while let ancestor = current, ancestor !== window {
+            if ancestor.clipsToBounds || ancestor.layer.masksToBounds {
+                guard let clipped = LevixelUniSourceGeometry.positiveIntersection(
+                    visibleFrame,
+                    ancestor.convert(ancestor.bounds, to: nil)
+                ) else {
+                    return nil
+                }
+                visibleFrame = clipped
+            }
+            current = ancestor.superview
+        }
+        return visibleFrame
     }
 }

@@ -157,7 +157,7 @@ npx expo prebuild
 
 ## UniApp
 
-推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。动态列表可用 `initialItemId + sourceBindings` 只绑定当前已挂载源。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
+推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。动态列表可用 `initialItemId + sourceBindings` 绑定当前已挂载源；回场以源矩形和有效页面视口的真实交集为准，部分可见时共享转场，完全不可见时安全淡出。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
 
 完整兼容范围、加载态接入和示例见 [UniApp 使用说明](uni_modules/Sandrox-Levixel/readme.md)。对应版本的 GitHub Release 也提供 UTS ZIP 与校验和，供直接下载和离线归档。
 

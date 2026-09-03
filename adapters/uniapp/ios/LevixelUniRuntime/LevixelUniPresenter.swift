@@ -467,18 +467,27 @@ public final class LevixelUniPresenter: NSObject {
         window: UIWindow
     ) -> UIImageView? {
         let frameInWindow = sourceViewport.frameInWindow(for: hint)
-        guard frameInWindow.isLevixelUniUsable, frameInWindow.intersects(window.bounds) else {
+        guard
+            let clippingFrameInWindow = sourceViewport.clippingFrameInWindow(for: hint, window: window),
+            LevixelUniSourceGeometry.positiveIntersection(frameInWindow, clippingFrameInWindow) != nil
+        else {
             return nil
         }
 
-        let anchor = UIImageView(frame: host.convert(frameInWindow, from: nil))
+        let clippingView = UIView(frame: host.convert(clippingFrameInWindow, from: nil))
+        clippingView.backgroundColor = .clear
+        clippingView.clipsToBounds = true
+        clippingView.isUserInteractionEnabled = false
+        host.addSubview(clippingView)
+
+        let anchor = UIImageView(frame: clippingView.convert(frameInWindow, from: nil))
         anchor.image = image
         anchor.alpha = LevixelUniSyntheticAnchorVisibility.anchorAlpha
         anchor.contentMode = hint.objectFit.contentMode
         anchor.clipsToBounds = true
         anchor.layer.cornerRadius = hint.cornerRadius * hint.rectScale
         anchor.isUserInteractionEnabled = false
-        host.addSubview(anchor)
+        clippingView.addSubview(anchor)
         return anchor
     }
 
