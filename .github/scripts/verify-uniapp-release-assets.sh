@@ -48,6 +48,10 @@ done
 
 ios_runtime_source="${release_source}/adapters/uniapp/ios/LevixelUniRuntime"
 ios_api_verifier="${release_source}/scripts/verify-ios-core-adapter-api.sh"
+legacy_source_viewport_verifier="${release_source}/adapters/uniapp/ios/verify-legacy-source-viewport.sh"
+if [[ -f "${legacy_source_viewport_verifier}" ]]; then
+  bash "${legacy_source_viewport_verifier}"
+fi
 if [[ -f "${ios_api_verifier}" ]]; then
   bash "${ios_api_verifier}" "${ios_artifact}"
 elif grep -R -E -q \

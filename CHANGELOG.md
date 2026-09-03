@@ -2,6 +2,7 @@
 
 ## 1.3.0 - 2026-08-31
 
+- Resolved legacy UniApp iOS source geometry against the visible page viewport, restoring shared transitions when the bridge root view differs from the rendered page.
 - Made UniApp return transitions follow the source rectangle's positive-area intersection with the effective page viewport: partially visible sources remain shared-transition targets, while fully offscreen sources fade safely.
 - Restored UniApp iOS return transitions by keeping synthetic-anchor hosts registry-visible while hiding only the generated anchor views.
 - Made UniApp warmup dimension-only, bounded click-time preview waiting, and constrained managed previews by per-file size, total bytes, entry count, and idle lifetime.

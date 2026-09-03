@@ -21,8 +21,9 @@ UNI_EXPORT_METHOD(@selector(open:callback:))
     [self configureEventHandler];
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        // Selector rectangles use the visible page viewport, not DCUni's bridge root view.
         [[LevixelUniPresenter shared] openWithOptions:options
-                                             rootView:self.uniInstance.rootView
+                                             rootView:nil
                                        viewController:self.uniInstance.viewController
                                            completion:^(NSDictionary *result) {
             if (callback) {
