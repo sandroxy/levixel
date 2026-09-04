@@ -33,8 +33,13 @@ export function resolveElementSourceLayout(
     const paintContainment = style.contain.split(/\s+/).some(value => (
       value === 'content' || value === 'paint' || value === 'strict'
     ));
-    const clipX = paintContainment || CLIPPING_OVERFLOW.has(style.overflowX);
-    const clipY = paintContainment || CLIPPING_OVERFLOW.has(style.overflowY);
+    // Root overflow represents the viewport scrollport. The viewer locks that
+    // scrollport while it is open, so treating it as an ordinary element clip
+    // would offset the viewport by the document scroll position. Viewport
+    // clipping is applied separately by resolveSourceGeometry.
+    const rootViewport = ancestor === document.body || ancestor === document.documentElement;
+    const clipX = paintContainment || (!rootViewport && CLIPPING_OVERFLOW.has(style.overflowX));
+    const clipY = paintContainment || (!rootViewport && CLIPPING_OVERFLOW.has(style.overflowY));
     if (clipX || clipY) {
       clippingRect = intersectClippedAxes(
         clippingRect,

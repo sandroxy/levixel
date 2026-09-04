@@ -420,6 +420,7 @@ try {
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   await verifyLiveSourceGeometry(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifyScrolledRootViewportSource(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyDynamicListBindings(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
@@ -504,6 +505,69 @@ async function verifyLiveSourceGeometry(targetBrowser, fixtureURL) {
   }
   finally {
     await geometryPage.close();
+  }
+}
+
+async function verifyScrolledRootViewportSource(targetBrowser, fixtureURL) {
+  const scrolledPage = await targetBrowser.newPage({ viewport: { width: 390, height: 844 } });
+  const errors = [];
+  scrolledPage.on('pageerror', error => errors.push(error.message));
+  try {
+    await scrolledPage.goto(fixtureURL);
+    await scrolledPage.waitForFunction(() => window.levixelFixture?.events?.length > 0);
+    await scrolledPage.evaluate(() => {
+      const spacer = document.createElement('div');
+      spacer.style.height = '1100px';
+      spacer.setAttribute('aria-hidden', 'true');
+      document.body.prepend(spacer);
+    });
+
+    const source = scrolledPage.locator('.source').first();
+    await source.scrollIntoViewIfNeeded();
+    const visibleSource = await source.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        scrollY: window.scrollY,
+        intersectsViewport: rect.bottom > 0 && rect.top < window.innerHeight,
+      };
+    });
+    assert.ok(visibleSource.scrollY > 0, 'regression coverage must open below the initial viewport');
+    assert.equal(visibleSource.intersectsViewport, true);
+
+    await source.click();
+    await scrolledPage.waitForFunction(() => window.levixelFixture.results.length === 1);
+    const visibleReturnUsesSnapshot = await scrolledPage.evaluate(async () => {
+      const closing = window.levixelFixture.closeLevixel();
+      const host = document.querySelector('[data-levixel-web-root]');
+      const usesSnapshot = Boolean(host?.shadowRoot.querySelector('.snapshot'));
+      await closing;
+      return usesSnapshot;
+    });
+    assert.equal(
+      visibleReturnUsesSnapshot,
+      true,
+      'a source visible after document scrolling must retain its shared return transition',
+    );
+
+    await scrolledPage.evaluate(() => window.scrollTo(0, 0));
+    await scrolledPage.evaluate(() => window.levixelFixture.open(0));
+    await scrolledPage.waitForFunction(() => window.levixelFixture.results.length === 2);
+    const offscreenReturnUsesSnapshot = await scrolledPage.evaluate(async () => {
+      const closing = window.levixelFixture.closeLevixel();
+      const host = document.querySelector('[data-levixel-web-root]');
+      const usesSnapshot = Boolean(host?.shadowRoot.querySelector('.snapshot'));
+      await closing;
+      return usesSnapshot;
+    });
+    assert.equal(
+      offscreenReturnUsesSnapshot,
+      false,
+      'a source fully outside the current viewport must still use a safe fade',
+    );
+    assert.deepEqual(errors, []);
+  }
+  finally {
+    await scrolledPage.close();
   }
 }
 
