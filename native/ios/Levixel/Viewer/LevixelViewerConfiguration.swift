@@ -31,6 +31,11 @@ public enum LevixelViewerBarButton {
 public struct LevixelViewerConfiguration {
     public var theme: LevixelViewerTheme
     public var contentMode: UIView.ContentMode
+    public var sourceCornerRadius: CGFloat? {
+        didSet {
+            Self.validateSourceCornerRadius(sourceCornerRadius)
+        }
+    }
     public var closeIcon: UIImage?
     public var rightBarButton: LevixelViewerBarButton?
     public var onIndexChange: ((Int) -> Void)?
@@ -42,13 +47,24 @@ public struct LevixelViewerConfiguration {
         closeIcon: UIImage? = nil,
         rightBarButton: LevixelViewerBarButton? = nil,
         onIndexChange: ((Int) -> Void)? = nil,
-        onDismiss: (() -> Void)? = nil
+        onDismiss: (() -> Void)? = nil,
+        sourceCornerRadius: CGFloat? = nil
     ) {
+        Self.validateSourceCornerRadius(sourceCornerRadius)
         self.theme = theme
         self.contentMode = contentMode
+        self.sourceCornerRadius = sourceCornerRadius
         self.closeIcon = closeIcon
         self.rightBarButton = rightBarButton
         self.onIndexChange = onIndexChange
         self.onDismiss = onDismiss
+    }
+
+    private static func validateSourceCornerRadius(_ value: CGFloat?) {
+        guard let value else { return }
+        precondition(
+            value.isFinite && value >= 0,
+            "Levixel sourceCornerRadius must be a non-negative finite number."
+        )
     }
 }

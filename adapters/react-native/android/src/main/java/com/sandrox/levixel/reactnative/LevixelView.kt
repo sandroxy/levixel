@@ -36,6 +36,14 @@ class LevixelView(context: Context) : ViewGroup(context) {
             field = value
             refreshBinding()
         }
+    var sourceCornerRadius: Float = 0f
+        set(value) {
+            require(value.isFinite() && value >= 0f) {
+                "Levixel sourceCornerRadius must be a non-negative finite number."
+            }
+            field = value
+            refreshBinding()
+        }
     var theme: LevixelTheme = LevixelTheme.DARK
 
     val onIndexChange by EventDispatcher()
@@ -112,7 +120,8 @@ class LevixelView(context: Context) : ViewGroup(context) {
             ?: return
         LevixelSourceViewRegistry.register(
             LevixelSharedElementNames.forItem(scopedGalleryId(), mediaItems[safeIndex]),
-            sourceView
+            sourceView,
+            sourceCornerRadiusInPixels()
         )
 
         val overlay = LevixelViewerOverlayView(
@@ -196,7 +205,11 @@ class LevixelView(context: Context) : ViewGroup(context) {
         val sourceKey = LevixelSharedElementNames.forItem(scopedGalleryId(), mediaItems[safeIndex])
         if (isSourceImageViewUsable(imageView)) {
             clearSourceImageObserver(imageView)
-            LevixelSourceViewRegistry.register(sourceKey, imageView)
+            LevixelSourceViewRegistry.register(
+                sourceKey,
+                imageView,
+                sourceCornerRadiusInPixels()
+            )
         } else {
             observeSourceImageView(imageView)
         }
@@ -298,6 +311,9 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     private fun scopedGalleryId(): String? = galleryId.takeIf(String::isNotBlank)
+
+    private fun sourceCornerRadiusInPixels(): Float =
+        sourceCornerRadius * resources.displayMetrics.density
 
     private fun findActivity(sourceContext: Context): Activity? {
         var current = sourceContext

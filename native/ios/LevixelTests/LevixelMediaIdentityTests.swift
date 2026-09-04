@@ -217,6 +217,56 @@ final class LevixelMediaIdentityTests: XCTestCase {
         XCTAssertEqual(state.geometry.cornerRadius, 0)
     }
 
+    func testConfiguredSourceCornerRadiusDrivesTheFullSourceTransition() throws {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let imageView = UIImageView(frame: CGRect(x: 20, y: 30, width: 80, height: 60))
+        imageView.image = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 60)).image {
+            context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 60))
+        }
+        imageView.contentMode = .scaleToFill
+        window.addSubview(imageView)
+        imageView.setupLevixelViewer(
+            configuration: LevixelViewerConfiguration(sourceCornerRadius: 12)
+        )
+        defer {
+            imageView.removeLevixelViewerInteraction()
+            window.isHidden = true
+        }
+
+        let state = try XCTUnwrap(imageView.levixelSharedElementState())
+        XCTAssertEqual(state.geometry.cornerRadius, 12)
+
+        imageView.removeLevixelViewerInteraction()
+        let stateAfterRemoval = try XCTUnwrap(imageView.levixelSharedElementState())
+        XCTAssertEqual(stateAfterRemoval.geometry.cornerRadius, 0)
+    }
+
+    func testConfiguredSourceCornerRadiusDoesNotRoundInsetAspectFitContent() throws {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let imageView = UIImageView(frame: CGRect(x: 20, y: 30, width: 80, height: 80))
+        imageView.image = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 40)).image {
+            context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 40))
+        }
+        imageView.contentMode = .scaleAspectFit
+        window.addSubview(imageView)
+        imageView.setupLevixelViewer(
+            configuration: LevixelViewerConfiguration(sourceCornerRadius: 12)
+        )
+        defer {
+            imageView.removeLevixelViewerInteraction()
+            window.isHidden = true
+        }
+
+        let state = try XCTUnwrap(imageView.levixelSharedElementState())
+        XCTAssertEqual(state.geometry.cornerRadius, 0)
+    }
+
     func testRegistryKeepsThePluginHiddenSourceAnchorResolvable() {
         let galleryId = "test-\(UUID().uuidString)"
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))

@@ -23,11 +23,20 @@ public final class LevixelLayoutSupport {
 
     @Nullable
     public static LevixelSharedElementState captureImageViewState(@Nullable ImageView imageView) {
-        return captureImageViewState(imageView, null);
+        return captureImageViewState(imageView, null, 0f);
     }
 
     @Nullable
     public static LevixelSharedElementState captureImageViewState(@Nullable ImageView imageView, @Nullable RectF clippingFrameInWindow) {
+        return captureImageViewState(imageView, clippingFrameInWindow, 0f);
+    }
+
+    @Nullable
+    public static LevixelSharedElementState captureImageViewState(
+            @Nullable ImageView imageView,
+            @Nullable RectF clippingFrameInWindow,
+            float cornerRadius
+    ) {
         if (imageView == null) {
             return null;
         }
@@ -74,12 +83,29 @@ public final class LevixelLayoutSupport {
 
         return new LevixelSharedElementState(
                 transitionDrawable,
-                new LevixelSharedElementGeometry(visibleFrameInWindow, contentFrameInVisibleBounds)
+                new LevixelSharedElementGeometry(
+                        visibleFrameInWindow,
+                        contentFrameInVisibleBounds,
+                        resolveVisibleCornerRadius(
+                                imageBoundsInWindow,
+                                visibleFrameInWindow,
+                                cornerRadius
+                        )
+                )
         );
     }
 
     @Nullable
     public static LevixelSharedElementGeometry captureImageViewGeometry(@Nullable ImageView imageView, @Nullable Drawable geometryDrawable) {
+        return captureImageViewGeometry(imageView, geometryDrawable, 0f);
+    }
+
+    @Nullable
+    public static LevixelSharedElementGeometry captureImageViewGeometry(
+            @Nullable ImageView imageView,
+            @Nullable Drawable geometryDrawable,
+            float cornerRadius
+    ) {
         if (imageView == null || imageView.getWidth() <= 0 || imageView.getHeight() <= 0) {
             return null;
         }
@@ -117,7 +143,15 @@ public final class LevixelLayoutSupport {
                 contentFrameInWindow.bottom - visibleFrameInWindow.top
         );
 
-        return new LevixelSharedElementGeometry(visibleFrameInWindow, contentFrameInVisibleBounds);
+        return new LevixelSharedElementGeometry(
+                visibleFrameInWindow,
+                contentFrameInVisibleBounds,
+                resolveVisibleCornerRadius(
+                        imageBoundsInWindow,
+                        visibleFrameInWindow,
+                        cornerRadius
+                )
+        );
     }
 
     @NonNull
@@ -147,6 +181,34 @@ public final class LevixelLayoutSupport {
                 location[0] + localVisibleRect.right,
                 location[1] + localVisibleRect.bottom
         );
+    }
+
+    static float resolveVisibleCornerRadius(
+            @NonNull RectF sourceBounds,
+            @NonNull RectF visibleFrame,
+            float cornerRadius
+    ) {
+        if (!Float.isFinite(cornerRadius) || cornerRadius <= 0f) {
+            return 0f;
+        }
+        boolean fullSourceVisible = approximatelyEqual(sourceBounds.left, visibleFrame.left)
+                && approximatelyEqual(sourceBounds.top, visibleFrame.top)
+                && approximatelyEqual(sourceBounds.right, visibleFrame.right)
+                && approximatelyEqual(sourceBounds.bottom, visibleFrame.bottom);
+        if (!fullSourceVisible) {
+            return 0f;
+        }
+        return Math.min(
+                cornerRadius,
+                Math.min(
+                        sourceBounds.right - sourceBounds.left,
+                        sourceBounds.bottom - sourceBounds.top
+                ) * 0.5f
+        );
+    }
+
+    private static boolean approximatelyEqual(float first, float second) {
+        return Math.abs(first - second) <= 0.5f;
     }
 
     @Nullable

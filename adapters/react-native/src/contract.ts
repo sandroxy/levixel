@@ -11,6 +11,21 @@ const ITEM_KEYS = new Set([
   'alt',
 ]);
 
+const NON_UNIFORM_SOURCE_RADIUS_KEYS = [
+  'borderTopLeftRadius',
+  'borderTopRightRadius',
+  'borderBottomLeftRadius',
+  'borderBottomRightRadius',
+  'borderTopStartRadius',
+  'borderTopEndRadius',
+  'borderBottomStartRadius',
+  'borderBottomEndRadius',
+  'borderStartStartRadius',
+  'borderStartEndRadius',
+  'borderEndStartRadius',
+  'borderEndEndRadius',
+] as const;
+
 export function normalizeMediaItems(
   items: readonly LevixelMediaItem[],
 ): NativeLevixelMediaItem[] {
@@ -108,6 +123,42 @@ export function resolveSourceIndex(
     throw new RangeError('[Levixel] Levixel.Source index is outside the items array.');
   }
   return selection.index;
+}
+
+export function resolveSourceCornerRadius(
+  style: Readonly<Record<string, unknown>> | undefined,
+): number {
+  if (style === undefined) {
+    return 0;
+  }
+
+  for (const key of NON_UNIFORM_SOURCE_RADIUS_KEYS) {
+    if (style[key] !== undefined) {
+      throw new TypeError(
+        `[Levixel] Levixel.Source style.${key} is not supported; use one uniform numeric borderRadius.`,
+      );
+    }
+  }
+
+  const cornerRadius = style.borderRadius;
+  if (cornerRadius === undefined) {
+    return 0;
+  }
+  if (
+    typeof cornerRadius !== 'number'
+    || !Number.isFinite(cornerRadius)
+    || cornerRadius < 0
+  ) {
+    throw new TypeError(
+      '[Levixel] Levixel.Source style.borderRadius must be a non-negative finite number.',
+    );
+  }
+  if (cornerRadius > 0 && style.overflow !== 'hidden') {
+    throw new TypeError(
+      '[Levixel] Levixel.Source with borderRadius must also set overflow to "hidden".',
+    );
+  }
+  return cornerRadius;
 }
 
 function requireRecord(value: unknown, path: string): Record<string, unknown> {

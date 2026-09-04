@@ -109,6 +109,12 @@ if ! grep -Eq '<Levixel\.Source[^>]*itemId=' "${plugin_dir}/adapters/react-nativ
   echo "React Native documentation must recommend stable itemId source binding." >&2
   exit 1
 fi
+for source_style_marker in borderRadius "overflow: 'hidden'" "single source of truth"; do
+  if ! grep -Fq "${source_style_marker}" "${plugin_dir}/adapters/react-native/README.md"; then
+    echo "React Native documentation is missing the authoritative source style marker: ${source_style_marker}." >&2
+    exit 1
+  fi
+done
 for dynamic_api in initialItemId sourceBindings; do
   if ! grep -Fq "${dynamic_api}" "${plugin_dir}/adapters/web/README.md"; then
     echo "Web documentation is missing dynamic-list API ${dynamic_api}." >&2

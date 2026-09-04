@@ -19,6 +19,9 @@ class LevixelModule : Module() {
             Prop("galleryId") { view: LevixelView, galleryId: String ->
                 view.galleryId = galleryId
             }
+            Prop("sourceCornerRadius") { view: LevixelView, sourceCornerRadius: Double ->
+                view.sourceCornerRadius = sourceCornerRadius.toFloat()
+            }
             Prop("theme") { view: LevixelView, theme: LevixelTheme ->
                 view.theme = theme
             }

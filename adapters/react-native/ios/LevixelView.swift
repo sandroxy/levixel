@@ -20,6 +20,14 @@ final class LevixelView: ExpoView {
     var items: [[String: Any]] = []
     var initialIndex = 0
     var galleryId = ""
+    var sourceCornerRadius: CGFloat = 0 {
+        didSet {
+            precondition(
+                sourceCornerRadius.isFinite && sourceCornerRadius >= 0,
+                "Levixel sourceCornerRadius must be a non-negative finite number."
+            )
+        }
+    }
     var theme: LevixelTheme = .dark
 
     let onIndexChange = EventDispatcher()
@@ -86,6 +94,7 @@ final class LevixelView: ExpoView {
 
         let safeIndex = min(max(0, initialIndex), media.items.count - 1)
         var configuration = LevixelViewerConfiguration(theme: theme.viewerTheme)
+        configuration.sourceCornerRadius = sourceCornerRadius
         configuration.onIndexChange = { [weak self] index in
             self?.onIndexChange([
                 "currentIndex": index,

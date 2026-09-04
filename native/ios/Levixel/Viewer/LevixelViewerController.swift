@@ -248,6 +248,7 @@ final class LevixelViewerController: UIViewController {
         setNavigationBarHidden(shouldHideNavigationBarForCurrentPage, animated: false)
         transitionCoordinatorRef?.performOpenTransition(
             from: initialSourceView,
+            sourceCornerRadius: sourceCornerRadius(for: initialSourceView, at: initialIndex),
             to: pageView,
             backgroundView: backgroundView,
             contentView: contentView
@@ -314,6 +315,7 @@ final class LevixelViewerController: UIViewController {
         transitionCoordinatorRef?.performCloseTransition(
             from: pageView,
             to: anchorView,
+            anchorCornerRadius: sourceCornerRadius(for: anchorView, at: currentIndex),
             backgroundView: backgroundView,
             contentView: contentView
         ) { [weak self] in
@@ -357,6 +359,15 @@ final class LevixelViewerController: UIViewController {
             return initialSourceView
         }
         return nil
+    }
+
+    private func sourceCornerRadius(for sourceView: UIImageView?, at index: Int) -> CGFloat? {
+        if sourceView === initialSourceView,
+           index == initialIndex,
+           configuration.sourceCornerRadius != nil {
+            return configuration.sourceCornerRadius
+        }
+        return sourceView?.levixelConfiguredSourceCornerRadius
     }
 
     private func clampedIndex(_ index: Int) -> Int {

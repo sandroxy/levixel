@@ -95,6 +95,10 @@ then register it for the new media identity. The viewer copies the media array
 it opens with as its session snapshot; dismissal resolves the latest visible
 registered source by stable ID and fades when that source is unmounted instead
 of returning to a different cell at the same index.
+For a rounded source, use the `register(key, imageView, cornerRadiusPx)`
+overload with the uniform visible clipping radius in physical pixels. If only
+part of the source intersects the effective viewport, the transition preserves
+that real intersection and drops the radius instead of rounding a list clip.
 
 For complete system-bar transitions, use an edge-to-edge host and route system back events to `viewer.requestClose()`.
 
@@ -130,7 +134,7 @@ imageView.setupLevixelViewer(
 )
 ```
 
-For a multi-item list, configure every currently visible source `UIImageView` with the same `dataSource` and `galleryId`, using that source's own `initialIndex`. Stable `itemIdentifiers` keep return anchors correct across prepends, removals, and reordering; reconfigure visible cells from the latest snapshot when data order changes. Call `removeLevixelViewerInteraction()` before a reusable cell is rebound to different content.
+For a multi-item list, configure every currently visible source `UIImageView` with the same `dataSource` and `galleryId`, using that source's own `initialIndex`. Stable `itemIdentifiers` keep return anchors correct across prepends, removals, and reordering; reconfigure visible cells from the latest snapshot when data order changes. Call `removeLevixelViewerInteraction()` before a reusable cell is rebound to different content. Levixel normally reads clipping radius from the `UIImageView`; when an equal-sized outer container owns the visible clipping instead, give that cell's `LevixelViewerConfiguration.sourceCornerRadius` the same value.
 
 The Swift Package verifies the downloaded XCFramework against the checksum recorded in `Package.swift`.
 
@@ -155,7 +159,7 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-The package includes the React Native integration and the required Android/iOS native runtimes, so the native core does not need to be integrated separately. Dynamic, paginated, and virtualized lists bind mounted cells by stable media identity with `Levixel.Source itemId`. See the [React Native adapter guide](adapters/react-native/README.md) for the component API and host requirements.
+The package includes the React Native integration and the required Android/iOS native runtimes, so the native core does not need to be integrated separately. Dynamic, paginated, and virtualized lists bind mounted cells by stable media identity with `Levixel.Source itemId`. Rounded sources put a numeric `borderRadius` and `overflow: 'hidden'` on `Levixel.Source` itself, so one style controls both visible clipping and native transition geometry. See the [React Native adapter guide](adapters/react-native/README.md) for the component API and host requirements.
 
 ## UniApp
 

@@ -1,9 +1,13 @@
 import { requireNativeView } from 'expo';
 import * as React from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
-import type { NativeSyntheticEvent, ViewProps } from 'react-native';
+import { StyleSheet, type NativeSyntheticEvent, type ViewProps } from 'react-native';
 
-import { normalizeMediaItems, resolveSourceIndex } from './contract';
+import {
+  normalizeMediaItems,
+  resolveSourceCornerRadius,
+  resolveSourceIndex,
+} from './contract';
 import type {
   LevixelIndexChangePayload,
   LevixelProps,
@@ -23,6 +27,7 @@ interface NativeLevixelSourceProps extends ViewProps {
   galleryId: string;
   index: number;
   items: NativeLevixelMediaItem[];
+  sourceCornerRadius: number;
   theme: LevixelTheme;
   onIndexChange?: (
     event: NativeSyntheticEvent<LevixelIndexChangePayload>,
@@ -73,6 +78,10 @@ function LevixelSource(props: LevixelSourceProps) {
   }
   const { children, style } = props;
   const index = resolveSourceIndex(context.items, props);
+  const flattenedStyle = StyleSheet.flatten(style) as
+    | Readonly<Record<string, unknown>>
+    | undefined;
+  const sourceCornerRadius = resolveSourceCornerRadius(flattenedStyle);
 
   return (
     <NativeLevixelSource
@@ -86,6 +95,7 @@ function LevixelSource(props: LevixelSourceProps) {
           event.nativeEvent.itemId,
         );
       }}
+      sourceCornerRadius={sourceCornerRadius}
       style={style}
       theme={context.theme}
     >

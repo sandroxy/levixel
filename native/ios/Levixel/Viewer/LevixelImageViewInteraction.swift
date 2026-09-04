@@ -297,6 +297,10 @@ extension UIImageView {
         }
     }
 
+    var levixelConfiguredSourceCornerRadius: CGFloat? {
+        levixelTapGestureRecognizer?.configuration.sourceCornerRadius
+    }
+
     private var levixelAnchorRegistration: LevixelAnchorRegistration? {
         get {
             objc_getAssociatedObject(self, &Self.anchorRegistrationKey) as? LevixelAnchorRegistration

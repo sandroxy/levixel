@@ -6,7 +6,11 @@ import { pathToFileURL } from 'node:url';
 const contractModule = process.env.LEVIXEL_RN_CONTRACT_PATH
   ? pathToFileURL(path.resolve(process.env.LEVIXEL_RN_CONTRACT_PATH)).href
   : new URL('../src/contract.ts', import.meta.url).href;
-const { normalizeMediaItems, resolveSourceIndex } = await import(contractModule);
+const {
+  normalizeMediaItems,
+  resolveSourceCornerRadius,
+  resolveSourceIndex,
+} = await import(contractModule);
 
 const image = {
   id: 'image-1',
@@ -72,5 +76,37 @@ test('source identity rejects ambiguous, missing, and unknown selections', () =>
   assert.throws(
     () => resolveSourceIndex(items, { itemId: '   ' }),
     /itemId must be a non-empty string/,
+  );
+});
+
+test('source corner radius uses one clipped uniform source boundary', () => {
+  assert.equal(resolveSourceCornerRadius(undefined), 0);
+  assert.equal(
+    resolveSourceCornerRadius({ borderRadius: 8, overflow: 'hidden' }),
+    8,
+  );
+  assert.equal(resolveSourceCornerRadius({ borderRadius: 0 }), 0);
+});
+
+test('source corner radius rejects values the native transition cannot represent', () => {
+  assert.throws(
+    () => resolveSourceCornerRadius({ borderRadius: '50%', overflow: 'hidden' }),
+    /borderRadius must be a non-negative finite number/,
+  );
+  assert.throws(
+    () => resolveSourceCornerRadius({ borderRadius: -1, overflow: 'hidden' }),
+    /borderRadius must be a non-negative finite number/,
+  );
+  assert.throws(
+    () => resolveSourceCornerRadius({ borderRadius: 8 }),
+    /must also set overflow to "hidden"/,
+  );
+  assert.throws(
+    () => resolveSourceCornerRadius({
+      borderRadius: 8,
+      borderTopLeftRadius: 4,
+      overflow: 'hidden',
+    }),
+    /borderTopLeftRadius is not supported/,
   );
 });

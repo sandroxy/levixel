@@ -7,6 +7,7 @@
 - Restored UniApp iOS return transitions by keeping synthetic-anchor hosts registry-visible while hiding only the generated anchor views.
 - Made UniApp warmup dimension-only, bounded click-time preview waiting, and constrained managed previews by per-file size, total bytes, entry count, and idle lifetime.
 - Rebound React Native iOS Fabric source views after component mounting and reuse so recycled list cells remain valid open and return-transition targets.
+- Made a clipped, uniform numeric `Levixel.Source` radius authoritative for React Native Android/iOS transition geometry, preventing square-to-rounded flashes across image renderers and recycled source cells.
 - Made Android shared-element names collision-safe across galleries and between stable item identities and legacy indices.
 - Rejected detached, hidden, and fully clipped iOS and Web source views so unavailable transition targets fall back cleanly instead of animating from stale geometry.
 - Prevented Android video posters from flashing after progress-bar seeks by making the decoded-frame handoff idempotent across renderer callbacks, page reactivation, and cancelled dismiss gestures.

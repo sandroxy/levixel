@@ -59,6 +59,7 @@ final class LevixelViewerTransitionCoordinator {
 
     func performOpenTransition(
         from sourceView: UIImageView?,
+        sourceCornerRadius: CGFloat?,
         to pageView: LevixelViewerPageView?,
         backgroundView: UIView,
         contentView: UIView,
@@ -78,7 +79,12 @@ final class LevixelViewerTransitionCoordinator {
         contentView.alpha = 0
 
         flushLayoutForSharedElementSampling(of: sourceView)
-        guard let sourceView = sourceView, let sourceState = sourceView.levixelSharedElementState() else {
+        guard
+            let sourceView = sourceView,
+            let sourceState = sourceView.levixelSharedElementState(
+                cornerRadius: sourceCornerRadius
+            )
+        else {
             pageView?.completeOpenTransitionPreviewHandoff()
             animateSimpleAppearance(
                 backgroundView: backgroundView,
@@ -147,6 +153,7 @@ final class LevixelViewerTransitionCoordinator {
     func performCloseTransition(
         from pageView: LevixelViewerPageView?,
         to anchorView: UIImageView?,
+        anchorCornerRadius: CGFloat?,
         backgroundView: UIView,
         contentView: UIView,
         completion: @escaping () -> Void
@@ -182,7 +189,10 @@ final class LevixelViewerTransitionCoordinator {
 
         var targetGeometry: LevixelSharedElementGeometry?
         flushLayoutForSharedElementSampling(of: anchorView)
-        if let anchorView = anchorView, let anchorState = anchorView.levixelSharedElementState() {
+        if let anchorView = anchorView,
+           let anchorState = anchorView.levixelSharedElementState(
+               cornerRadius: anchorCornerRadius
+           ) {
             hiddenAnchorView = anchorView
             anchorView.alpha = 0
             targetGeometry = anchorState.geometry

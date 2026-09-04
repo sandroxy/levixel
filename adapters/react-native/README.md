@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
   tile: {
     width: 160,
     height: 160,
+    borderRadius: 12,
     overflow: 'hidden',
   },
 });
@@ -70,6 +71,12 @@ lists that can prepend, append, reorder, paginate, or virtualize: the source is
 resolved against the current `items` by stable media identity on every render.
 An `index` may be used instead for a fixed, fully rendered gallery. The two
 properties are mutually exclusive and an unknown identity fails immediately.
+
+For a rounded source, put one non-negative numeric `borderRadius` and
+`overflow: 'hidden'` on `Levixel.Source` itself, as in the example. That style
+is the single source of truth for both the visible clipping boundary and the
+native transition geometry. Percentage, animated, and per-corner radii are not
+representable by the uniform shared-element snapshot and fail explicitly.
 
 Render `Levixel.Source` only for currently mounted list cells. `items` may
 contain additional loaded media that is not on screen; those entries remain

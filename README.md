@@ -93,6 +93,9 @@ rootView.addView(viewer);
 `LevixelSourceViewRegistry.unregisterView(imageView)`，再以新媒体身份注册。
 查看器会复制打开时的媒体数组作为会话快照；关闭时按稳定 ID 查找最新注册且
 可见的源视图，源已卸载时采用淡出，不会回到同下标的其他 cell。
+圆角源可使用 `register(key, imageView, cornerRadiusPx)` 重载，以物理像素传入与
+可见裁剪一致的统一圆角；当源只剩部分区域位于有效视口内时，转场会保留真实
+交集并取消圆角，避免把列表裁剪边界误画成圆角。
 
 为获得完整的系统栏转场效果，宿主页面应采用 edge-to-edge，并将系统返回事件交给 `viewer.requestClose()`。
 
@@ -128,7 +131,7 @@ imageView.setupLevixelViewer(
 )
 ```
 
-多项列表中，每个当前可见的源 `UIImageView` 都应使用同一个 `dataSource` 和 `galleryId`，并传入自身对应的 `initialIndex`。稳定 `itemIdentifiers` 用于在前插、删除或重排后找到正确回场源；数据顺序变化时应以最新快照重新配置当前可见 cell。可复用 cell 在重新绑定内容前应调用 `removeLevixelViewerInteraction()`。
+多项列表中，每个当前可见的源 `UIImageView` 都应使用同一个 `dataSource` 和 `galleryId`，并传入自身对应的 `initialIndex`。稳定 `itemIdentifiers` 用于在前插、删除或重排后找到正确回场源；数据顺序变化时应以最新快照重新配置当前可见 cell。可复用 cell 在重新绑定内容前应调用 `removeLevixelViewerInteraction()`。通常会直接读取 `UIImageView` 自身的裁剪圆角；若可见圆角实际由等尺寸的外层容器裁剪，则为该 cell 的 `LevixelViewerConfiguration.sourceCornerRadius` 提供同一数值。
 
 Swift Package 会验证下载的 XCFramework 与 `Package.swift` 中记录的 checksum 一致。
 
@@ -153,7 +156,7 @@ pnpm add @sandrox/levixel
 npx expo prebuild
 ```
 
-该包同时提供 React Native 集成层和所需的 Android/iOS 原生运行时，无需再单独接入原生核心。动态、分页或虚拟列表使用 `Levixel.Source itemId` 按稳定媒体身份绑定当前已挂载 cell；组件接口与宿主要求见 [React Native 适配器文档](adapters/react-native/README.md)。
+该包同时提供 React Native 集成层和所需的 Android/iOS 原生运行时，无需再单独接入原生核心。动态、分页或虚拟列表使用 `Levixel.Source itemId` 按稳定媒体身份绑定当前已挂载 cell；圆角源在 `Levixel.Source` 自身使用数字型 `borderRadius` 与 `overflow: 'hidden'`，同一份样式同时决定可见裁剪和原生转场几何。组件接口与宿主要求见 [React Native 适配器文档](adapters/react-native/README.md)。
 
 ## UniApp
 

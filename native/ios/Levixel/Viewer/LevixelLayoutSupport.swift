@@ -147,7 +147,10 @@ extension UIImageView {
         return convert(contentFrame, to: nil)
     }
 
-    func levixelSharedElementState(clippingFrameInWindow: CGRect? = nil) -> LevixelSharedElementState? {
+    func levixelSharedElementState(
+        clippingFrameInWindow: CGRect? = nil,
+        cornerRadius: CGFloat? = nil
+    ) -> LevixelSharedElementState? {
         guard let image = image else { return nil }
         guard image.size.width > 0, image.size.height > 0 else { return nil }
 
@@ -163,7 +166,15 @@ extension UIImageView {
             visibleFrame = clippingFrame
         }
 
-        let fullContainerVisible = clippingFrame.levixelApproximatelyEquals(frameInWindow())
+        let sourceFrame = frameInWindow()
+        let fullSourceVisible = clippingFrame.levixelApproximatelyEquals(sourceFrame)
+            && visibleFrame.levixelApproximatelyEquals(sourceFrame)
+        let requestedCornerRadius = cornerRadius
+            ?? levixelConfiguredSourceCornerRadius
+            ?? ((clipsToBounds || layer.masksToBounds) ? layer.cornerRadius : 0)
+        let resolvedCornerRadius = requestedCornerRadius.isFinite
+            ? min(max(0, requestedCornerRadius), min(sourceFrame.width, sourceFrame.height) * 0.5)
+            : 0
 
         let geometry = LevixelSharedElementGeometry(
             visibleFrameInWindow: visibleFrame,
@@ -171,9 +182,7 @@ extension UIImageView {
                 dx: -visibleFrame.minX,
                 dy: -visibleFrame.minY
             ),
-            cornerRadius: fullContainerVisible && (clipsToBounds || layer.masksToBounds)
-                ? layer.cornerRadius
-                : 0
+            cornerRadius: fullSourceVisible ? resolvedCornerRadius : 0
         )
         let scale = window?.screen.scale ?? UIScreen.main.scale
         return LevixelSharedElementState(

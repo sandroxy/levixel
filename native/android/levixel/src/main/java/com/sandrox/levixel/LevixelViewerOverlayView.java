@@ -395,7 +395,12 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
         String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
         ImageView sourceView = LevixelSourceViewRegistry.find(anchorKey);
-        LevixelSharedElementState sourceState = LevixelLayoutSupport.captureImageViewState(sourceView);
+        float sourceCornerRadius = LevixelSourceViewRegistry.cornerRadiusForView(sourceView);
+        LevixelSharedElementState sourceState = LevixelLayoutSupport.captureImageViewState(
+                sourceView,
+                null,
+                sourceCornerRadius
+        );
         applySourcePlaceholderIfNeeded(pageView, currentIndex);
         pageView.prepareForOpenTransition();
         pageView.setMediaHidden(true);
@@ -465,12 +470,18 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
         String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
         ImageView targetView = LevixelSourceViewRegistry.findVisible(anchorKey);
-        LevixelSharedElementState targetState = LevixelLayoutSupport.captureImageViewState(targetView);
+        float targetCornerRadius = LevixelSourceViewRegistry.cornerRadiusForView(targetView);
+        LevixelSharedElementState targetState = LevixelLayoutSupport.captureImageViewState(
+                targetView,
+                null,
+                targetCornerRadius
+        );
         LevixelSharedElementGeometry targetGeometry = targetState != null
                 ? targetState.getGeometry()
                 : LevixelLayoutSupport.captureImageViewGeometry(
                         targetView,
-                        pageState != null ? pageState.getDrawable() : null
+                        pageState != null ? pageState.getDrawable() : null,
+                        targetCornerRadius
                 );
         if (targetGeometry == null) {
             targetGeometry = geometryFromHint(
