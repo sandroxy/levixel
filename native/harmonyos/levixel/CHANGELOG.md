@@ -5,6 +5,8 @@
 - Aligns the package version with the coordinated Levixel 1.3.0 candidate.
 - Keeps each open viewer on an immutable media snapshot while resolving its
   return source against the latest host grid by stable media ID.
+- Preserves uncached thumbnail proportions during opening, prewarms newly
+  visible dynamic items, and fades the full image over its preview.
 
 ## 1.2.0 - 2026-08-28
 

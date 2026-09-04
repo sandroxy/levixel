@@ -30,6 +30,10 @@ interface SharedElementState {
   radius: number;
 }
 
+interface OpeningSharedElementState extends SharedElementState {
+  targetGeometry: SharedElementGeometry;
+}
+
 interface TransitionImageResource {
   pixelMap: image.PixelMap;
   width: number;
@@ -238,6 +242,7 @@ export struct LevixelGallery {
     .onVisibleAreaChange([0.0, 0.01], (isVisible: boolean, currentRatio: number) => {
       if (isVisible && currentRatio > 0) {
         this.visibleSourceIds.add(item.id);
+        this.loadImageResource(item.thumbnailUrl);
       } else {
         this.visibleSourceIds.delete(item.id);
       }
@@ -346,7 +351,7 @@ export struct LevixelGallery {
       Image(this.previewSourceFor(item))
         .width('100%')
         .height('100%')
-        .objectFit(ImageFit.Fill)
+        .objectFit(ImageFit.Cover)
         .syncLoad(this.previewUsesPixelMap(item))
         .onComplete(() => {
           this.handleViewerPreviewReady(item.id);
@@ -409,7 +414,7 @@ export struct LevixelGallery {
     const token: number = this.beginTransition();
     const item: LevixelMediaItem = sessionItems[index];
     this.sessionItems = sessionItems;
-    const sourceState: SharedElementState | null = await this.captureSourceState(item, index);
+    const sourceState: OpeningSharedElementState | null = await this.captureSourceState(item, index);
     if (!this.isActiveTransition(token)) {
       return;
     }
@@ -432,7 +437,7 @@ export struct LevixelGallery {
       return;
     }
 
-    const targetGeometry: SharedElementGeometry = this.viewerGeometryFor(item);
+    const targetGeometry: SharedElementGeometry = sourceState.targetGeometry;
     this.applySnapshotState(sourceState);
     this.snapshotVisible = true;
     this.hiddenSourceId = item.id;
@@ -572,26 +577,66 @@ export struct LevixelGallery {
     return this.transitionActive && this.transitionToken === token;
   }
 
-  private async captureSourceState(item: LevixelMediaItem, index: number): Promise<SharedElementState | null> {
+  private async captureSourceState(
+    item: LevixelMediaItem,
+    index: number
+  ): Promise<OpeningSharedElementState | null> {
     const sourceRect: RectMetrics = this.sourceRectFor(item, index);
+    const targetRect: RectMetrics = this.targetRectFor(item);
     const cachedResource: TransitionImageResource | undefined = this.imageResourceCache.get(item.thumbnailUrl);
     if (cachedResource !== undefined) {
-      return this.createImageResourceState(cachedResource, sourceRect, TransitionImageFit.COVER, THUMBNAIL_RADIUS);
+      return this.createOpeningSourceState(cachedResource, sourceRect, targetRect);
     }
 
     const pixelMap: image.PixelMap | null = await this.capturePixelMap(this.sourceSnapshotId(item));
     if (pixelMap !== null) {
-      return {
-        pixelMap: pixelMap,
-        geometry: this.defaultGeometryFor(sourceRect),
-        radius: THUMBNAIL_RADIUS
-      };
+      const capturedResource: TransitionImageResource = await this.describePixelMap(pixelMap, sourceRect);
+      return this.createOpeningSourceState(capturedResource, sourceRect, targetRect);
     }
 
     const resource: TransitionImageResource | null = await this.loadImageResource(item.thumbnailUrl);
     return resource !== null
-      ? this.createImageResourceState(resource, sourceRect, TransitionImageFit.COVER, THUMBNAIL_RADIUS)
+      ? this.createOpeningSourceState(resource, sourceRect, targetRect)
       : null;
+  }
+
+  private createOpeningSourceState(
+    resource: TransitionImageResource,
+    sourceRect: RectMetrics,
+    targetRect: RectMetrics
+  ): OpeningSharedElementState {
+    const sourceState: SharedElementState = this.createImageResourceState(
+      resource,
+      sourceRect,
+      TransitionImageFit.COVER,
+      THUMBNAIL_RADIUS
+    );
+    return {
+      pixelMap: sourceState.pixelMap,
+      geometry: sourceState.geometry,
+      radius: sourceState.radius,
+      targetGeometry: this.geometryForImageResource(resource, targetRect, TransitionImageFit.COVER)
+    };
+  }
+
+  private async describePixelMap(
+    pixelMap: image.PixelMap,
+    fallbackFrame: RectMetrics
+  ): Promise<TransitionImageResource> {
+    try {
+      const info: image.ImageInfo = await pixelMap.getImageInfo();
+      return {
+        pixelMap: pixelMap,
+        width: Math.max(1, info.size.width),
+        height: Math.max(1, info.size.height)
+      };
+    } catch (_error) {
+      return {
+        pixelMap: pixelMap,
+        width: Math.max(1, fallbackFrame.width),
+        height: Math.max(1, fallbackFrame.height)
+      };
+    }
   }
 
   private async captureViewerState(item: LevixelMediaItem): Promise<SharedElementState | null> {
@@ -686,10 +731,6 @@ export struct LevixelGallery {
         height: visibleFrame.height
       }
     };
-  }
-
-  private viewerGeometryFor(item: LevixelMediaItem): SharedElementGeometry {
-    return this.defaultGeometryFor(this.targetRectFor(item));
   }
 
   private sourceSnapshotId(item: LevixelMediaItem): string {
