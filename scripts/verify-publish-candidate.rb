@@ -9,12 +9,14 @@ require "time"
 require "yaml"
 require_relative "native-release-manifest"
 require_relative "release-policy"
+require_relative "acceptance-reuse"
 
 options = {}
 OptionParser.new do |parser|
   parser.banner = "Usage: verify-publish-candidate.rb --candidate FILE --acceptance FILE"
   parser.on("--candidate FILE") { |value| options[:candidate] = value }
   parser.on("--acceptance FILE") { |value| options[:acceptance] = value }
+  parser.on("--verifier-repository DIR") { |value| options[:verifier_repository] = value }
 end.parse!
 
 required = %i[candidate acceptance]
@@ -104,7 +106,7 @@ native_roles = %w[
   native-android-aar native-android-maven-central-bundle native-android-maven-repository
   native-harmonyos-har native-ios-swift-package native-ios-xcframework
 ]
-candidate_native_entries = native_roles.filter_map { |role| artifacts_by_role[role] }
+candidate_native_entries = native_roles.map { |role| artifacts_by_role[role] }.compact
 manifest_native_entries = native_manifest.fetch("artifacts").to_h do |entry|
   [entry.fetch("file"), entry]
 end
@@ -213,6 +215,26 @@ end
 
 manual_checks.each do |target, entry|
   evidence = entry.fetch("evidence")
+  if evidence.is_a?(Hash) && evidence["kind"] == "plugin-candidate-manual-reuse"
+    begin
+      run_sha256 = evidence.fetch("runSha256")
+      run = evidence.reject { |key, _value| key == "runSha256" }
+      abort("Manual reuse digest differs: #{target}") unless AcceptanceReuse.checksum(run) == run_sha256
+      scopes = AcceptanceReuse.load_policy(
+        root.join("acceptance-reuse-policy.json"), plugin: plugin, acceptance: acceptance_requirements,
+        artifact_roles: artifacts_by_role.keys
+      )
+      AcceptanceReuse.validate!(
+        run, candidate: candidate, candidate_digest: candidate_manifest_sha256, target: target,
+        verifier: verifier, scopes: scopes,
+        validate_candidate: ->(value) { ReleasePolicy.validate_candidate!(value, release_policy) },
+        verifier_root: options[:verifier_repository], latest: [recorded_at, Time.now.utc].min
+      )
+    rescue AcceptanceReuse::Error, ReleasePolicy::Error, KeyError => error
+      abort(error.message)
+    end
+    next
+  end
   expected_evidence_fields = %w[
     artifactSetSha256 candidateId candidateManifestSha256 environment kind notes plugin
     recordedAt runSha256 scenarios schemaVersion status target verifier version

@@ -74,7 +74,7 @@ Product publication workflows are intentionally manual. Publishing a GitHub Rele
 ## Immutable Candidate Rule
 
 1. Start from the release commit with a clean worktree.
-2. Build each candidate once.
+2. Build each artifact once, or explicitly reuse unchanged artifacts under the rules below, then snapshot the complete set.
 3. Run the artifact self-checks in this repository.
 4. Install those exact files in artifact-only consumer hosts. Consumer hosts must not compile or copy Levixel source.
 5. Complete the required Android, iOS, HarmonyOS, React Native, UniApp, and Web interaction verification for the targets being released.
@@ -109,7 +109,83 @@ For a local pipeline rehearsal only:
 ./scripts/prepare-native-release.sh --allow-dirty --allow-unsigned
 ```
 
-The formal candidate requires a clean worktree and Maven signing credentials.
+The formal candidate requires a clean worktree. Maven signing credentials are
+required when building its signed Maven artifacts, not when verifying and
+copying an existing signed set.
+
+## Reusing unchanged candidate artifacts and manual evidence
+
+Reuse is a per-artifact decision, not a platform exemption. It is limited to
+candidates for the same still-unpublished version. Old snapshots and evidence
+remain immutable; the new full candidate gets its own identity and manifest.
+
+[`native-reuse-policy.json`](native-reuse-policy.json) declares each native
+artifact group, output directory, and repository-controlled source/package
+inputs. Inspect a source candidate without changing any files:
+
+```sh
+ruby scripts/reuse-native-artifacts.rb \
+  --candidate /absolute/path/to/source/candidate.json --plan
+```
+
+From a clean commit, select any unchanged groups printed by the plan:
+
+```sh
+./scripts/prepare-native-release.sh \
+  --reuse-candidate /absolute/path/to/source/candidate.json \
+  --reuse "<group-name>"
+```
+
+Repeat `--reuse` for additional groups. The command verifies the entire source
+snapshot, source-commit ancestry, and the declared tracked inputs, including
+file modes, added files, and deleted files. It copies the selected artifacts
+and sidecars without repacking; unselected groups follow their normal build
+commands. A selected group with changed or missing inputs fails explicitly.
+Maven reuse also verifies the release-key signatures, internal checksums, and
+agreement between the standalone AAR, Maven repository, and Central bundle.
+There is no signing-key export for this operation. Reuse cannot be combined
+with rehearsal flags or independent iOS artifact/URL overrides.
+
+The new native manifest retains the source candidate and per-group input
+digests under `buildProvenance.artifactReuse`. Candidate creation and the
+publication gate check this provenance again. Its release commit identifies the
+new coordinated set; it does not claim the reused binaries were rebuilt there.
+The input digest describes tracked source/package inputs, not a claim that a
+different compiler or SDK would reproduce identical bytes. Changes to build
+dependencies require reviewing the declared scopes.
+
+Run all package self-checks before snapshotting. An adapter archive can remain
+unchanged only if its full existing bytes still pass those checks against the
+new release inputs. Embedded documentation counts as package content; a
+documentation-only repack is still a changed artifact.
+
+Manual acceptance may be reused only through the verifier's
+`verification/reuse-manual-run.rb`, with an explicit original candidate and
+original passed manual-run file. Both repositories independently declare the
+consumed artifact roles and tracked verifier input scopes for every target:
+this repository owns [`acceptance-reuse-policy.json`](acceptance-reuse-policy.json).
+The verifier owns its separate `verification/levixel/reuse-policy.json`.
+Byte length and SHA-256 must match for every consumed artifact; the declared
+host, lockfiles, fixtures, and preparation inputs must match across ancestor
+verifier commits. The existing environment and test date remain attached to
+the original run. Missing evidence, changed inputs, incomplete scenarios, and
+reuse chains require a new manual run; chat reports are not synthesized into
+evidence files. All automated targets still run on the new candidate.
+
+For a receipt containing reused manual evidence, give the publication gate an
+explicit verifier checkout containing both recorded commits. It reads Git
+objects to independently verify the input digests and repository identity; it
+does not execute verifier code or inspect a guessed sibling directory:
+
+```sh
+./scripts/verify-publish-candidate.rb \
+  --candidate /absolute/path/to/candidate.json \
+  --acceptance /absolute/path/to/accepted-receipt.json \
+  --verifier-repository /absolute/path/to/integrated-plugins
+```
+
+The local npm publication command accepts the same `--verifier-repository`
+option. Missing history or failed proof verification stops publication.
 
 ## Documentation Boundary
 
@@ -298,7 +374,7 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
    ./scripts/package-uniapp.sh
    ```
 
-   Packaging fails before building if the worktree is dirty or if the generated canonical SDK, target/native version split, native release hashes, or declared source root has drifted. It builds into temporary storage and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. `--allow-dirty` is only a local rehearsal; `--replace` is allowed only after deliberately rejecting the previous candidate and requires repeating all acceptance. The result is `dist/uniapp/levixel-uniapp-<version>.zip`; record its SHA-256 before any device run.
+   Packaging fails before building if the worktree is dirty or if the generated canonical SDK, target/native version split, native release hashes, or declared source root has drifted. It builds into temporary storage and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. `--allow-dirty` is only a local rehearsal; `--replace` is allowed only after deliberately rejecting the previous candidate. Changed ZIP bytes require new manual acceptance for every consumer of that ZIP; unchanged targets may use the explicit evidence-reuse rules above. The result is `dist/uniapp/levixel-uniapp-<version>.zip`; record its SHA-256 before any device run.
 
 2. Inspect the exact bytes and compile classic/x bridges with the declared HBuilderX minimum or newer, including official x SDK typechecks:
 
@@ -368,7 +444,7 @@ The Web package is ESM-only, has no runtime dependencies, and publishes as `@san
 
 7. Run `Publish Web npm` with the same version and SHA-256. The workflow downloads, verifies, and publishes the exact GitHub Release tarball through OIDC. It fails if that npm version already exists.
 
-The local `--allow-dirty` packaging option is only a pipeline rehearsal. A dirty-worktree artifact is not publishable until the identical bytes pass clean-commit verification. A differing candidate must use `--replace` explicitly and repeat all artifact-only acceptance; never rename or silently overwrite an accepted tarball.
+The local `--allow-dirty` packaging option is only a pipeline rehearsal. A dirty-worktree artifact is not publishable until the identical bytes pass clean-commit verification. A differing candidate must use `--replace` explicitly and repeat Web artifact-only acceptance; unchanged targets may use the explicit evidence-reuse rules above. Never rename or silently overwrite an accepted tarball.
 
 ## Provenance
 

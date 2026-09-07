@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+require_relative "native-artifact-reuse"
+
 module NativeReleaseManifest
   class Error < StandardError; end
 
@@ -46,7 +48,8 @@ module NativeReleaseManifest
       [true, false].include?(manifest.fetch("androidMavenSigned"))
     provenance = manifest.fetch("buildProvenance")
     raise Error, "Invalid native build provenance" unless
-      provenance.is_a?(Hash) && provenance.keys.sort == ["iosXcframework"]
+      provenance.is_a?(Hash) && provenance.key?("iosXcframework") &&
+        (provenance.keys - %w[iosXcframework artifactReuse]).empty?
     ios = provenance.fetch("iosXcframework")
     raise Error, "Invalid iOS XCFramework provenance fields" unless
       ios.is_a?(Hash) && ios.keys.sort == %w[sourceCommit sourceDigest]
@@ -56,7 +59,12 @@ module NativeReleaseManifest
       ios_commit.is_a?(String) && ios_commit.match?(SHA40_PATTERN)
     raise Error, "Invalid iOS XCFramework source digest" unless
       ios_digest.is_a?(String) && ios_digest.match?(SHA256_PATTERN)
+    if provenance.key?("artifactReuse")
+      NativeArtifactReuse.validate!(provenance.fetch("artifactReuse"), manifest: manifest)
+    end
     manifest
+  rescue NativeArtifactReuse::Error => error
+    raise Error, error.message
   rescue KeyError => error
     raise Error, "Incomplete native release manifest: #{error.message}"
   end

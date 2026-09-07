@@ -4,6 +4,7 @@ set -euo pipefail
 mode="--dry-run"
 candidate_manifest=""
 acceptance_receipt=""
+verifier_repository=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run|--publish)
@@ -18,8 +19,12 @@ while [[ $# -gt 0 ]]; do
       acceptance_receipt="${2:-}"
       shift 2
       ;;
+    --verifier-repository)
+      verifier_repository="${2:?Missing verifier repository path}"
+      shift 2
+      ;;
     *)
-      echo "Usage: $0 [--dry-run|--publish] --candidate /absolute/candidate.json --acceptance /absolute/accepted-receipt.json" >&2
+      echo "Usage: $0 [--dry-run|--publish] --candidate /absolute/candidate.json --acceptance /absolute/accepted-receipt.json [--verifier-repository DIR]" >&2
       exit 1
       ;;
   esac
@@ -36,9 +41,11 @@ package_name="@sandrox/levixel"
 release_tag="refs/tags/${version}"
 registry="https://registry.npmjs.org/"
 
-"${script_dir}/verify-publish-candidate.rb" \
-  --candidate "${candidate_manifest}" \
-  --acceptance "${acceptance_receipt}" >/dev/null
+verifier_arguments=(--candidate "${candidate_manifest}" --acceptance "${acceptance_receipt}")
+if [[ -n "${verifier_repository}" ]]; then
+  verifier_arguments+=(--verifier-repository "${verifier_repository}")
+fi
+"${script_dir}/verify-publish-candidate.rb" "${verifier_arguments[@]}" >/dev/null
 artifact_path="$(ruby -rjson -rpathname -e '
   manifest_path = Pathname.new(ARGV.fetch(0)).realpath
   manifest = JSON.parse(manifest_path.read)

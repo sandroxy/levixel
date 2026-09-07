@@ -23,6 +23,9 @@ ruby -I "${script_dir}" -rdigest -rjson -r native-release-manifest -e '
   version = ARGV.fetch(1)
   artifact_path = ARGV.fetch(2)
   NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
+  if (proof = manifest.dig("buildProvenance", "artifactReuse"))
+    NativeArtifactReuse.verify_inputs!(proof, root: ARGV.fetch(3), commit: manifest.fetch("commit"))
+  end
   artifact_name = "levixel-#{version}.xcframework.zip"
   artifact = manifest.fetch("artifacts").find { |entry| entry.fetch("file") == artifact_name }
   abort("Native release manifest is missing #{artifact_name}") unless artifact
@@ -30,7 +33,7 @@ ruby -I "${script_dir}" -rdigest -rjson -r native-release-manifest -e '
     File.size(artifact_path) == artifact.fetch("bytes")
   abort("iOS XCFramework checksum differs from the native manifest") unless
     Digest::SHA256.file(artifact_path).hexdigest == artifact.fetch("sha256")
-' "${manifest_path}" "${version}" "${xcframework_zip}"
+' "${manifest_path}" "${version}" "${xcframework_zip}" "${script_dir}/.."
 
 source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
 read -r binary_source_commit binary_source_digest < <(

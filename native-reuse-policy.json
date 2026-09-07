@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "native-artifact-reuse-policy",
+  "groups": {
+    "android": {
+      "directory": "native-android",
+      "inputs": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "native/android",
+        "plugin.yaml",
+        "scripts/package-native-android.sh",
+        "scripts/prepare-maven-central-bundle.sh"
+      ],
+      "roles": [
+        "native-android-aar",
+        "native-android-maven-central-bundle",
+        "native-android-maven-repository"
+      ]
+    },
+    "harmonyos": {
+      "directory": "native-harmonyos",
+      "inputs": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "native/harmonyos",
+        "plugin.yaml",
+        "scripts/package-native-harmonyos.sh"
+      ],
+      "roles": ["native-harmonyos-har"]
+    },
+    "ios": {
+      "directory": "native-ios",
+      "inputs": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "native/ios",
+        "packaging/swift-package",
+        "plugin.yaml",
+        "scripts/compute-ios-source-digest.rb",
+        "scripts/package-native-ios.sh",
+        "scripts/verify-ios-xcframework-provenance.sh"
+      ],
+      "roles": ["native-ios-swift-package", "native-ios-xcframework"]
+    }
+  }
+}
