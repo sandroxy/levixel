@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.3.0 - 2026-08-31
+## 1.3.0 - 2026-09-07
 
+- Isolated the UniApp Android viewer in its own full-screen window, preventing the host list from shifting when opening or closing the viewer at the bottom of a page.
+- Restored Web shared transitions for thumbnails scrolled into view by correcting document-root viewport clipping.
 - Resolved legacy UniApp iOS source geometry against the visible page viewport, restoring shared transitions when the bridge root view differs from the rendered page.
 - Made UniApp return transitions follow the source rectangle's positive-area intersection with the effective page viewport: partially visible sources remain shared-transition targets, while fully offscreen sources fade safely.
 - Restored UniApp iOS return transitions by keeping synthetic-anchor hosts registry-visible while hiding only the generated anchor views.

@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.3.0 - 2026-08-31
+## 1.3.0 - 2026-09-07
 
-- Aligns the package version with the coordinated Levixel 1.3.0 candidate.
+- Aligns the package version with the coordinated Levixel 1.3.0 release.
 - Separates the full-screen viewer from host-owned source UI through
   `LevixelViewer`, `LevixelSource`, and `LevixelSourceViewport`, connected by an
   explicit `LevixelController`; the ready-made `LevixelGallery` uses the same

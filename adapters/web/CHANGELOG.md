@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Restored shared transitions for thumbnails scrolled into view by correcting document-root viewport clipping.
 - Rejected duplicate media ids so each request has an unambiguous stable identity.
 - Added stable ID `initialItemId` and sparse `sourceBindings` for prepended,
   appended, reordered, paginated, and virtualized DOM galleries.
