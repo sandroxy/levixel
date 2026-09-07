@@ -23,9 +23,14 @@
   list updates cannot make a session index identify the wrong item.
 - Isolated each open HarmonyOS viewer from later host list updates while still
   resolving its return target against the latest visible source by stable ID.
-- Preserved uncached HarmonyOS thumbnail proportions through the opening
-  transition, prewarmed newly visible dynamic items, and faded the full image
-  over its preview instead of stretching a cropped source snapshot.
+- Separated the HarmonyOS viewer from host-owned source UI through public
+  viewer, source, and clipping-viewport components connected by an explicit
+  controller; the ready-made gallery uses those same primitives, and hosts can
+  open media by stable ID from their own controls.
+- Preserved HarmonyOS thumbnail proportions through the opening transition,
+  kept cropped source snapshots separate from original-image caching, and
+  removed network waits from transition preparation. The full image fades over
+  its preview without stretching the source crop.
 
 ## 1.2.0 - 2026-08-28
 

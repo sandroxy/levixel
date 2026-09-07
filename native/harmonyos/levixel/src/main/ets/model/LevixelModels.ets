@@ -3,6 +3,12 @@ export enum LevixelMediaType {
   VIDEO = 'video'
 }
 
+export enum LevixelSourceImageFit {
+  COVER = 'cover',
+  CONTAIN = 'contain',
+  FILL = 'fill'
+}
+
 export interface LevixelMediaItem {
   id: string;
   mediaType: LevixelMediaType;

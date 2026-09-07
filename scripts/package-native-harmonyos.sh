@@ -48,6 +48,8 @@ if [[ ! -d "${deveco_sdk_home}" ]]; then
   exit 1
 fi
 
+node --test "${script_dir}/test-harmonyos-viewer-context.mjs"
+
 rm -rf "${module_dir}/build"
 (
   cd "${harmony_dir}"

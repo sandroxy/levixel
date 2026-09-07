@@ -3,10 +3,18 @@
 ## 1.3.0 - 2026-08-31
 
 - Aligns the package version with the coordinated Levixel 1.3.0 candidate.
-- Keeps each open viewer on an immutable media snapshot while resolving its
-  return source against the latest host grid by stable media ID.
-- Preserves uncached thumbnail proportions during opening, prewarms newly
-  visible dynamic items, and fades the full image over its preview.
+- Separates the full-screen viewer from host-owned source UI through
+  `LevixelViewer`, `LevixelSource`, and `LevixelSourceViewport`, connected by an
+  explicit `LevixelController`; the ready-made `LevixelGallery` uses the same
+  public primitives.
+- Adds `LevixelController.open(itemId)` for host-controlled opening alongside
+  direct source taps.
+- Supports paginated, prepended, reordered, and virtualized source collections
+  by stable media ID, including precise scroll-viewport clipping and safe fades
+  for fully unavailable return sources.
+- Keeps each open viewer on an immutable media snapshot, preserves thumbnail
+  proportions, and bounds transition-image caching. Opening and dismissal do
+  not wait for a transition image to download.
 
 ## 1.2.0 - 2026-08-28
 
