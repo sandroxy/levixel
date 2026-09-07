@@ -26,7 +26,8 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-24.04
+    # iOS artifact verification requires macOS utilities and the Xcode toolchain.
+    runs-on: macos-26
     steps:
       - name: Validate immutable candidate inputs
         env:
