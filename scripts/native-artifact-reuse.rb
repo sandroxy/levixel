@@ -57,7 +57,7 @@ module NativeArtifactReuse
   def validate!(proof, manifest:, policy: ReleasePolicy.load(File.expand_path("../release-policy.json", __dir__)))
     fields!(proof, %w[platformInputs sourceCandidate sourceCandidateSha256], "native reuse proof")
     source = proof.fetch("sourceCandidate")
-    ReleasePolicy.validate_candidate!(source, policy)
+    ReleasePolicy.validate_artifact_snapshot!(source, policy)
     raise Error, "Native reuse requires an eligible candidate of the same version" unless
       source.fetch("state") == "candidate" && source.fetch("acceptanceEligible") == true &&
         source.fetch("version") == manifest.fetch("version") && source.fetch("plugin") == manifest.fetch("plugin")
@@ -104,7 +104,7 @@ module NativeArtifactReuse
     raise Error, "Candidate path must be an absolute regular file" unless
       path.absolute? && path.file? && !path.symlink?
     candidate = JSON.parse(path.read)
-    ReleasePolicy.validate_candidate!(candidate, policy)
+    ReleasePolicy.validate_artifact_snapshot!(candidate, policy)
     raise Error, "Reuse requires a canonical, eligible candidate manifest" unless
       candidate.fetch("state") == "candidate" && candidate.fetch("acceptanceEligible") == true &&
         path.binread == canonical_json(candidate)

@@ -34,7 +34,7 @@ snapshot them once with:
 [`release-policy.json`](release-policy.json) is this product repository's
 machine-readable release contract. Candidate creation and the publication gate
 both require an exact match for the plugin id, source repository, qualification
-fields, artifact roles, and automated/manual acceptance matrix. Do not add
+fields, artifact roles, and automated consumer targets. Do not add
 sibling products to that policy: a new plugin owns its own policy and can be
 onboarded without changing Levixel's release gate.
 
@@ -46,17 +46,21 @@ Native and classic UniApp catalog sources are used to generate ignored isolated
 hosts, so another plugin's publication state can never block or influence a
 Levixel acceptance receipt. The separately named combined-showcase smoke uses
 only public stable artifacts and is not a Levixel publication gate.
-The manifest also declares the exact automated and manual acceptance targets.
-From a clean verifier commit, run each automated target through
-`verification/run-acceptance.rb`; direct `verify.sh all` output is useful for
-diagnosis but is not per-target release evidence. After exercising every
-candidate-declared scenario on a device or browser, record one environment-bound
-run with `verification/record-manual-run.rb`; it captures the target, device
-model, operating-system version, runtime, verifier commit, and scenario set.
-Pass those files to `verification/record-acceptance.rb` as repeated
-`--manual-evidence <target>=/absolute/run.json` arguments. Omitted targets remain
-`pending`, and the receipt cannot become `accepted` until every declared target
-has passed with matching evidence.
+The manifest declares automated consumer targets. From a clean verifier commit, run each target
+through `verification/run-acceptance.rb`; direct `verify.sh all` output is useful
+for diagnosis but is not per-target release evidence.
+
+The verifier's `record-acceptance.rb --candidate /absolute/path/to/candidate.json`
+summarizes those automated results for the exact artifact set. Its `accepted`
+status means the automated checks passed; it does not certify manual interaction
+coverage or authorize publication. No manual confirmation file or per-scenario
+evidence is required.
+
+The publisher decides whether to release after reviewing actual use and known
+issues. Representative testing is sufficient unless a change or observed problem
+calls for a targeted regression check. Disclose simulator-only coverage when
+describing testing; do not claim that untested devices or scenarios passed.
+Known release-blocking defects must be resolved before publishing.
 
 | Platform | Public product | Canonical artifact |
 | --- | --- | --- |
@@ -77,9 +81,10 @@ Product publication workflows are intentionally manual. Publishing a GitHub Rele
 2. Build each artifact once, or explicitly reuse unchanged artifacts under the rules below, then snapshot the complete set.
 3. Run the artifact self-checks in this repository.
 4. Install those exact files in artifact-only consumer hosts. Consumer hosts must not compile or copy Levixel source.
-5. Complete the required Android, iOS, HarmonyOS, React Native, UniApp, and Web interaction verification for the targets being released.
-6. Record an `accepted` receipt in `integrated-plugins` for the exact candidate
-   id and artifact-set digest.
+5. Generate the automated result summary in `integrated-plugins` for the exact
+   candidate id and artifact-set digest.
+6. Review the actual interaction experience and known limitations with the
+   publisher. Proceed only when the publisher chooses to release.
 7. Create the canonical annotated tag on the candidate source commit, then run
    the local publication gate before uploading any file:
 
@@ -113,7 +118,7 @@ The formal candidate requires a clean worktree. Maven signing credentials are
 required when building its signed Maven artifacts, not when verifying and
 copying an existing signed set.
 
-## Reusing unchanged candidate artifacts and manual evidence
+## Reusing unchanged candidate artifacts
 
 Reuse is a per-artifact decision, not a platform exemption. It is limited to
 candidates for the same still-unpublished version. Old snapshots and evidence
@@ -159,33 +164,11 @@ unchanged only if its full existing bytes still pass those checks against the
 new release inputs. Embedded documentation counts as package content; a
 documentation-only repack is still a changed artifact.
 
-Manual acceptance may be reused only through the verifier's
-`verification/reuse-manual-run.rb`, with an explicit original candidate and
-original passed manual-run file. Both repositories independently declare the
-consumed artifact roles and tracked verifier input scopes for every target:
-this repository owns [`acceptance-reuse-policy.json`](acceptance-reuse-policy.json).
-The verifier owns its separate `verification/levixel/reuse-policy.json`.
-Byte length and SHA-256 must match for every consumed artifact; the declared
-host, lockfiles, fixtures, and preparation inputs must match across ancestor
-verifier commits. The existing environment and test date remain attached to
-the original run. Missing evidence, changed inputs, incomplete scenarios, and
-reuse chains require a new manual run; chat reports are not synthesized into
-evidence files. All automated targets still run on the new candidate.
-
-For a receipt containing reused manual evidence, give the publication gate an
-explicit verifier checkout containing both recorded commits. It reads Git
-objects to independently verify the input digests and repository identity; it
-does not execute verifier code or inspect a guessed sibling directory:
-
-```sh
-./scripts/verify-publish-candidate.rb \
-  --candidate /absolute/path/to/candidate.json \
-  --acceptance /absolute/path/to/accepted-receipt.json \
-  --verifier-repository /absolute/path/to/integrated-plugins
-```
-
-The local npm publication command accepts the same `--verifier-repository`
-option. Missing history or failed proof verification stops publication.
+Changing release metadata does not by itself require repeating manual testing.
+Review changed behavior and package contents to decide whether additional
+interaction checks are needed. Keep previous snapshots and test results intact.
+Automated consumer results must refer to the new candidate and current verifier
+commit; generating them does not require another manual approval record.
 
 ## Documentation Boundary
 
@@ -276,13 +259,13 @@ LEVIXEL_IOS_ACCEPTED_XCFRAMEWORK_SHA256=<accepted-sha256> \
   ./scripts/prepare-native-release.sh
 ```
 
-The packaging script verifies the supplied SHA-256, embedded framework version, slices, privacy manifest, legal notices, and native-source digest before copying the ZIP byte-for-byte to its canonical release filename. For a formal clean release, the embedded digest must belong to the embedded source commit; that commit must be an ancestor of the release commit; and the same digest must still match every current iOS build input. This two-phase rule permits a later metadata-only release commit to add the accepted SwiftPM checksum without creating a commit/checksum cycle, but rejects dirty-source attribution and any intervening native-source change. Record both the source commit and accepted checksum in the release review.
+The packaging script verifies the supplied SHA-256, embedded framework version, slices, privacy manifest, legal notices, and native-source digest before copying the ZIP byte-for-byte to its canonical release filename. For a formal clean release, the embedded digest must belong to the embedded source commit; that commit must be an ancestor of the release commit; and the same digest must still match every current iOS build input. This two-phase rule permits a later metadata-only release commit to add the accepted SwiftPM checksum without creating a commit/checksum cycle, but rejects dirty-source attribution and any intervening native-source change. The native release manifest records the binary's source commit and checksum.
 
 ## HarmonyOS / OHPM
 
 1. Confirm the `@sandrox` scope and publisher access.
 2. Build and inspect `dist/native-harmonyos/levixel-<version>.har` once.
-3. Install that HAR in an artifact-only consumer and complete the HarmonyOS hand verification. While the viewer is open, prepend, append, and reorder the host `items`; confirm the active media remains on its opening snapshot and dismissal returns by stable id to the latest visible source, or fades when that source is absent.
+3. Install that HAR in an artifact-only consumer and review the interaction experience. Dynamic host updates, stable-id returns, and absent-source fades are useful targeted checks. Simulator testing must not be described as physical-device testing.
 4. Publish the accepted HAR to OHPM without rebuilding.
 5. Install the public package in a clean consumer and run a smoke test.
 6. Run the `Mirror HarmonyOS HAR` workflow for the approved version. It verifies the OHPM SHA-512 integrity and package metadata, mirrors the exact HAR and SHA-256 file to the matching GitHub Release, and reconciles the HAR entry in the native release manifest.
@@ -331,7 +314,7 @@ The npm product embeds the native artifacts recorded in `dist/native-release/lev
    rehearsal only. `--replace` may replace a rejected untagged local candidate;
    the version guard cannot be bypassed after a tag exists.
 
-2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, and return behavior. Prepend, append, and reorder loaded items; recycle visible cells; then confirm `itemId` sources still open and return to the matching media.
+2. Install the exact tarball in artifact-only Android and iOS React Native consumers. Review representative interaction coverage and focus additional checks on changed behavior or observed risks. Transitions, loading/video behavior, and stable-id returns after list updates or cell reuse are suggested checks, not an exhaustive per-release checklist.
 3. Confirm the shared canonical `<version>` tag points to the accepted release
    commit. Do not create a React Native-specific tag.
 
@@ -374,7 +357,7 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
    ./scripts/package-uniapp.sh
    ```
 
-   Packaging fails before building if the worktree is dirty or if the generated canonical SDK, target/native version split, native release hashes, or declared source root has drifted. It builds into temporary storage and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. `--allow-dirty` is only a local rehearsal; `--replace` is allowed only after deliberately rejecting the previous candidate. Changed ZIP bytes require new manual acceptance for every consumer of that ZIP; unchanged targets may use the explicit evidence-reuse rules above. The result is `dist/uniapp/levixel-uniapp-<version>.zip`; record its SHA-256 before any device run.
+   Packaging fails before building if the worktree is dirty or if the generated canonical SDK, target/native version split, native release hashes, or declared source root has drifted. It builds into temporary storage and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. `--allow-dirty` is only a local rehearsal; `--replace` is allowed only after deliberately rejecting the previous candidate. Changed package contents determine which interactions need additional testing. The result is `dist/uniapp/levixel-uniapp-<version>.zip` with a SHA-256 sidecar.
 
 2. Inspect the exact bytes and compile classic/x bridges with the declared HBuilderX minimum or newer, including official x SDK typechecks:
 
@@ -385,9 +368,9 @@ The manifest source root is `uni_modules/Sandrox-Levixel`; shared runtimes and t
      ./scripts/verify-uniapp-uts-compiler.sh
    ```
 
-3. The Marketplace ZIP root must directly contain `package.json` and `utssdk/`; DCloud rejects an archive wrapped in a `Sandrox-Levixel/` directory. For artifact-only consumer verification, extract the same ZIP into separate classic and x Vapor hosts. Verify transition, paging, zoom, pan, video, loading, retry, cached reopen, close timing, source alignment, scroll offsets, rapid open/close, and source return behavior on Android and iOS devices. Include prepend-style history loading, append-style pagination, sparse virtualized sources, out-of-order bindings, and per-cell component query contexts. Use HBuilderX standard run/custom base/cloud packaging for Vapor; SDK typecheck is not an offline Vapor App build.
+3. The Marketplace ZIP root must directly contain `package.json` and `utssdk/`; DCloud rejects an archive wrapped in a `Sandrox-Levixel/` directory. Consume the same ZIP in classic and x Vapor hosts, and review representative Android/iOS interactions. Focus additional testing on changed areas such as source geometry, list updates, loading, or video. Use HBuilderX standard run/custom base/cloud packaging for Vapor; SDK typecheck is not an offline Vapor App build.
 4. Complete the remaining contact, screenshot, and device fields in `dist/uniapp/levixel-uniapp-<version>-marketplace.md`.
-5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the final version was explicitly chosen, both classic/x applicable matrices passed, and the ZIP checksum still matches the accepted candidate.
+5. Upload the accepted ZIP to the DCloud Marketplace without rebuilding. Publish only after the final version was explicitly chosen, the publisher approved the actual classic/x coverage and disclosed limitations, and the ZIP checksum still matches the accepted candidate.
 6. Import the public Marketplace version into a clean classic uni-app consumer and rerun the production build. DCloud may add a `name` field equal to `displayName` and reformat `package.json`; all other JSON values and every other payload file must still match the accepted ZIP.
 7. Attach the exact accepted UTS ZIP and its existing SHA-256 sidecar to the matching canonical GitHub Release without rebuilding or re-zipping it. A coordinated release uses the one shared `<version>` tag defined above. DCloud remains the primary UniApp installation channel; the GitHub asset is the anonymous direct-download and offline mirror.
 8. Run `Verify UniApp Release Assets` with the resolved UTS version and the SHA-256 recorded during device acceptance. The workflow derives the native version from the release-source target constraint, downloads those native assets from the corresponding immutable Release, and checks the public ZIP against both product provenance lines. It never rebuilds or alters the candidate.
@@ -409,7 +392,7 @@ Release.
 
 GitHub Actions cannot receive a local file through `workflow_dispatch`, and the DCloud Marketplace requires an authenticated download and may normalize `package.json`. Therefore the release workflow verifies an already uploaded immutable candidate instead of silently rebuilding it or persisting a DCloud session.
 
-The separately generated `levixel-uniapp-legacy-<version>.zip` is the compatibility artifact for App native-plugin/offline consumers. Build it from the resolved native cores and canonical JavaScript SDK, then run the independent `uniapp-legacy` target in `integrated-plugins`. That target consumes only the ZIP, validates the Android and iOS payloads, and generates an isolated classic uni-app host for Android and iOS packaging. Record `uniapp-legacy-android-device` and `uniapp-legacy-ios-device` separately. Attach the accepted ZIP to the matching Release. Every historical legacy ZIP remains immutable on its original Release; no legacy ZIP may replace the Marketplace ZIP.
+The separately generated `levixel-uniapp-legacy-<version>.zip` is the compatibility artifact for App native-plugin/offline consumers. Build it from the resolved native cores and canonical JavaScript SDK, then run the independent `uniapp-legacy` target in `integrated-plugins`. That target consumes only the ZIP, validates the Android and iOS payloads, and generates an isolated classic uni-app host for Android and iOS packaging. Review the Android/iOS interaction experience, then attach the accepted ZIP to the matching Release. Every historical legacy ZIP remains immutable on its original Release; no legacy ZIP may replace the Marketplace ZIP.
 
 Audit the legacy ZIP independently by running `Verify UniApp Release Assets` with `include_legacy` against the same release source. Do not present the legacy artifact as a Marketplace package, a uni-app x package, or the recommended path for new projects.
 
@@ -417,7 +400,7 @@ Audit the legacy ZIP independently by running `Verify UniApp Release Assets` wit
 
 Resolve the Web product version from its explicit target in `plugin.yaml`. For a coordinated release it matches the shared release identity; an independently staged version must remain explicit and must not relabel already published products.
 
-The Web package is ESM-only, has no runtime dependencies, and publishes as `@sandrox/levixel-web`. Its accepted interaction matrix is macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Browsers outside that matrix, embedded WebViews, legacy bundles, UMD, and IIFE delivery are not claimed.
+The Web package is ESM-only, has no runtime dependencies, and publishes as `@sandrox/levixel-web`. Its supported browser matrix is macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. Browsers outside that matrix, embedded WebViews, legacy bundles, UMD, and IIFE delivery are not claimed.
 
 1. From the clean release commit, build and verify the candidate once:
 
@@ -426,7 +409,7 @@ The Web package is ESM-only, has no runtime dependencies, and publishes as `@san
    ./scripts/verify-web-package.sh
    ```
 
-2. Install `dist/web/levixel-web-<version>.tgz` in artifact-only consumers. Complete the declared desktop/mobile matrix without importing `adapters/web/src` or rebuilding the tarball. Exercise prepended and appended items, sparse and out-of-order mounted bindings, ambiguous-selector rejection, source removal before return, and reuse of a connected source node for another stable ID.
+2. Install `dist/web/levixel-web-<version>.tgz` in artifact-only consumers. Review representative desktop/mobile coverage without importing `adapters/web/src` or rebuilding the tarball. Suggested risk checks include list updates, sparse bindings, source removal, and node reuse. Record the actual browsers tested and any accepted coverage limitations.
 3. Record the accepted SHA-256 from `dist/web/levixel-web-<version>.tgz.sha256`.
 4. Create the canonical `<version>` tag and GitHub Release only when the declared release scope is approved. Attach these exact files without repacking:
 
@@ -444,7 +427,7 @@ The Web package is ESM-only, has no runtime dependencies, and publishes as `@san
 
 7. Run `Publish Web npm` with the same version and SHA-256. The workflow downloads, verifies, and publishes the exact GitHub Release tarball through OIDC. It fails if that npm version already exists.
 
-The local `--allow-dirty` packaging option is only a pipeline rehearsal. A dirty-worktree artifact is not publishable until the identical bytes pass clean-commit verification. A differing candidate must use `--replace` explicitly and repeat Web artifact-only acceptance; unchanged targets may use the explicit evidence-reuse rules above. Never rename or silently overwrite an accepted tarball.
+The local `--allow-dirty` packaging option is only a pipeline rehearsal. A dirty-worktree artifact is not publishable until the identical bytes pass clean-commit verification. A differing candidate must use `--replace` explicitly and pass automated artifact-only checks; additional manual testing depends on changed behavior and known risks. Never rename or silently overwrite an accepted tarball.
 
 ## Provenance
 

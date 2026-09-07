@@ -103,6 +103,16 @@ class NativeArtifactReuseTest < Minitest::Test
     assert_raises(NativeArtifactReuse::Error) { NativeArtifactReuse.load_candidate!(@candidate_path, policy: @policy) }
   end
 
+  def test_changed_acceptance_requirements_do_not_rebuild_unchanged_binaries
+    @candidate["acceptance"] = {"manualTargets" => ["device"], "manualScenarios" => ["open-and-close"]}
+    @candidate_path.write(NativeArtifactReuse.canonical_json(@candidate))
+    assert_raises(ReleasePolicy::Error) { ReleasePolicy.validate_candidate!(@candidate, @policy) }
+    loaded, = NativeArtifactReuse.load_candidate!(@candidate_path, policy: @policy)
+    assert_equal @candidate, loaded
+    NativeArtifactReuse.validate!(proof, manifest: @manifest)
+    NativeArtifactReuse.verify_inputs!(proof, root: @root, commit: @after)
+  end
+
   def test_symlink_and_missing_artifact_reject_the_snapshot
     path = @snapshot.join(@entries.first.fetch("file"))
     path.delete

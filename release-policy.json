@@ -55,33 +55,6 @@
       "uniapp-x",
       "web"
     ],
-    "manualTargets": [
-      "harmonyos-device",
-      "native-android-device",
-      "native-ios-device",
-      "react-native-android-device",
-      "react-native-ios-device",
-      "uniapp-android-device",
-      "uniapp-ios-device",
-      "uniapp-legacy-android-device",
-      "uniapp-legacy-ios-device",
-      "uniapp-x-android-device",
-      "uniapp-x-ios-device",
-      "web-browser"
-    ],
-    "manualScenarios": [
-      "dismiss-when-current-source-is-offscreen",
-      "double-tap-zoom-and-pan",
-      "open-after-host-list-update-by-stable-id",
-      "open-page-and-dismiss-to-new-visible-source",
-      "open-placeholder-before-preview-loads",
-      "open-visible-source-and-dismiss-to-same-source",
-      "pinch-during-full-image-loading",
-      "rapid-open-drag-dismiss-and-reopen",
-      "recycle-source-cell-and-reopen",
-      "seek-long-video-under-throttled-network",
-      "vertical-dismiss-only-while-fitted",
-      "video-poster-playback-and-dismiss"
-    ]
+    "manualTargets": []
   }
 }

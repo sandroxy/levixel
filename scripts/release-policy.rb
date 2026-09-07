@@ -66,15 +66,11 @@ module ReleasePolicy
     raise Error, "Artifact roles overlap: #{duplicates.join(", ")}" unless duplicates.empty?
 
     acceptance = policy.fetch("acceptance")
-    expect_fields!(acceptance, %w[automatedTargets manualScenarios manualTargets], "acceptance policy")
+    expect_fields!(acceptance, %w[automatedTargets manualTargets], "acceptance policy")
     automated = acceptance.fetch("automatedTargets")
     manual = acceptance.fetch("manualTargets")
     validate_sorted_unique_array!(automated, ID_PATTERN, "automated acceptance targets")
     validate_sorted_unique_array!(manual, ID_PATTERN, "manual acceptance targets")
-    scenarios = acceptance.fetch("manualScenarios")
-    validate_sorted_unique_array!(scenarios, ID_PATTERN, "manual acceptance scenarios")
-    raise Error, "Release policy must declare manual acceptance scenarios" if
-      !manual.empty? && scenarios.empty?
     raise Error, "Release policy must declare acceptance targets" if automated.empty? && manual.empty?
     overlap = automated & manual
     raise Error, "Acceptance targets overlap: #{overlap.join(", ")}" unless overlap.empty?
@@ -84,6 +80,15 @@ module ReleasePolicy
   end
 
   def validate_candidate!(candidate, policy)
+    validate_artifact_snapshot!(candidate, policy)
+    raise Error, "Candidate acceptance matrix differs from release policy" unless
+      candidate.fetch("acceptance") == policy.fetch("acceptance")
+    candidate
+  end
+
+  # Reusing a binary depends on its identity and build inputs, not on the
+  # source snapshot's former manual-testing requirements.
+  def validate_artifact_snapshot!(candidate, policy)
     expect_fields!(
       candidate,
       %w[
@@ -117,8 +122,6 @@ module ReleasePolicy
     raise Error, "Invalid candidate dirty flag" unless [true, false].include?(dirty)
     raise Error, "An acceptance candidate cannot come from a dirty source" if state == "candidate" && dirty
 
-    raise Error, "Candidate acceptance matrix differs from release policy" unless
-      candidate.fetch("acceptance") == policy.fetch("acceptance")
     qualifications = candidate.fetch("qualifications")
     raise Error, "Candidate qualifications must be an object" unless qualifications.is_a?(Hash)
     expected_qualifications = policy.fetch("qualifications")

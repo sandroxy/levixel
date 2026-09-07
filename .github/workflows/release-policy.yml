@@ -44,7 +44,7 @@ jobs:
           ruby scripts/test-native-release-manifest.rb
           ruby scripts/test-release-policy.rb
           ruby scripts/test-native-artifact-reuse.rb
-          ruby scripts/test-acceptance-reuse.rb
+          ruby scripts/test-publish-candidate.rb
           ruby scripts/test-maven-reuse.rb
           ruby -c scripts/reuse-native-artifacts.rb
           bash -n scripts/prepare-native-release.sh
