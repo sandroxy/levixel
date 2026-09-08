@@ -122,17 +122,8 @@ fi
 ruby -rjson -e '
   package = JSON.parse(File.read(ARGV.fetch(0)))
   version = ARGV.fetch(1)
-  android = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "android", "extVersion")
-  ios = package.dig("uni_modules", "platforms", "client", "uni-app", "app", "ios", "extVersion")
-  x_android = package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "android", "extVersion")
-  x_ios = package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "ios", "extVersion")
   abort("DCloud permits at most five keywords") unless package.fetch("keywords").length <= 5
-  abort("UniApp Android extVersion #{android.inspect} does not match #{version}") unless android == version
-  abort("UniApp iOS extVersion #{ios.inspect} does not match #{version}") unless ios == version
-  abort("UniApp x Android extVersion #{x_android.inspect} does not match #{version}") unless x_android == version
-  abort("UniApp x iOS extVersion #{x_ios.inspect} does not match #{version}") unless x_ios == version
-  abort("UniApp x Android minimum must be API 23") unless package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "android", "minVersion") == "23"
-  abort("UniApp x iOS minimum must be 15.0") unless package.dig("uni_modules", "platforms", "client", "uni-app-x", "app", "ios", "minVersion") == "15.0"
+  abort("UniApp package version differs from its release target") unless package.fetch("version") == version
 ' "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json" "${uniapp_target_version}"
 
 ios_versions="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' \

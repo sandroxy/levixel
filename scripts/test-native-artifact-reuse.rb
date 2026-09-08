@@ -193,7 +193,7 @@ class NativeArtifactReuseTest < Minitest::Test
     end
   end
 
-  def preparation_fixture
+  def preparation_fixture(in_place: false)
     # Compiler and cryptographic primitives have separate tests. This fixture
     # exercises the real orchestration, copying, manifest, and Git-input gates.
     %w[prepare-native-release.sh reuse-native-artifacts.rb native-release-manifest.rb
@@ -250,6 +250,10 @@ class NativeArtifactReuseTest < Minitest::Test
       {"file" => filename, "bytes" => data.bytesize, "sha256" => Digest::SHA256.hexdigest(data)}
     end
     contents["native-build-manifest"] = JSON.pretty_generate(@manifest) + "\n"
+    if in_place
+      @snapshot = @root.join("dist")
+      @candidate_path = @snapshot.join("candidate.json")
+    end
     @entries.each do |entry|
       role = entry.fetch("role")
       primary = role.delete_prefix("checksum-")
@@ -259,9 +263,11 @@ class NativeArtifactReuseTest < Minitest::Test
           contents[role] = "#{Digest::SHA256.hexdigest(contents.fetch(primary))}  #{filename}\n"
           filename += ".sha256"
         end
-        entry["file"] = "artifacts/#{filename}"
+        directory = in_place ? @definitions.values.find { |group| group.fetch("roles").include?(primary) }.fetch("directory") : "artifacts"
+        entry["file"] = "#{directory}/#{filename}"
       end
       path = @snapshot.join(entry.fetch("file"))
+      path.parent.mkpath
       path.write(contents.fetch(role, role + "\n"))
       entry["bytes"] = path.size
       entry["sha256"] = Digest::SHA256.file(path).hexdigest
@@ -303,6 +309,21 @@ class NativeArtifactReuseTest < Minitest::Test
       end
     end
     assert_equal @after, GitInputDigest.clean_head!(@root)
+  end
+
+  def test_current_platform_outputs_are_reused_in_place
+    preparation_fixture(in_place: true)
+    paths = @definitions.values.flat_map { |group| group.fetch("roles") }.map do |role|
+      @snapshot.join(@entries.find { |entry| entry.fetch("role") == role }.fetch("file"))
+    end
+    before = paths.to_h { |path| [path, [path.stat.ino, path.mtime, path.binread]] }
+    arguments = @definitions.keys.flat_map { |name| ["--reuse", name] }
+    _output, error, status = Open3.capture3(
+      @environment, "/bin/bash", @root.join("scripts/prepare-native-release.sh").to_s,
+      "--reuse-candidate", @candidate_path.to_s, *arguments, chdir: @root.to_s
+    )
+    assert status.success?, error
+    paths.each { |path| assert_equal before.fetch(path), [path.stat.ino, path.mtime, path.binread] }
   end
 
   def test_reuse_does_not_waive_credentials_for_an_unselected_signing_group

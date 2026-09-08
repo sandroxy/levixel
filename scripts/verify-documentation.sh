@@ -128,16 +128,20 @@ read -r hbuilderx_min classic_android_min classic_ios_min x_android_min x_ios_mi
   node -e '
     const p = require(process.argv[1])
     const client = p.uni_modules.platforms.client
+    const android = require(process.argv[2])
+    const ios = require(process.argv[3])
     const minimum = String(p.engines.HBuilderX).match(/\d+(?:\.\d+){1,2}/)?.[0]
     if (!minimum) throw new Error("Cannot resolve HBuilderX minimum")
     console.log([
       minimum,
-      client["uni-app"].app.android.minVersion,
-      client["uni-app"].app.ios.minVersion,
+      android.minSdkVersion,
+      ios.deploymentTarget,
       client["uni-app-x"].app.android.minVersion,
       client["uni-app-x"].app.ios.minVersion,
     ].join(" "))
-  ' "${package_json}"
+  ' "${package_json}" \
+    "${plugin_dir}/uni_modules/Sandrox-Levixel/utssdk/app-android/config.json" \
+    "${plugin_dir}/uni_modules/Sandrox-Levixel/utssdk/app-ios/config.json"
 )
 
 for required_compatibility in \

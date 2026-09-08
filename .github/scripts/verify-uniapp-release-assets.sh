@@ -333,7 +333,9 @@ verify_uts() {
         declaration = app[platform]
         next if declaration.nil? || declaration == "x"
         abort("Invalid #{platform} support declaration") unless declaration.is_a?(Hash)
-        abort("#{platform} extVersion must match the package version") unless declaration["extVersion"] == version
+        support_version = declaration["extVersion"]
+        abort("#{platform} extVersion must be a stable plugin version") unless
+          support_version.is_a?(String) && support_version.match?(/\A\d+\.\d+\.\d+\z/)
         minimum = declaration["minVersion"]
         abort("#{platform} minVersion must be non-empty") unless minimum.is_a?(String) && !minimum.empty?
       end

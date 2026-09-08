@@ -15,7 +15,7 @@ class PublishCandidateTest < Minitest::Test
     @product = @root.join("product")
     @product.join("scripts").mkpath
     source = Pathname.new(__dir__).parent
-    %w[verify-publish-candidate.rb release-policy.rb
+    %w[verify-publish-candidate.rb snapshot-release-candidate.rb release-policy.rb
        native-release-manifest.rb native-artifact-reuse.rb git-input-digest.rb].each do |file|
       FileUtils.cp(source.join("scripts", file), @product.join("scripts", file))
     end
@@ -24,6 +24,7 @@ class PublishCandidateTest < Minitest::Test
     end
     @policy = ReleasePolicy.load(@product.join("release-policy.json"))
     @product.join("plugin.yaml").write("id: levixel\nversion: 1.0.0\n")
+    @product.join(".gitignore").write("/dist/\n")
     # This fixture exercises publication checks, not native binary compilation.
     provenance = @product.join("scripts/verify-native-manifest-ios-provenance.sh")
     provenance.write("#!/bin/sh\nexit 0\n")
@@ -37,7 +38,7 @@ class PublishCandidateTest < Minitest::Test
     git("commit", "-qm", "fixture")
     @commit = git("rev-parse", "HEAD").strip
     git("tag", "-a", "1.0.0", "-m", "fixture")
-    @candidate_root = @root.join("candidate")
+    @candidate_root = @product.join("dist")
     qualifications = @policy.fetch("qualifications").to_h { |key| [key, true] }
     roles = ReleasePolicy.expected_artifact_roles(@policy, qualifications)
     contents = roles.to_h { |role| [role, role + "\n"] }
@@ -53,10 +54,10 @@ class PublishCandidateTest < Minitest::Test
     }
     contents["native-build-manifest"] = JSON.pretty_generate(native_manifest) + "\n"
     entries = contents.map do |role, content|
-      path = @candidate_root.join("artifacts", role)
+      path = @candidate_root.join("packages", role)
       path.parent.mkpath
       path.binwrite(content)
-      {"role" => role, "file" => "artifacts/#{role}", "bytes" => path.size,
+      {"role" => role, "file" => "packages/#{role}", "bytes" => path.size,
        "sha256" => Digest::SHA256.file(path).hexdigest}
     end
     set_payload = entries.sort_by { |entry| entry.fetch("role") }.map do |entry|
@@ -169,5 +170,49 @@ class PublishCandidateTest < Minitest::Test
     other_commit = git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "other fixture").strip
     git("tag", "-a", "1.0.0", other_commit, "-m", "wrong fixture target")
     assert_rejected(/does not point to the accepted source commit/)
+  end
+
+  def test_candidate_references_one_artifact_set_and_retires_only_known_old_outputs
+    command = [RbConfig.ruby, @product.join("scripts/snapshot-release-candidate.rb").to_s,
+               "--plugin", "levixel", "--policy", @product.join("release-policy.json").to_s,
+               "--version", "2.0.0", "--repository", @policy.fetch("sourceRepository"),
+               "--commit", @commit, "--dirty", "false", "--root", @product.to_s,
+               "--state", "candidate"]
+    @candidate.fetch("qualifications").each { |key, value| command += ["--qualification", "#{key}=#{value}"] }
+    @policy.dig("acceptance", "automatedTargets").each { |target| command += ["--automated-target", target] }
+    files = @candidate.fetch("artifacts").map do |entry|
+      path = @candidate_root.join("packages", "#{entry.fetch('role')}-2.0.0.bin")
+      path.write(entry.fetch("role"))
+      command += ["--artifact", "#{entry.fetch('role')}=#{path}"]
+      path
+    end
+    older = files.first.sub("2.0.0", "0.9.0")
+    stable = files.first.sub("2.0.0", "1.0.0")
+    unknown = @candidate_root.join("packages/unrelated-0.9.0.txt")
+    [older, stable, unknown].each { |path| path.write("retention fixture") }
+    original_stat = files.first.stat
+    output, error, status = Open3.capture3(*command)
+    assert status.success?, error
+    assert_equal @candidate_path.realpath.to_s, output.lines.first.strip
+    manifest = JSON.parse(@candidate_path.read)
+    assert_equal files.map(&:to_s).sort,
+                 manifest.fetch("artifacts").map { |entry| @candidate_root.join(entry.fetch("file")).to_s }.sort
+    assert_equal original_stat.ino, files.first.stat.ino
+    assert_equal original_stat.mtime, files.first.stat.mtime
+    refute older.exist?
+    assert stable.file?
+    assert unknown.file?
+    refute @candidate_root.join("candidates").exist?
+    files.first.write("changed artifact")
+    _output, error, status = Open3.capture3(*command)
+    assert status.success?, error
+    refute_equal manifest.fetch("candidateId"), JSON.parse(@candidate_path.read).fetch("candidateId")
+    assert_equal [@candidate_path], @candidate_root.glob("*.json")
+    older.write("must survive a failed candidate")
+    files.first.unlink
+    _output, error, status = Open3.capture3(*command)
+    refute status.success?
+    assert_match(/not a regular file/, error)
+    assert older.file?
   end
 end

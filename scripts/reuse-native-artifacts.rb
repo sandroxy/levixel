@@ -100,9 +100,9 @@ begin
   destinations = copies.map { |_source, destination, _entry| destination }
   raise NativeArtifactReuse::Error, "Reuse output paths collide" unless
     destinations.uniq == destinations && !destinations.include?(proof_path)
-  copies.each do |_source, destination, _entry|
+  copies.each do |source, destination, _entry|
     raise NativeArtifactReuse::Error, "Reuse must not overwrite its source snapshot" if
-      destination.to_s.start_with?(candidate_root.to_s + "/")
+      destination != source && destination.to_s.start_with?(candidate_root.to_s + "/")
     cursor = root
     destination.relative_path_from(root).each_filename do |part|
       cursor = cursor.join(part)
@@ -113,6 +113,11 @@ begin
   end
   GitInputDigest.clean_head!(root, head)
   copies.each do |source, destination, entry|
+    if source == destination
+      raise NativeArtifactReuse::Error, "Reused artifact changed: #{source}" unless
+        source.size == entry.fetch("bytes") && Digest::SHA256.file(source).hexdigest == entry.fetch("sha256")
+      next
+    end
     FileUtils.mkdir_p(destination.parent)
     Tempfile.create([".reuse-", ".tmp"], destination.parent.to_s) do |temporary|
       temporary.binmode

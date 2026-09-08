@@ -20,7 +20,9 @@ Levixel 以列表中源媒体当前可见的位置、尺寸和圆角为转场起
 | 宿主 | 页面类型 | Android | iOS |
 | --- | --- | --- | --- |
 | 经典 uni-app | Vue 2 / Vue 3 App Vue | API 21+ | iOS 13.0+，arm64 真机 |
-| uni-app x | 仅 Vapor | API 23+ | iOS 15.0+，arm64 真机 |
+| uni-app x | 仅 Vapor | API 23+ | iOS 15+，arm64 真机 |
+
+市场兼容表要求经典 uni-app 与 uni-app x 使用共同的最低系统声明，因此统一填写 Android 6 / API 23 与 iOS 15；上表分别列出各宿主的实际支持范围。
 
 uni-app x 不支持 VDOM。本 UniApp 交付也不覆盖 nvue、Web、小程序或 HarmonyOS；Web 与 HarmonyOS 可使用 Levixel 的[对应平台包](https://github.com/sandroxy/levixel#支持平台与分发)。
 

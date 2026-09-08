@@ -180,10 +180,8 @@ if [[ ${allow_dirty} -eq 0 ]] \
 fi
 
 state=candidate
-output_root="${plugin_dir}/dist/candidates"
 if [[ "${dirty}" == true || "${native_dirty}" == true || "${native_signed}" != true ]]; then
   state=rehearsal
-  output_root="${plugin_dir}/dist/rehearsals"
 fi
 
 snapshot_arguments=(
@@ -194,7 +192,6 @@ snapshot_arguments=(
   --commit "${commit}"
   --dirty "${dirty}"
   --root "${plugin_dir}"
-  --output-root "${output_root}"
   --state "${state}"
   --qualification "androidMavenSigned=${native_signed}"
   --qualification nativeManifestVerified=true

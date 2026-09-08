@@ -89,27 +89,9 @@ ruby -rjson -e '
   abort "unexpected package version" unless package.fetch("version") == version
   abort "package must be a UTS plugin" unless package.dig("dcloudext", "type") == "uts"
   abort "legacy native-plugin metadata must not exist" if package.key?("_dp_nativeplugin")
-  abort "DCloud permits at most five keywords" unless package.fetch("keywords").length <= 5
-  abort "unexpected HBuilderX minimum" unless package.dig("engines", "HBuilderX") == "^5.24"
-  abort "uni-app x engine declaration missing" unless package.dig("engines", "uni-app-x") == "^5.24"
-
-  client = package.dig("uni_modules", "platforms", "client")
-  classic = client.fetch("uni-app")
-  abort "classic Vue 2 support missing" unless classic.dig("vue", "vue2") == "√"
-  abort "classic Vue 3 support missing" unless classic.dig("vue", "vue3") == "√"
-  abort "nvue must be explicitly unsupported" unless classic.dig("app", "nvue") == "x"
-  abort "unexpected Android minimum" unless classic.dig("app", "android", "minVersion") == "21"
-  abort "unexpected iOS minimum" unless classic.dig("app", "ios", "minVersion") == "13.0"
-
-  x = client.fetch("uni-app-x")
-  abort "uni-app x Android support missing" unless x.dig("app", "android", "extVersion") == version
-  abort "unexpected uni-app x Android minimum" unless x.dig("app", "android", "minVersion") == "23"
-  abort "uni-app x iOS support missing" unless x.dig("app", "ios", "extVersion") == version
-  abort "unexpected uni-app x iOS minimum" unless x.dig("app", "ios", "minVersion") == "15.0"
-  abort "uni-app x HarmonyOS must be unsupported" unless x.dig("app", "harmony") == "x"
-  abort "uni-app x Web must be unsupported" unless x.fetch("web").values.all? { |entry| entry == "x" }
-  abort "uni-app x mini app must be unsupported" unless x.fetch("mp").values.all? { |entry| entry == "x" }
-' "${package_root}/package.json" "${version}"
+  source = JSON.parse(File.read(ARGV.fetch(2)))
+  abort "packaged metadata differs from the declared source" unless package == source
+' "${package_root}/package.json" "${version}" "${plugin_dir}/uni_modules/Sandrox-Levixel/package.json"
 
 ruby -rjson -e '
   android = JSON.parse(File.read(ARGV.fetch(0)))

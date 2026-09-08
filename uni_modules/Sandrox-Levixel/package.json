@@ -6,7 +6,7 @@
   "keywords": [
     "UTS",
     "uni-app",
-    "uni-app x",
+    "uni-app-x",
     "图片预览",
     "视频预览"
   ],
@@ -14,7 +14,7 @@
   "license": "MIT",
   "engines": {
     "HBuilderX": "^5.24",
-    "uni-app": "^3.1.0",
+    "uni-app": "^5.24",
     "uni-app-x": "^5.24"
   },
   "dcloudext": {
@@ -63,12 +63,12 @@
             "vue": "√",
             "nvue": "x",
             "android": {
-              "extVersion": "1.3.0",
-              "minVersion": "21"
+              "extVersion": "1.1.1",
+              "minVersion": "23"
             },
             "ios": {
-              "extVersion": "1.3.0",
-              "minVersion": "13.0"
+              "extVersion": "1.1.1",
+              "minVersion": "15"
             },
             "harmony": "x"
           },
@@ -95,12 +95,12 @@
           },
           "app": {
             "android": {
-              "extVersion": "1.3.0",
+              "extVersion": "1.2.0",
               "minVersion": "23"
             },
             "ios": {
-              "extVersion": "1.3.0",
-              "minVersion": "15.0"
+              "extVersion": "1.2.0",
+              "minVersion": "15"
             },
             "harmony": "x"
           },
