@@ -22,6 +22,7 @@ Pod::Spec.new do |s|
   s.vendored_frameworks = 'ios/Frameworks/Levixel.xcframework'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
+    'OTHER_SWIFT_FLAGS' => "$(inherited) #{ENV['RCT_NEW_ARCH_ENABLED'] == '1' ? '-DRCT_NEW_ARCH_ENABLED' : ''}",
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 end
