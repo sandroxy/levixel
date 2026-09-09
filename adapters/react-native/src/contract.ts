@@ -1,4 +1,4 @@
-import type { LevixelMediaItem, NativeLevixelMediaItem } from './types';
+import type { LevixelAction, LevixelActionLayout, LevixelMediaItem, NativeLevixelMediaItem } from './types';
 
 const ITEM_KEYS = new Set([
   'id',
@@ -206,4 +206,51 @@ function optionalPositiveNumber(
     throw new TypeError(`[Levixel] ${path} must be a positive number.`);
   }
   return value;
+}
+
+export function normalizeActions(actions: readonly LevixelAction[] | undefined, layout: LevixelActionLayout = 'list'): LevixelAction[] {
+  if (actions === undefined) return [];
+  if (!Array.isArray(actions)) throw new TypeError('[Levixel] actions must be an array.');
+  const keys = new Set(['id', 'label', 'icon', 'group', 'disabled', 'destructive', 'onPress']);
+  const ids = new Set<string>();
+  return actions.map((value, index) => {
+    const path = `actions[${index}]`;
+    const record = requireRecord(value, path);
+    for (const key of Object.keys(record)) {
+      if (!keys.has(key)) throw new TypeError(`[Levixel] ${path}.${key} is not part of the Levixel contract.`);
+    }
+    const action: LevixelAction = {
+      id: requireNonEmptyString(record.id, `${path}.id`),
+      label: requireNonEmptyString(record.label, `${path}.label`),
+    };
+    if (ids.has(action.id)) throw new TypeError('[Levixel] action IDs must be unique.');
+    ids.add(action.id);
+    for (const key of ['icon', 'group'] as const) {
+      const value = optionalNonEmptyString(record[key], `${path}.${key}`);
+      if (value !== undefined) action[key] = value;
+    }
+    for (const key of ['disabled', 'destructive'] as const) {
+      if (record[key] === undefined) continue;
+      if (typeof record[key] !== 'boolean') throw new TypeError(`[Levixel] ${path}.${key} must be a boolean.`);
+      action[key] = record[key];
+    }
+    if (record.onPress !== undefined) {
+      if (typeof record.onPress !== 'function') throw new TypeError(`[Levixel] ${path}.onPress must be a function.`);
+      action.onPress = record.onPress as NonNullable<LevixelAction['onPress']>;
+    }
+    if (layout === 'grid' && action.icon === undefined)
+      throw new TypeError(`[Levixel] ${path}.icon is required for grid actionLayout.`);
+    return action;
+  });
+}
+
+export function normalizeActionOptions(actions: readonly LevixelAction[] | undefined, layout: unknown, icons: unknown): {
+  actions: LevixelAction[]; actionLayout: LevixelActionLayout; actionListIcons: boolean;
+} {
+  const actionLayout = layout === undefined ? 'list' : layout;
+  if (actionLayout !== 'list' && actionLayout !== 'grid')
+    throw new TypeError('[Levixel] actionLayout must be list or grid.');
+  const actionListIcons = icons === undefined ? false : icons;
+  if (typeof actionListIcons !== 'boolean') throw new TypeError('[Levixel] actionListIcons must be a boolean.');
+  return { actionLayout, actionListIcons, actions: normalizeActions(actions, actionLayout) };
 }

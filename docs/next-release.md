@@ -1,6 +1,6 @@
 # Levixel 1.4.0 开发说明
 
-原生 Android/iOS 的以下接口面向下一版，尚未发布。当前公开版本仍为 1.3.0；本文件记录原生接入与本地验证方法。
+原生 Android/iOS 与 React Native 的以下接口面向下一版，尚未发布。当前公开版本仍为 1.3.0；本文件记录原生及 React Native 接入与本地验证方法。
 
 ## 本次范围
 
@@ -8,6 +8,7 @@
 - 抽屉由查看器持有：Android 使用 Material BottomSheetDialog，iOS 15 及以上使用 UIKit 系统 Sheet（iOS 13–14 使用自定义 UIKit 转场）。接入方无需调整宿主页层级。
 - 任意业务按钮、显式列表/网格布局、分组和超高内容滚动、图标和两行文字、禁用/危险操作样式、取消和安全区。抽屉使用独立浅色配色，画廊的 `theme` 继续控制媒体背景；原生 iOS/Android 内容底色为 `#DEDEDE`，网格按钮字号 12、列表和取消字号 16（iOS 为 pt，Android 为 sp），跟随系统字体缩放，系统抽屉负责形态和转场。
 - 打开、切页、关闭、加载成功/失败和按钮选择事件；失败提示及手动重试。
+- React Native 的 `ref.open(itemId)`、`ref.close()`、`ref.retry()`；不要求目标缩略图挂载。
 
 点按关闭仍采用原有行为。插件不实现下载、保存、分享、权限申请或任意业务内容插槽。
 
@@ -17,11 +18,11 @@
 | --- | --- |
 | `id` | 本次配置内唯一的非空字符串，业务自行命名 |
 | `label` | 非空文字，显示最多两行，完整文字用于无障碍名称 |
-| `icon?` | 图片 URI；列表可省略，网格每项必传 |
+| `icon?` | 图片 URI；列表可省略，网格每项必传。React Native 的静态资源需先解析成 URI |
 | `group?` | 列表中的分组；网格中同组按钮位于同一横向滚动行。组与按钮按首次出现顺序排列；省略归入默认组 |
 | `disabled?` | 默认 false，禁用项不触发业务回调 |
 | `destructive?` | 默认 false，仅表示危险操作样式，不代替业务确认 |
-| `onPress?` | 原生回调收到操作上下文；也可统一处理 `action` 事件 |
+| `onPress?` | 操作回调；JavaScript 接收操作上下文，原生接口接收事件对象。也可统一处理 `action` 事件 |
 
 布局由接入方明确配置，与按钮数量无关：
 
@@ -58,6 +59,7 @@ Android/iOS 保留打开时的首次 `indexChange` 通知（在 `opened` 前）�
 
 失败后显示重试按钮；重试仅重载当前失败媒体，不创建新会话。加载中、无失败页或查看器已关闭时不重复发起请求。
 
+- React Native：`await ref.current.retry()` → `boolean`；`await ref.current.close()` 在查看器关闭完成后返回。
 - Android：`overlay.retry()` → `boolean`；`overlay.requestClose()`；宿主 Back 应调用 `overlay.handleBack()`。
 - iOS：`session.retry()` → `Bool`（主线程）；`session.close()`，可传 completion 等待关闭完成。自动点击接入可从 `configuration.onSession` 接收 session。
 
@@ -67,13 +69,23 @@ Android 的新构造重载在 `galleryId` 后接受 `List<LevixelAction>`（完�
 
 iOS 通过 `LevixelViewerConfiguration.actions` / `.actionLayout`（`.list` / `.grid`，默认 `.list`）/ `.actionListIcons`（默认 false）/ `.onEvent` / `.onSession` 配置。`LevixelAction` 原生回调接收 `LevixelViewerEvent`，媒体上下文为 `event.context`，序列化值为 `event.dictionary`。原有 `onIndexChange` / `onDismiss` 保留。
 
+## React Native 接入
+
+`<Levixel>` 通过 `actions`、`actionLayout`、`actionListIcons` 和 `onEvent` 接入相同的原生抽屉，完整示例见 [React Native 接入说明](../adapters/react-native/README.md)。`LevixelRef` 提供 `open(itemId)`、`close()` 和 `retry()`；目标缩略图未挂载时也可以打开。
+
+每次打开保存媒体、按钮配置与按钮回调；组件重渲染不会把旧会话的按钮回调替换成新配置。`onEvent` 和既有 `onIndexChange` 使用当前 props。`open()` 完成表示原生打开请求已创建，转场完成以 `opened` 事件为准；`close()` 在关闭完成后返回。组件卸载会清理查看器，连续打开和延迟到达的关闭通知按各自会话处理。
+
+点击来源会经过 RN 事件和打开调用，动画开始后由原生执行；新增事件不参与逐帧动画。接入方应避免阻塞 JavaScript 线程，以免延后点击响应和业务回调。
+
 ## 主仓本地验证
 
 ```sh
 ./native/android/gradlew -p native/android :levixel:testDebugUnitTest :levixel:assembleDebug :levixel:lintDebug --console=plain
 ./scripts/test-native-ios-source.sh
+./scripts/verify-react-native-contract.sh
+./scripts/verify-react-native-ios-lifecycle.rb
 ```
 
 Android 检查需要本机 Android SDK；iOS 检查需要 Xcode 与可用 iPhone 模拟器。LevixelTestHost 仅给测试提供真实 UIWindowScene，不进入插件发布产物。
 
-独立的 integrated-plugins 测试仓通过 development/run.rb 消费本仓的开发产物，提供原生 Android/iOS 的布局、列表图标和 1/3/10 个操作切换。源码测试与开发宿主运行不代替正式发布制品验收；统一版本元数据与发布资料在发布准备时处理。
+独立的 integrated-plugins 测试仓通过 development/run.rb 消费本仓的开发产物，提供原生 Android/iOS 与 RN 双端的布局、列表图标和 1/3/10 个操作切换。源码测试与开发宿主运行不代替正式发布制品验收；统一版本元数据与发布资料在发布准备时处理。

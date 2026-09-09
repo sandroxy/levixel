@@ -117,3 +117,54 @@ Levixel is released under the MIT License. See
 [THIRD_PARTY_NOTICES.md](https://github.com/sandroxy/levixel/blob/master/THIRD_PARTY_NOTICES.md)
 and [PROVENANCE.md](https://github.com/sandroxy/levixel/blob/master/PROVENANCE.md)
 for retained upstream notices and source lineage.
+
+## Actions and viewer control (development branch)
+
+These additions are pending release. `<Levixel>` accepts `actions`, `onEvent`,
+and a `ref` typed as `LevixelRef`:
+
+```tsx
+const viewer = useRef<LevixelRef>(null);
+<Levixel ref={viewer} items={items} actions={[
+  { id: 'inspect', label: 'Inspect', group: 'tools',
+    onPress: context => showDetails(context.itemId) },
+]} onEvent={event => console.log(event.type, event.payload.itemId)}>
+  {children}
+</Levixel>
+// No mounted Source is required for programmatic opening.
+await viewer.current?.open(items[0].id);
+await viewer.current?.retry(); // boolean: whether a failed media request restarted
+await viewer.current?.close();
+```
+
+Import `useRef` from React and `LevixelRef` from this package. Each action has a
+unique `id`, `label`, optional URI `icon`, section `group`, `disabled`, `destructive`,
+and `onPress`. Resolve bundled images with `Image.resolveAssetSource(...).uri`.
+No actions means an event-only long press. The native drawer closes before the
+business callback and leaves the viewer open. System Back closes the drawer
+first; the ref's close method closes the entire viewer. Business behavior and
+permissions belong to the application.
+The close Promise resolves after dismissal, so subsequent native UI can be
+presented from the host. The open Promise resolves when the native viewer request
+has been created; wait for `opened` to observe the completed opening transition.
+
+`actionLayout: 'list' | 'grid'` defaults to `'list'` and never changes with action
+count. Lists support any number of actions and hide icons by default, even when
+provided. Set `actionListIcons: true` to show list icons; missing icons leave an
+aligned empty column. Grid always shows icons and requires a non-empty `icon`
+on every action, including a single-action grid. Invalid grid configuration is
+rejected before opening. Groups form list sections or horizontal grid rows;
+excess content scrolls while Cancel stays accessible. Failed icons use a neutral
+placeholder, never the first letter of the action label.
+
+Events are `opened`, `longPress`, `indexChange`, `mediaLoad`, `mediaError`,
+`action`, and `dismiss`. Their context contains `sessionId`, `galleryId`, `index`,
+`itemId`, `mediaType`; action adds `actionId`, indexChange retains `currentIndex`,
+and mediaError adds `code` and `message`. `opened` means the transition finished;
+preloaded pages may report media readiness earlier. The existing `onIndexChange`
+prop continues to work. Use either `onPress` or the `action` event for side effects.
+
+Each opening retains its media, action configuration, and action callbacks across
+rerenders and source cell recycling. `onEvent` and `onIndexChange` use the current
+props. Use `itemId` for asynchronous work; `index` refers to that opening's array.
+Unmounting the provider closes its viewer. Failures show a retry button.

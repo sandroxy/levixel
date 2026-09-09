@@ -2,13 +2,17 @@ package com.sandrox.levixel.reactnative
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.Promise
 
 class LevixelModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("Levixel")
 
         View(LevixelView::class) {
-            Events("onIndexChange")
+            Events("onSourcePress", "onViewerEvent")
+            AsyncFunction("open") { view: LevixelView, options: Map<String, Any?> -> view.open(options) }
+            AsyncFunction("close") { view: LevixelView, promise: Promise -> view.close(promise) }
+            AsyncFunction("retry") { view: LevixelView -> view.retry() }
 
             Prop("items") { view: LevixelView, items: Array<Map<String, Any?>> ->
                 view.items = items.toList()
@@ -21,9 +25,6 @@ class LevixelModule : Module() {
             }
             Prop("sourceCornerRadius") { view: LevixelView, sourceCornerRadius: Double ->
                 view.sourceCornerRadius = sourceCornerRadius.toFloat()
-            }
-            Prop("theme") { view: LevixelView, theme: LevixelTheme ->
-                view.theme = theme
             }
         }
     }

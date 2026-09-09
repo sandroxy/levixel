@@ -1,6 +1,6 @@
 # Levixel
 
-开发分支正在增加原生 Android/iOS 的长按操作抽屉、会话事件与失败重试，接口和本地验证方法见 [下一版开发说明](docs/next-release.md)。这些新增能力尚未公开发布。
+开发分支正在增加原生 Android/iOS 与 React Native 的长按操作抽屉、会话事件与失败重试，接口和本地验证方法见 [下一版开发说明](docs/next-release.md)。这些新增能力尚未公开发布。
 
 [English](README-EN.md)
 

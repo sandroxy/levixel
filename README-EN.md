@@ -1,6 +1,6 @@
 # Levixel
 
-The development branch adds native Android/iOS long-press actions, session events, and media retry. See the [next release development notes](docs/next-release.md). These additions are not yet published.
+The development branch adds native Android/iOS and React Native long-press actions, session events, and media retry. See the [next release development notes](docs/next-release.md). These additions are not yet published.
 
 [中文](README.md)
 

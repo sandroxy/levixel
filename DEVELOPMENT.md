@@ -18,9 +18,9 @@ candidate id and only an accepted candidate may be published.
 
 ## Current development work
 
-The upcoming native Android/iOS viewer actions, session events, and retry APIs
+The upcoming native Android/iOS and React Native viewer actions, session events, and retry APIs
 are documented in [the next release notes](docs/next-release.md). The notes
-include native source checks and the separate consumer development workflow.
+include native and React Native source checks and the separate consumer development workflow.
 
 ## Native Cores
 
@@ -70,13 +70,15 @@ Build and inspect the immutable npm candidate:
 
 ```sh
 ./scripts/verify-react-native-contract.sh
+./scripts/verify-react-native-ios-lifecycle.rb
 ./scripts/package-react-native.sh
 ./scripts/verify-react-native-package.sh
 ```
 
 The tarball embeds the accepted Android AAR and iOS XCFramework. It must be tested as a tarball dependency in Android and iOS consumer hosts before publication.
-Contract verification requires Node.js 22.6 or newer. It exercises the shared
-request validator only; TypeScript component compilation and Android/iOS bridge
+Contract verification requires Node.js 22.6 or newer. It exercises request
+validation and action callback ownership across opening snapshots and dismissal;
+TypeScript component compilation and Android/iOS bridge
 integration remain artifact-consumer checks. Packaging also type-checks the
 adapter-facing iOS API against the exact embedded XCFramework on macOS; the same
 API surface is inspected portably when a release asset is verified on Linux.
