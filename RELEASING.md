@@ -188,6 +188,13 @@ commit; generating them does not require another manual approval record.
 
 User-facing landing pages and platform guides describe stable capabilities, installation, and compatibility without copying the current Levixel release number into prose. Exact versions belong in `plugin.yaml`, package manifests, changelogs, immutable release notes, artifact filenames, and generated publication material.
 
+Branch progress, local build and verification steps, and pending-release API
+drafts belong in maintainer documents. Public guides must not carry development
+announcements or unreleased API appendices, even with a disclaimer. Changelogs
+may retain an `Unreleased` section; legal notices and provenance retain their
+required attribution. Contributor links and integration requirements such as
+Expo development builds are appropriate in public guides.
+
 Before creating a tag, run:
 
 ```sh
@@ -206,9 +213,13 @@ entries.
 
 Post-release documentation corrections are normal commits on the default branch. They must not move an already published tag, replace an accepted release asset, or rebuild a public version. A registry README embedded in an immutable artifact remains the historical copy shipped with that artifact; editable landing pages may link to the current guide.
 
-The root README files are stable-installation guides. Do not show an unreleased
-initializer, method, or option there while the latest tagged binary lacks it;
-record it under `Unreleased` until the compatible artifact is accepted.
+The root README files and public platform guides must match the published
+packages they install. Keep detailed new API examples in maintainer documentation
+until preparing the compatible release. As part of that release, integrate the
+reviewed content into the normal API sections, update both landing-page languages,
+and ship the guides with their matching artifacts. Removing an unpublished
+disclaimer alone is not a documentation update. Review this boundary manually
+as well as running the wording checks.
 
 ## Canonical Git Tag
 

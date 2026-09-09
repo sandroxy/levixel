@@ -6,6 +6,7 @@
 - Adds native and React Native session events, media-load/error events, visible retry controls, and programmatic retry and close APIs.
 - Preserves media identity and registered source corners during iOS transitions, retains asynchronous image-loading targets until completion, and safely finalizes Android viewers during host removal.
 - Adds React Native viewer refs for opening, closing, and retrying without a mounted thumbnail; opening snapshots retain their action callbacks during list updates.
+- Fixes the React Native Swift new-architecture build flag so the iOS bridge uses the host's configured architecture.
 
 ## 1.3.0 - 2026-09-07
 

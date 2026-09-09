@@ -1,7 +1,5 @@
 # Levixel
 
-开发分支正在增加原生 Android/iOS 与 React Native 的长按操作抽屉、会话事件与失败重试，接口和本地验证方法见 [下一版开发说明](docs/next-release.md)。这些新增能力尚未公开发布。
-
 [English](README-EN.md)
 
 Levixel 是一套强调原生手感的共享转场图片与视频查看器，支持横向分页、双指缩放、缩放后平移、竖拖关闭与视频播放。
@@ -179,19 +177,6 @@ Web 包使用浏览器原生 DOM、Pointer Events、Web Animations API 与媒体
 已验证的浏览器范围包括 macOS Chrome、macOS Safari、Android Chrome 与 iOS Safari。API、浏览器边界和无障碍行为见 [Web 使用说明](adapters/web/README.md)。
 
 ## 源码与发布
-
-```text
-levixel/
-├── native/          # Android、iOS、HarmonyOS 原生核心
-├── adapters/        # React Native、UniApp 与 Web 适配层
-├── uni_modules/     # DCloud 市场 UTS 插件源目录
-├── contract/        # 跨平台公共契约
-├── packaging/       # 平台制品模板
-├── scripts/         # 构建、制品检查与发布工具
-├── schema/          # 插件清单 Schema
-├── release-policy.json # 发布候选与验收矩阵的机器契约
-└── plugin.yaml      # 版本、能力与交付目标的机器可读清单
-```
 
 本地构建、测试与 SDK 要求见 [DEVELOPMENT.md](DEVELOPMENT.md)。版本签名与各渠道发布流程见 [RELEASING.md](RELEASING.md)。
 

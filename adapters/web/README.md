@@ -129,35 +129,12 @@ The supported interaction matrix covers macOS Chrome, macOS Safari, Android Chro
 
 The implementation relies on Pointer Events, the Web Animations API, Shadow DOM, and modern media elements. Browsers outside the supported matrix, embedded WebViews, and compatibility bundles for legacy browsers are not claimed. No UMD, IIFE, or separately maintained browser implementation is shipped.
 
-## Local development
-
-```sh
-cd adapters/web
-npm ci
-npm run dev
-```
-
-Open the printed local URL to exercise mixed images and videos, portrait and landscape media, loading states, paging, and repeated open/close transitions.
-
-For an iPhone or another device on the same trusted local network, expose the development server on the LAN:
-
-```sh
-npm run dev:device
-```
-
-Open the printed `Network` URL on the device. Stop the server after testing; this command intentionally listens on all local interfaces.
-
-Run the static, unit, and real-Chrome checks with:
-
-```sh
-npm run verify
-```
-
-Set `LEVIXEL_CHROME_PATH` if Chrome or Chromium is installed outside the standard macOS/Linux locations.
-
-## License
+## License and source
 
 Levixel Web is released under the MIT License. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
 [PROVENANCE.md](PROVENANCE.md) for retained upstream notices and source
 lineage.
+
+For source builds and browser testing, see the
+[development guide](https://github.com/sandroxy/levixel/blob/master/DEVELOPMENT.md#web).

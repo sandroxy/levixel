@@ -10,33 +10,31 @@ marketplace_readme="${plugin_dir}/uni_modules/Sandrox-Levixel/readme.md"
 marketplace_template="${plugin_dir}/adapters/uniapp/MARKETPLACE.md"
 package_json="${plugin_dir}/uni_modules/Sandrox-Levixel/package.json"
 
-version_neutral_docs=(
+public_integration_guides=(
   "${plugin_dir}/README.md"
   "${plugin_dir}/README-EN.md"
-  "${plugin_dir}/DEVELOPMENT.md"
   "${plugin_dir}/adapters/react-native/README.md"
-  "${plugin_dir}/adapters/uniapp/README.md"
-  "${marketplace_template}"
   "${plugin_dir}/adapters/web/README.md"
   "${plugin_dir}/native/harmonyos/levixel/README.md"
   "${plugin_dir}/packaging/swift-package/README.md"
   "${marketplace_readme}"
 )
 
+version_neutral_docs=(
+  "${public_integration_guides[@]}"
+  "${plugin_dir}/DEVELOPMENT.md"
+  "${plugin_dir}/adapters/uniapp/README.md"
+  "${marketplace_template}"
+)
+
 public_facing_docs=(
+  "${public_integration_guides[@]}"
   "${plugin_dir}/CHANGELOG.md"
   "${plugin_dir}/PROVENANCE.md"
-  "${plugin_dir}/README.md"
-  "${plugin_dir}/README-EN.md"
-  "${plugin_dir}/adapters/react-native/README.md"
   "${plugin_dir}/adapters/web/CHANGELOG.md"
   "${plugin_dir}/adapters/web/PROVENANCE.md"
-  "${plugin_dir}/adapters/web/README.md"
   "${plugin_dir}/native/harmonyos/levixel/CHANGELOG.md"
-  "${plugin_dir}/native/harmonyos/levixel/README.md"
-  "${plugin_dir}/packaging/swift-package/README.md"
   "${plugin_dir}/uni_modules/Sandrox-Levixel/changelog.md"
-  "${marketplace_readme}"
 )
 
 ruby -e '
@@ -64,6 +62,28 @@ ruby -e '
   end
   abort("Maintainer-only wording leaked into a public-facing document:\n#{failures.join("\n")}") unless failures.empty?
 ' "${public_facing_docs[@]}"
+
+# Changelogs and maintainer guides may describe work awaiting release. Expo
+# development builds are an integration requirement, not branch-status prose.
+ruby -e '
+  forbidden = {
+    /开发分支|(?:尚未|暂未|还未|未)(?:公开)?发布|待发布|下一版(?:开发|接口)说明/ => "Chinese development or pending-release announcement",
+    /\b(?:unreleased|pending\s+release|awaiting\s+(?:release|publication)|not\s+yet\s+(?:published|released)|(?:development|working)\s+branch|next\s+release\s+(?:development\s+)?notes)\b/i => "English development or pending-release announcement",
+    /\]\([^\)\n]*\bnext-release\.md(?:[?#][^\)\n]*)?\)/i => "link to an unreleased API draft",
+    /^\#{1,6}[ \t]+(?:Local development|Source (?:development|verification)|Release preparation|本地开发|源码验证|发布准备)[ \t]*$/i => "maintainer workflow section"
+  }
+  failures = []
+  ARGV.each do |path|
+    contents = File.read(path)
+    forbidden.each do |pattern, description|
+      match = contents.match(pattern)
+      next unless match
+      line = contents[0...match.begin(0)].count("\n") + 1
+      failures << "#{path}:#{line}: #{description}: #{match[0]}"
+    end
+  end
+  abort("Move development notes into maintainer documentation; public guides must match published packages:\n#{failures.join("\n")}") unless failures.empty?
+' "${public_integration_guides[@]}"
 
 ruby -e '
   allowed = %w[1.0.0 1.1.0]
@@ -263,7 +283,7 @@ ruby -e '
     end
   end
   abort("Broken local Markdown links:\n#{failures.join("\n")}") unless failures.empty?
-' "${version_neutral_docs[@]}" "${plugin_dir}/RELEASING.md" "${plugin_dir}/PROVENANCE.md"
+' "${version_neutral_docs[@]}" "${plugin_dir}/RELEASING.md" "${plugin_dir}/PROVENANCE.md" "${plugin_dir}/docs/next-release.md"
 
 rendered_marketplace="$(mktemp)"
 trap 'rm -f "${rendered_marketplace}"' EXIT

@@ -22,6 +22,21 @@ The upcoming native Android/iOS and React Native viewer actions, session events,
 are documented in [the next release notes](docs/next-release.md). The notes
 include native and React Native source checks and the separate consumer development workflow.
 
+## Repository layout
+
+```text
+levixel/
+├── native/             # Android, iOS, and HarmonyOS native cores
+├── adapters/           # React Native, UniApp, and Web adapters
+├── uni_modules/        # DCloud Marketplace UTS plugin source
+├── contract/           # Cross-platform public contract
+├── packaging/          # Platform artifact templates
+├── scripts/            # Build, verification, and release tools
+├── schema/             # Plugin manifest schema
+├── release-policy.json # Release candidate and acceptance matrix contract
+└── plugin.yaml         # Version, capability, and delivery manifest
+```
+
 ## Native Cores
 
 Build and inspect all native artifacts:
@@ -145,6 +160,12 @@ npm run dev
 npm run verify
 ```
 
+The demo covers mixed images and videos, portrait and landscape media, loading
+states, paging, and repeated open/close transitions. To test on a phone on the
+same local network, run `npm run dev:device` from `adapters/web` and open the
+printed `Network` URL. This command listens on all local interfaces; stop the
+server when the device session is finished.
+
 The automated suite uses a system Chrome/Chromium binary rather than downloading a browser. Set `LEVIXEL_CHROME_PATH` when necessary. `./scripts/verify-web.sh` also validates the declared target package metadata, legal-file bytes, and npm payload allowlist. Manual interaction acceptance covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari.
 It must also exercise prepended and appended media, sparse mounted DOM sources,
 out-of-order bindings, source removal before dismissal, and a connected DOM
@@ -184,8 +205,24 @@ unless the root version is unused locally and on `origin`, the release entry is
 first in each coordinated changelog, and all release metadata is internally
 consistent.
 
-The root README files describe the latest stable binaries. Keep unreleased API
-examples in `CHANGELOG.md` or maintainer documentation until a compatible
-artifact is accepted and its new version becomes the stable installation target.
+## Documentation
+
+The root README files and public platform guides serve developers integrating
+published packages. Keep them focused on capabilities, installation, API usage,
+and compatibility. A short link to contributor documentation is enough for
+source builds and release procedures.
+
+Keep branch progress, local verification steps, and detailed unreleased API
+drafts in maintainer documentation such as [the next release notes](docs/next-release.md).
+Changelogs may summarize those changes under `Unreleased`. Do not add pending
+release banners or development appendices to public guides, and do not remove
+only the disclaimer while leaving an API unsupported by the published package.
+
+For the compatible release, integrate reviewed additions into the normal API
+sections and publish the documentation with its matching artifacts. Follow the
+[documentation boundary](RELEASING.md#documentation-boundary), including version
+placement and consistency between the Chinese and English landing pages.
+`verify-documentation.sh` checks known wording regressions, links, and metadata;
+passing it does not replace reviewing the audience and accuracy of the prose.
 
 The release procedure and signing requirements are documented in [RELEASING.md](RELEASING.md).

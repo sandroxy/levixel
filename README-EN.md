@@ -1,7 +1,5 @@
 # Levixel
 
-The development branch adds native Android/iOS and React Native long-press actions, session events, and media retry. See the [next release development notes](docs/next-release.md). These additions are not yet published.
-
 [中文](README.md)
 
 Levixel is a native-feeling image and video viewer built around shared transitions, horizontal paging, pinch-to-zoom, zoomed panning, drag-to-dismiss, and video playback.
@@ -182,18 +180,6 @@ The Web package uses the browser DOM, Pointer Events, the Web Animations API, an
 The verified browser matrix covers macOS Chrome, macOS Safari, Android Chrome, and iOS Safari. See the [Web guide](adapters/web/README.md) for the API, browser boundary, and accessibility behavior.
 
 ## Source and releases
-
-```text
-levixel/
-├── native/          # Android, iOS, and HarmonyOS native cores
-├── adapters/        # React Native, UniApp, and Web adapters
-├── uni_modules/     # DCloud Marketplace UTS plugin source
-├── contract/        # Cross-platform public contract
-├── packaging/       # Platform artifact templates
-├── scripts/         # Build, artifact inspection, and release tools
-├── schema/          # Plugin manifest schema
-└── plugin.yaml      # Machine-readable version, capability, and delivery manifest
-```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for local builds, tests, and SDK prerequisites. See [RELEASING.md](RELEASING.md) for signing and channel-publication procedures.
 
