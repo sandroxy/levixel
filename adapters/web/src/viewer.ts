@@ -1,3 +1,4 @@
+import { ActionSheet } from './action-sheet.js';
 import {
   currentViewport,
   resolveSourceGeometry,
@@ -10,7 +11,9 @@ import { imageInfoFromElement, peekImage, transitionURL } from './media-cache.js
 import { LEVIXEL_STYLES } from './styles.js';
 import type {
   ImageInfo,
+  LevixelAction,
   LevixelEvent,
+  LevixelMediaContext,
   LevixelMediaItem,
   LevixelOpenResult,
   LevixelRect,
@@ -91,12 +94,16 @@ export class LevixelWebViewer {
   private trackOffset = 0;
   private hiddenSource: HiddenSource | undefined;
   private sourceEventIndex: number | undefined;
+  private actionSheet: ActionSheet | undefined;
+  private longPressTimer: number | undefined;
+  private suppressClickUntil = 0;
   private tapTimer: number | undefined;
   private lastTap: { x: number; y: number; time: number } | undefined;
   private controlsInteractionActive = false;
   private navigating = false;
   private destroyed = false;
   private closing = false;
+  private closePromise: Promise<void> | undefined;
   private opened = false;
   private reducedMotion = false;
 
@@ -147,6 +154,13 @@ export class LevixelWebViewer {
       item,
       {
         requestClose: () => this.callbacks.requestClose(),
+        mediaState: (loaded, message) => {
+          if (this.destroyed || this.closing) return;
+          const payload = this.mediaContext(index);
+          this.callbacks.emit(loaded
+            ? { type: 'mediaLoad', payload, time: Date.now() }
+            : { type: 'mediaError', payload: { ...payload, code: 'LOAD_FAILED', message: message ?? 'Media could not be loaded' }, time: Date.now() });
+        },
         videoChromeChanged: visible => this.updateVideoChrome(index, visible),
         controlsInteractionChanged: active => { this.controlsInteractionActive = active; },
       },
@@ -191,8 +205,10 @@ export class LevixelWebViewer {
       this.sourceEventIndex = this.currentIndex;
       this.emitSourceVisibility(true, this.currentIndex);
     }
+    this.assertAlive();
     this.root.focus({ preventScroll: true });
     this.announceIndex();
+    this.callbacks.emit({ type: 'opened', payload: this.mediaContext(), time: Date.now() });
     return {
       index: this.currentIndex,
       itemId: this.options.items[this.currentIndex]!.id,
@@ -201,13 +217,21 @@ export class LevixelWebViewer {
     };
   }
 
-  async close(animated: boolean, emitDismiss: boolean): Promise<void> {
-    if (this.destroyed || this.closing)
-      return;
+  close(animated: boolean, emitDismiss: boolean): Promise<void> {
+    if (this.closePromise) return this.closePromise;
+    if (this.destroyed) return Promise.resolve();
     this.closing = true;
+    this.closePromise = this.performClose(animated, emitDismiss);
+    return this.closePromise;
+  }
+
+  private async performClose(animated: boolean, emitDismiss: boolean): Promise<void> {
+    this.clearLongPress();
     this.cancelAnimations();
     this.clearTapTimer();
     this.cancelGesture(false);
+    if (this.actionSheet) await this.closeActions(animated);
+    if (this.destroyed) return;
     const page = this.currentPage();
     page.prepareForReturnAnimation();
     const fromGeometry = page.transitionGeometry();
@@ -228,8 +252,11 @@ export class LevixelWebViewer {
     if (this.destroyed)
       return;
     this.closing = true;
+    this.actionSheet?.destroy();
+    this.actionSheet = undefined;
+    this.clearLongPress();
     this.cancelAnimations();
-    this.finish(false);
+    this.finish(true);
   }
 
   isClosing(): boolean {
@@ -254,13 +281,83 @@ export class LevixelWebViewer {
     if (emitDismiss) {
       this.callbacks.emit({
         type: 'dismiss',
-        payload: {},
+        payload: this.mediaContext(),
         time: Date.now(),
       });
     }
   }
 
+  retry(): boolean {
+    return !this.destroyed && !this.closing && !this.actionSheet && this.currentPage().retry();
+  }
+
+  private mediaContext(index = this.currentIndex): LevixelMediaContext {
+    const item = this.options.items[index]!;
+    return { sessionId: this.galleryId, galleryId: this.galleryId, index, itemId: item.id, mediaType: item.type };
+  }
+
+  private clearLongPress(): void {
+    window.clearTimeout(this.longPressTimer);
+    this.longPressTimer = undefined;
+  }
+
+  private readonly handleClick = (event: MouseEvent): void => {
+    // Keyboard activation is independent of the pointer that opened the drawer.
+    if (event.detail === 0 && this.currentPage().isControlTarget(event.target)) return;
+    if (performance.now() < this.suppressClickUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  };
+
+  private readonly handleContextMenu = (event: MouseEvent): void => {
+    // A browser menu can arrive after our drawer has opened, including over its icons.
+    event.preventDefault();
+    if (this.currentPage().isControlTarget(event.target) || this.actionSheet) return;
+    if (performance.now() >= this.suppressClickUntil && this.gesture?.mode !== 'reanchor') this.longPress();
+  };
+
+  private longPress(): void {
+    this.clearLongPress();
+    if (!this.opened || this.closing || this.destroyed || this.navigating || this.actionSheet) return;
+    this.clearTapTimer();
+    this.lastTap = undefined;
+    if (this.gesture) this.gesture.mode = 'reanchor';
+    this.suppressClickUntil = performance.now() + 350;
+    const payload = this.mediaContext();
+    this.callbacks.emit({ type: 'longPress', payload: { ...payload }, time: Date.now() });
+    if (this.destroyed || this.closing || this.options.actions.length === 0) return;
+    this.actionSheet = new ActionSheet(this.options.actions,
+      action => { void this.selectAction(action, payload); },
+      () => { void this.closeActions(); }, this.options.actionLayout, this.options.actionListIcons);
+    this.root.append(this.actionSheet.element);
+    this.actionSheet.present(this.shadow);
+    this.content.inert = true;
+  }
+
+  private async selectAction(action: LevixelAction, payload: LevixelMediaContext): Promise<void> {
+    if (!await this.closeActions()) return;
+    const context = { ...payload, actionId: action.id };
+    try { this.callbacks.emit({ type: 'action', payload: { ...context }, time: Date.now() }); }
+    finally { action.onPress?.(context); }
+  }
+
+  private async closeActions(animated = true): Promise<boolean> {
+    const sheet = this.actionSheet;
+    if (!sheet) return false;
+    await sheet.close(animated);
+    if (this.actionSheet !== sheet) return false;
+    this.actionSheet = undefined;
+    this.content.inert = false;
+    if (this.closing || this.destroyed) return false;
+    sheet.restoreFocus();
+    if (!this.shadow.activeElement) this.root.focus({ preventScroll: true });
+    return true;
+  }
+
   private installListeners(): void {
+    this.root.addEventListener('contextmenu', this.handleContextMenu);
+    this.root.addEventListener('click', this.handleClick, true);
     this.root.addEventListener('pointerdown', this.handlePointerDown);
     this.root.addEventListener('pointermove', this.handlePointerMove);
     this.root.addEventListener('pointerup', this.handlePointerEnd);
@@ -276,6 +373,8 @@ export class LevixelWebViewer {
   }
 
   private removeListeners(): void {
+    this.root.removeEventListener('contextmenu', this.handleContextMenu);
+    this.root.removeEventListener('click', this.handleClick, true);
     this.root.removeEventListener('pointerdown', this.handlePointerDown);
     this.root.removeEventListener('pointermove', this.handlePointerMove);
     this.root.removeEventListener('pointerup', this.handlePointerEnd);
@@ -296,11 +395,17 @@ export class LevixelWebViewer {
       || this.closing
       || !this.opened
       || this.navigating
-      || this.currentPage().isControlTarget(event.target)
     )
       return;
     if (event.button !== 0 && event.pointerType === 'mouse')
       return;
+    if (this.currentPage().isControlTarget(event.target)) {
+      // A fresh press on a control is intentional. The original long-press
+      // release still has a tracked pointer and remains click-suppressed.
+      if (this.pointers.size === 0) this.suppressClickUntil = 0;
+      return;
+    }
+    if (this.actionSheet !== undefined) return;
     const point = pointerPoint(event);
     try {
       this.root.setPointerCapture(event.pointerId);
@@ -308,6 +413,7 @@ export class LevixelWebViewer {
     catch (_) {}
     this.pointers.set(event.pointerId, point);
 
+    this.clearLongPress();
     if (this.pointers.size === 1) {
       this.gesture = {
         mode: 'pending',
@@ -317,6 +423,7 @@ export class LevixelWebViewer {
         horizontalDelta: 0,
         verticalDelta: { x: 0, y: 0 },
       };
+      this.longPressTimer = window.setTimeout(() => this.longPress(), 500);
       return;
     }
     if (this.pointers.size === 2) {
@@ -344,6 +451,8 @@ export class LevixelWebViewer {
     if (!this.gesture || !this.pointers.has(event.pointerId) || this.destroyed || this.closing)
       return;
     const point = pointerPoint(event);
+    if (Math.hypot(point.x - this.gesture.start.x, point.y - this.gesture.start.y) > MOVE_THRESHOLD)
+      this.clearLongPress();
     this.pointers.set(event.pointerId, point);
     this.updateSamples(point);
 
@@ -408,6 +517,8 @@ export class LevixelWebViewer {
   };
 
   private readonly handlePointerEnd = (event: PointerEvent): void => {
+    this.clearLongPress();
+    if (this.gesture?.mode === 'reanchor') this.suppressClickUntil = performance.now() + 350;
     if (!this.pointers.has(event.pointerId))
       return;
     const point = pointerPoint(event);
@@ -453,6 +564,7 @@ export class LevixelWebViewer {
       || this.closing
       || !this.opened
       || this.navigating
+      || this.actionSheet !== undefined
     )
       return;
     const page = this.currentPage();
@@ -475,7 +587,14 @@ export class LevixelWebViewer {
       return;
     if (event.key === 'Escape') {
       event.preventDefault();
-      this.callbacks.requestClose();
+      if (this.actionSheet) void this.closeActions();
+      else this.callbacks.requestClose();
+      return;
+    }
+    if (this.actionSheet) return;
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      this.longPress();
       return;
     }
     if (this.currentPage().isZoomed() || this.controlsInteractionActive || this.navigating)
@@ -654,6 +773,7 @@ export class LevixelWebViewer {
       this.callbacks.emit({
         type: 'indexChange',
         payload: {
+          ...this.mediaContext(targetIndex),
           currentIndex: targetIndex,
           itemId: this.options.items[targetIndex]!.id,
         },
@@ -691,6 +811,7 @@ export class LevixelWebViewer {
   }
 
   private cancelGesture(animate: boolean): void {
+    this.clearLongPress();
     if (!this.gesture && this.pointers.size === 0)
       return;
     const mode = this.gesture?.mode;
@@ -944,9 +1065,10 @@ export class LevixelWebViewer {
   }
 
   private trapFocus(event: KeyboardEvent): void {
-    const focusable = [...this.shadow.querySelectorAll<HTMLElement>(
+    const focusable = [...(this.actionSheet?.element ?? this.shadow).querySelectorAll<HTMLElement>(
+      this.actionSheet ? '.action-sheet button' :
       'button[data-visible="true"], .video-controls[data-visible="true"] button, '
-      + '.video-controls[data-visible="true"] input',
+      + '.video-controls[data-visible="true"] input, .page:not([aria-hidden="true"]) .retry-button:not([hidden])',
     )].filter(element => !element.hasAttribute('disabled'));
     if (focusable.length === 0) {
       event.preventDefault();
@@ -961,7 +1083,9 @@ export class LevixelWebViewer {
     if (index >= focusable.length)
       index = 0;
     event.preventDefault();
-    focusable[index]?.focus({ preventScroll: true });
+    const target = focusable[index];
+    if (target && this.actionSheet) this.actionSheet.focusButton(target);
+    else target?.focus({ preventScroll: true });
   }
 
   private announceIndex(): void {

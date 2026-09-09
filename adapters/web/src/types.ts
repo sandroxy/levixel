@@ -1,5 +1,6 @@
 export type LevixelMediaType = 'image' | 'video';
 export type LevixelTheme = 'dark' | 'light';
+export type LevixelActionLayout = 'list' | 'grid';
 export type LevixelObjectFit = 'contain' | 'cover' | 'fill';
 export type LevixelSourceVisibility = 'hidden' | 'visible';
 
@@ -35,7 +36,37 @@ export interface LevixelSourceHint {
   cornerRadius?: number;
 }
 
+export interface LevixelMediaContext {
+  sessionId: string;
+  galleryId: string;
+  index: number;
+  itemId: string;
+  mediaType: LevixelMediaType;
+}
+
+export interface LevixelActionContext extends LevixelMediaContext {
+  actionId: string;
+}
+
+export interface LevixelAction {
+  id: string;
+  label: string;
+  /** Image URI. Required for grid; optional for list. */
+  icon?: string;
+  group?: string;
+  disabled?: boolean;
+  destructive?: boolean;
+  onPress?: (context: LevixelActionContext) => void;
+}
+
+export interface LevixelRetryResult { retried: boolean }
+
 export interface LevixelOpenOptions {
+  actions?: readonly LevixelAction[];
+  /** Explicit layout, independent of action count. Defaults to 'list'. */
+  actionLayout?: LevixelActionLayout;
+  /** Show provided icons in list layout. Defaults to false; grid always shows icons. */
+  actionListIcons?: boolean;
   items: LevixelMediaItem[];
   index?: number;
   theme?: LevixelTheme;
@@ -67,6 +98,11 @@ export interface LevixelPreparedPreview {
 }
 
 interface LevixelSelectorOpenOptionsBase {
+  actions?: readonly LevixelAction[];
+  /** Explicit layout, independent of action count. Defaults to 'list'. */
+  actionLayout?: LevixelActionLayout;
+  /** Show provided icons in list layout. Defaults to false; grid always shows icons. */
+  actionListIcons?: boolean;
   items: LevixelMediaItem[];
   theme?: LevixelTheme;
   sourceVisibility?: LevixelSourceVisibility;
@@ -98,6 +134,9 @@ export type LevixelSelectorOpenOptions = LevixelSelectorOpenOptionsBase
   & LevixelSelectorSources;
 
 export type LevixelEvent =
+  | { type: 'opened' | 'longPress' | 'mediaLoad'; payload: LevixelMediaContext; time: number }
+  | { type: 'action'; payload: LevixelActionContext; time: number }
+  | { type: 'mediaError'; payload: LevixelMediaContext & { code: 'LOAD_FAILED'; message: string }; time: number }
   | {
       type: 'ready';
       payload: Record<string, unknown>;
@@ -105,7 +144,7 @@ export type LevixelEvent =
     }
   | {
       type: 'indexChange';
-      payload: { currentIndex: number; itemId: string };
+      payload: { currentIndex: number; itemId: string } & Partial<LevixelMediaContext>;
       time: number;
     }
   | {
@@ -115,7 +154,7 @@ export type LevixelEvent =
     }
   | {
       type: 'dismiss';
-      payload: Record<string, never>;
+      payload: LevixelMediaContext;
       time: number;
     };
 
@@ -131,6 +170,9 @@ export interface LevixelCloseResult {
 }
 
 export interface NormalizedOpenOptions {
+  actions: LevixelAction[];
+  actionLayout: LevixelActionLayout;
+  actionListIcons: boolean;
   items: LevixelMediaItem[];
   index: number;
   theme: LevixelTheme;
@@ -139,6 +181,9 @@ export interface NormalizedOpenOptions {
 }
 
 interface NormalizedSelectorOpenOptionsBase {
+  actions: LevixelAction[];
+  actionLayout: LevixelActionLayout;
+  actionListIcons: boolean;
   items: LevixelMediaItem[];
   index: number;
   theme: LevixelTheme;

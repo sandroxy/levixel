@@ -4,6 +4,7 @@ import {
   openLevixelFromSelector,
   warmupLevixelItem,
   type LevixelMediaItem,
+  type LevixelAction,
 } from '../src/index.js';
 
 const items: LevixelMediaItem[] = [
@@ -31,6 +32,18 @@ const gallery = document.querySelector<HTMLElement>('#gallery');
 const status = document.querySelector<HTMLElement>('#status');
 if (!gallery || !status)
   throw new Error('Levixel demo host is incomplete');
+
+const actionStatus = document.createElement('p');
+actionStatus.id = 'action-status';
+actionStatus.textContent = 'Open an image or video, then hold to see actions. Shift+F10 also opens the drawer.';
+status.after(actionStatus);
+const actions: LevixelAction[] = ['Inspect', 'Bookmark', 'Add to list', 'Tag', 'Unavailable', 'Remove'].map((label, index) => ({
+  id: `demo-${index}`, label, group: index < 4 ? 'tools' : 'manage',
+  disabled: index === 4, destructive: index === 5,
+  onPress: context => {
+    actionStatus.textContent = `${label}: ${context.itemId} (page ${context.index + 1}). Demo callback received; no media was modified.`;
+  },
+}));
 
 items.forEach((item, index) => {
   const card = document.createElement('button');
@@ -63,6 +76,7 @@ items.forEach((item, index) => {
     try {
       const result = await openLevixelFromSelector({
         items,
+        actions,
         initialItemId: item.id,
         sourceBindings: [...gallery.querySelectorAll<HTMLElement>('.levixel-demo-source')]
           .map(source => ({

@@ -194,3 +194,39 @@ test('identified selector bindings reject ambiguous identities and mixed source 
     );
   }
 });
+
+test('actions copy callbacks and reject ambiguous or malformed configuration', () => {
+  const onPress = () => {};
+  const actions = [{ id: 'inspect', label: 'Inspect', group: 'tools', onPress }];
+  const request = normalizeOpenOptions({ items: [item], actions });
+  actions[0].label = 'Changed';
+  assert.equal(request.actions[0].label, 'Inspect');
+  assert.equal(request.actions[0].onPress, onPress);
+  for (const invalid of [null, new Array(1), [{ id: 'x', label: 'X' }, { id: 'x', label: 'Y' }],
+    [{ id: 'x', label: ' ' }], [{ id: 'x', label: 'X', disabled: 'true' }],
+    [{ id: 'x', label: 'X', onPress: 'callback' }]]) {
+    assert.throws(() => normalizeOpenOptions({ items: [item], actions: invalid }));
+  }
+});
+
+test('drawer layout is explicit and only grid requires icons', () => {
+  const actions = Array.from({ length: 10 }, (_, index) => ({ id: `a${index}`, label: `Action ${index}` }));
+  const request = normalizeOpenOptions({ items: [item], actions });
+  assert.equal(request.actionLayout, 'list');
+  assert.equal(request.actionListIcons, false);
+  assert.equal(request.actions.length, 10);
+  const grid = normalizeOpenOptions({ items: [item], actionLayout: 'grid', actions: [{ ...actions[0], icon: 'https://example.com/icon.png' }] });
+  assert.equal(grid.actionLayout, 'grid');
+  assert.equal(grid.actions.length, 1);
+  const selector = normalizeSelectorOpenOptions({ items: [item], actionLayout: 'list', actionListIcons: true, actions });
+  assert.equal(selector.actionLayout, 'list');
+  assert.equal(selector.actionListIcons, true);
+  for (const [options, path] of [
+    [{ actionLayout: 'grid', actions }, '$.actions[0].icon'],
+    [{ actionLayout: 'auto' }, '$.actionLayout'],
+    [{ actionLayout: null }, '$.actionLayout'],
+    [{ actionListIcons: 'true' }, '$.actionListIcons'],
+    [{ actionListIcons: null }, '$.actionListIcons'],
+  ]) assert.throws(() => normalizeOpenOptions({ items: [item], ...options }), error => error.path === path);
+  assert.deepEqual(normalizeOpenOptions({ items: [item], actionLayout: 'grid', actions: [] }).actions, []);
+});

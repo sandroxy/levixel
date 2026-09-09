@@ -17,6 +17,7 @@ import type { ImageInfo, LevixelMediaItem, LevixelSize } from './types.js';
 
 export interface ViewerPageDelegate {
   requestClose(): void;
+  mediaState(loaded: boolean, message?: string): void;
   videoChromeChanged(visible: boolean): void;
   controlsInteractionChanged(active: boolean): void;
 }
@@ -27,6 +28,7 @@ export interface ViewerPage {
   readonly index: number;
   setActive(active: boolean): void;
   ensureLoaded(priority?: boolean): void;
+  retry(): boolean;
   updateViewport(size: LevixelSize): void;
   setMediaHidden(hidden: boolean): void;
   transitionGeometry(): SharedElementGeometry | null;
@@ -60,6 +62,9 @@ abstract class BasePage implements ViewerPage {
   protected readonly mediaShell: HTMLElement;
   protected readonly spinner: HTMLElement;
   protected viewport: LevixelSize = { width: 1, height: 1 };
+  protected readonly retryButton: HTMLButtonElement;
+  protected failed = false;
+  protected disposed = false;
   protected active = false;
   protected loadGeneration = 0;
 
@@ -79,9 +84,17 @@ abstract class BasePage implements ViewerPage {
     this.spinner.setAttribute('aria-label', 'Loading media');
     this.spinner.setAttribute('aria-hidden', 'true');
     this.spinner.dataset.visible = 'false';
-    this.element.append(this.mediaShell, this.spinner);
+    this.retryButton = document.createElement('button');
+    this.retryButton.type = 'button';
+    this.retryButton.className = 'retry-button';
+    this.retryButton.dataset.levixelControl = '';
+    this.retryButton.textContent = navigator.language.startsWith('zh') ? '加载失败，重试' : 'Unable to load. Retry';
+    this.retryButton.hidden = true;
+    this.retryButton.addEventListener('click', event => { event.stopPropagation(); this.retry(); });
+    this.element.append(this.mediaShell, this.spinner, this.retryButton);
   }
 
+  abstract retry(): boolean;
   abstract setActive(active: boolean): void;
   abstract ensureLoaded(priority?: boolean): void;
   abstract updateViewport(size: LevixelSize): void;
@@ -126,7 +139,16 @@ abstract class BasePage implements ViewerPage {
   resumeFromBackground(_wasPlaying: boolean): void {}
 
   destroy(): void {
+    this.disposed = true;
     this.loadGeneration += 1;
+  }
+
+  protected reportMediaState(loaded: boolean): void {
+    if (this.disposed) return;
+    this.failed = !loaded;
+    this.retryButton.hidden = loaded;
+    this.showLoading(false);
+    this.delegate.mediaState(loaded);
   }
 
   protected showLoading(visible: boolean): void {
@@ -201,14 +223,28 @@ export class ImagePage extends BasePage {
     void loadImage(this.item.url, priority).then((info) => {
       if (this.loadGeneration !== generation)
         return;
-      this.fullImageReady = true;
-      this.clearLoading();
-      void this.handoffToImage(info, generation);
+      void this.handoffToImage(info, generation).then(committed => {
+        if (this.loadGeneration !== generation || this.disposed) return;
+        this.fullImageReady = committed;
+        this.clearLoading();
+        this.reportMediaState(committed);
+      });
     }, () => {
       if (this.loadGeneration !== generation)
         return;
       this.clearLoading();
+      this.reportMediaState(false);
     });
+  }
+
+  override retry(): boolean {
+    if (!this.failed || this.disposed) return false;
+    this.failed = false;
+    this.retryButton.hidden = true;
+    this.loadStarted = false;
+
+    this.ensureLoaded(true);
+    return true;
   }
 
   override updateViewport(size: LevixelSize): void {
@@ -340,13 +376,13 @@ export class ImagePage extends BasePage {
     this.relayout(state);
   }
 
-  private async handoffToImage(info: ImageInfo, generation: number): Promise<void> {
+  private async handoffToImage(info: ImageInfo, generation: number): Promise<boolean> {
     if (this.loadGeneration !== generation)
-      return;
+      return false;
     const currentSource = this.image.currentSrc || this.image.src;
     if (!currentSource || currentSource === info.src) {
       this.applyImage(info, true);
-      return;
+      return true;
     }
 
     this.cancelImageHandoff();
@@ -361,14 +397,14 @@ export class ImagePage extends BasePage {
     const decoded = await waitForDecodedImage(incoming, controller.signal);
     if (!decoded || controller.signal.aborted || this.loadGeneration !== generation) {
       this.discardIncomingImage(incoming, controller);
-      return;
+      return false;
     }
 
     const committed = await commitOnNextRenderingUpdate(() => {
       if (controller.signal.aborted
         || this.loadGeneration !== generation
         || this.incomingImage !== incoming) {
-        return;
+        return false;
       }
       const state = this.captureViewportState();
       const previous = this.image;
@@ -384,6 +420,7 @@ export class ImagePage extends BasePage {
     }, controller.signal);
     if (!committed)
       this.discardIncomingImage(incoming, controller);
+    return committed && this.image === incoming;
   }
 
   private relayout(state: ZoomedViewportState | null): void {
@@ -569,6 +606,17 @@ export class VideoPage extends BasePage {
     }
   }
 
+  override retry(): boolean {
+    if (!this.failed || this.disposed) return false;
+    this.failed = false;
+    this.retryButton.hidden = true;
+    this.loadStarted = false;
+    this.firstFrameReady = false;
+    this.video.pause();
+    this.ensureLoaded(true);
+    return true;
+  }
+
   override updateViewport(size: LevixelSize): void {
     this.viewport = size;
     this.element.style.width = `${size.width}px`;
@@ -667,7 +715,7 @@ export class VideoPage extends BasePage {
   private installVideoListeners(): void {
     this.video.addEventListener('loadeddata', () => this.handleFirstFrame());
     this.video.addEventListener('canplay', () => this.handleFirstFrame());
-    this.video.addEventListener('error', () => this.showLoading(false));
+    this.video.addEventListener('error', () => this.reportMediaState(false));
     this.video.addEventListener('play', () => this.updatePlayButton());
     this.video.addEventListener('pause', () => this.updatePlayButton());
     this.video.addEventListener('timeupdate', () => this.updateTimeline());
@@ -693,10 +741,9 @@ export class VideoPage extends BasePage {
   }
 
   private handleFirstFrame(): void {
-    if (this.firstFrameReady)
+    if (this.firstFrameReady || this.disposed)
       return;
     this.firstFrameReady = true;
-    this.showLoading(false);
     this.video.pause();
     try {
       this.video.currentTime = 0;
@@ -705,6 +752,9 @@ export class VideoPage extends BasePage {
     this.video.muted = false;
     if (this.active)
       this.revealVideo();
+    // Finish local playback changes before notifying code that may close or
+    // replace this viewer synchronously from the mediaLoad callback.
+    this.reportMediaState(true);
   }
 
   private revealVideo(tryPlayback = true): void {

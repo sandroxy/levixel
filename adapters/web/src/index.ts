@@ -33,6 +33,11 @@ import type {
 } from './types.js';
 
 export type {
+  LevixelAction,
+  LevixelActionLayout,
+  LevixelActionContext,
+  LevixelMediaContext,
+  LevixelRetryResult,
   LevixelCloseResult,
   LevixelEvent,
   LevixelMediaItem,
@@ -79,6 +84,11 @@ export async function closeLevixel(): Promise<LevixelCloseResult> {
   if (activeViewer === viewer)
     activeViewer = undefined;
   return { closed: true };
+}
+
+export async function retryLevixel(): Promise<{ retried: boolean }> {
+  requireBrowser();
+  return { retried: activeViewer?.retry() ?? false };
 }
 
 export function onLevixelEvent(listener: (event: LevixelEvent) => void): () => void {
@@ -140,6 +150,9 @@ export async function openLevixelFromSelector(
   const bindings = bindingsFromSelector(normalized);
   const openOptions: NormalizedOpenOptions = {
     items: normalized.items,
+    actions: normalized.actions,
+    actionLayout: normalized.actionLayout,
+    actionListIcons: normalized.actionListIcons,
     index: normalized.index,
     theme: normalized.theme,
     sourceVisibility: normalized.sourceVisibility,
@@ -341,6 +354,7 @@ function cancelledError(): Error {
 const levixel = {
   open: openLevixel,
   close: closeLevixel,
+  retry: retryLevixel,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,

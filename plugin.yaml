@@ -247,6 +247,11 @@ targets:
       - web
     sourceRoot: adapters/web
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing

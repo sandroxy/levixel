@@ -5,6 +5,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright-core';
+import { verifyActions } from './actions.test.mjs';
 
 const adapterRoot = resolve(join(fileURLToPath(new URL('.', import.meta.url)), '..'));
 const packageDistRoot = resolve(process.env.LEVIXEL_WEB_DIST_ROOT ?? join(adapterRoot, 'dist'));
@@ -123,10 +124,13 @@ try {
   assert.deepEqual(openState.pageAriaHidden, [null, 'true', 'true']);
 
   const openingEvents = await page.evaluate(() => window.levixelFixture.events);
-  assert.deepEqual(openingEvents.map(event => event.type), ['ready', 'sourceVisibilityChange']);
-  assert.equal(openingEvents[1].payload.hidden, true);
-  assert.equal(openingEvents[1].payload.itemId, 'portrait');
-  assert.equal(typeof openingEvents[1].time, 'number');
+  assert.deepEqual(openingEvents.filter(event => !['mediaLoad', 'mediaError'].includes(event.type)).map(event => event.type),
+    ['ready', 'sourceVisibilityChange', 'opened']);
+  const hiddenEvent = openingEvents.find(event => event.type === 'sourceVisibilityChange');
+  assert.equal(hiddenEvent.payload.hidden, true);
+  assert.equal(hiddenEvent.payload.itemId, 'portrait');
+  assert.equal(typeof hiddenEvent.time, 'number');
+  assert.equal(openingEvents.at(-1).payload.itemId, 'portrait');
 
   await page.mouse.move(300, 422);
   await page.mouse.down();
@@ -182,7 +186,8 @@ try {
   ]);
   assert.equal(closedState.events.at(-2).payload.hidden, false);
   assert.equal(closedState.events.at(-2).payload.itemId, 'portrait');
-  assert.deepEqual(closedState.events.at(-1).payload, {});
+  assert.equal(closedState.events.at(-1).payload.itemId, 'portrait');
+  assert.equal(closedState.events.at(-1).payload.sessionId, openingEvents.at(-1).payload.sessionId);
 
   await page.locator('.source').nth(1).click();
   await page.waitForFunction(() => window.levixelFixture?.results?.length === 2);
@@ -229,12 +234,12 @@ try {
     roots: 1,
     first: '',
     second: 'hidden',
-    dismisses: 2,
+    dismisses: 3,
   });
   await page.evaluate(() => window.levixelFixture.closeLevixel());
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   const replacementEvents = await page.evaluate(() => window.levixelFixture.events);
-  assert.equal(replacementEvents.filter(event => event.type === 'dismiss').length, 3);
+  assert.equal(replacementEvents.filter(event => event.type === 'dismiss').length, 4);
 
   await page.evaluate(() => window.levixelFixture.open(2));
   await page.waitForFunction(() => window.levixelFixture.results.length === 5);
@@ -259,7 +264,8 @@ try {
     closeVisible: 'false',
     closeTabIndex: -1,
   });
-  await page.mouse.click(195, 422);
+  // This fixture deliberately fails to load video; avoid its central Retry control.
+  await page.mouse.click(195, 320);
   await page.waitForFunction(() => {
     const host = document.querySelector('[data-levixel-web-root]');
     return host?.shadowRoot.querySelector('.video-controls')?.dataset.visible === 'true';
@@ -289,7 +295,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   assert.equal(
     await page.evaluate(() => window.levixelFixture.events.filter(event => event.type === 'dismiss').length),
-    4,
+    5,
   );
 
   await page.evaluate(() => {
@@ -335,7 +341,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('[data-levixel-web-root]'));
   assert.equal(
     await page.evaluate(() => window.levixelFixture.events.filter(event => event.type === 'dismiss').length),
-    5,
+    6,
   );
 
   await page.evaluate(() => {
@@ -425,6 +431,7 @@ try {
   await verifySingleTouchReopen(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifyActions(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   assert.deepEqual(pageErrors, []);
 }
 finally {

@@ -1,4 +1,6 @@
 import type {
+  LevixelAction,
+  LevixelActionLayout,
   LevixelMediaItem,
   LevixelObjectFit,
   LevixelOpenOptions,
@@ -13,6 +15,9 @@ import type {
 } from './types.js';
 
 const OPEN_KEYS = new Set([
+  'actions',
+  'actionLayout',
+  'actionListIcons',
   'items',
   'index',
   'theme',
@@ -22,6 +27,9 @@ const OPEN_KEYS = new Set([
   'closeButton',
 ]);
 const SELECTOR_KEYS = new Set([
+  'actions',
+  'actionLayout',
+  'actionListIcons',
   'items',
   'index',
   'initialItemId',
@@ -53,6 +61,7 @@ const RECT_KEYS = new Set(['left', 'top', 'width', 'height']);
 const SIZE_KEYS = new Set(['width', 'height']);
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius']);
 const SOURCE_BINDING_KEYS = new Set(['itemId', 'selector', 'objectFit', 'cornerRadius']);
+const ACTION_KEYS = new Set(['id', 'label', 'icon', 'group', 'disabled', 'destructive', 'onPress']);
 
 export class LevixelContractError extends Error {
   readonly code: string;
@@ -312,6 +321,52 @@ function rejectUnsupportedBoolean(value: unknown, path: '$.counter' | '$.closeBu
   contractError(path, message, 'UNSUPPORTED_VALUE');
 }
 
+export function normalizeActions(value: unknown, layout: LevixelActionLayout = 'list'): LevixelAction[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) contractError('$.actions', '$.actions must be an array');
+  const ids = new Set<string>();
+  return Array.from(value, (entry, index) => {
+    const path = `$.actions[${index}]`;
+    const record = requireRecord(entry, path);
+    rejectUnknownKeys(record, ACTION_KEYS, path);
+    const id = requireNonEmptyString(record.id, `${path}.id`);
+    const label = requireNonEmptyString(record.label, `${path}.label`);
+    if (ids.has(id))
+      contractError(path, `${path} requires a unique non-blank id and label`);
+    ids.add(id);
+    const result: LevixelAction = { id, label };
+    for (const key of ['icon', 'group'] as const) {
+      if (record[key] !== undefined) {
+        const value = requireNonEmptyString(record[key], `${path}.${key}`);
+        result[key] = value;
+      }
+    }
+    for (const key of ['disabled', 'destructive'] as const) {
+      if (record[key] !== undefined) {
+        if (typeof record[key] !== 'boolean') contractError(`${path}.${key}`, `${path}.${key} must be boolean`);
+        result[key] = record[key];
+      }
+    }
+    if (record.onPress !== undefined) {
+      if (typeof record.onPress !== 'function') contractError(`${path}.onPress`, `${path}.onPress must be a function`);
+      result.onPress = record.onPress as NonNullable<LevixelAction['onPress']>;
+    }
+    if (layout === 'grid' && result.icon === undefined)
+      contractError(`${path}.icon`, `${path}.icon is required for grid actionLayout`);
+    return result;
+  });
+}
+
+function normalizeActionOptions(record: Record<string, unknown>): Pick<NormalizedOpenOptions, 'actions' | 'actionLayout' | 'actionListIcons'> {
+  const actionLayout = record.actionLayout === undefined ? 'list' : record.actionLayout;
+  if (actionLayout !== 'list' && actionLayout !== 'grid')
+    contractError('$.actionLayout', '$.actionLayout must be list or grid');
+  const actionListIcons = record.actionListIcons === undefined ? false : record.actionListIcons;
+  if (typeof actionListIcons !== 'boolean')
+    contractError('$.actionListIcons', '$.actionListIcons must be boolean');
+  return { actionLayout, actionListIcons, actions: normalizeActions(record.actions, actionLayout) };
+}
+
 export function normalizeOpenOptions(value: LevixelOpenOptions | unknown): NormalizedOpenOptions {
   const record = requireRecord(value, '$');
   rejectUnknownKeys(record, OPEN_KEYS, '$');
@@ -320,6 +375,7 @@ export function normalizeOpenOptions(value: LevixelOpenOptions | unknown): Norma
   rejectUnsupportedBoolean(record.closeButton, '$.closeButton');
   return {
     items,
+    ...normalizeActionOptions(record),
     index: normalizeIndex(record.index, items.length),
     theme: normalizeTheme(record.theme),
     sourceHints: normalizeHints(record.sourceHints, items.length),
@@ -433,6 +489,7 @@ export function normalizeSelectorOpenOptions(
   }
   const normalizedBase = {
     items,
+    ...normalizeActionOptions(record),
     index: normalizeInitialIndex(record.index, record.initialItemId, items),
     theme: normalizeTheme(record.theme),
     sourceVisibility: normalizeSourceVisibility(record.sourceVisibility),

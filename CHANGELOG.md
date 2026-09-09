@@ -2,10 +2,11 @@
 
 ## 1.4.0 - Unreleased
 
-- Adds image and video long-press events and viewer-owned action drawers on native Android/iOS and React Native, with explicit list/grid layouts, optional list icons, groups, and arbitrary business callbacks.
-- Adds native and React Native session events, media-load/error events, visible retry controls, and programmatic retry and close APIs.
+- Adds image and video long-press events and viewer-owned action drawers on native Android/iOS, React Native, and Web, with explicit list/grid layouts, optional list icons, groups, and arbitrary business callbacks.
+- Adds native, React Native, and Web session events, media-load/error events, visible retry controls, and programmatic retry and close APIs.
 - Preserves media identity and registered source corners during iOS transitions, retains asynchronous image-loading targets until completion, and safely finalizes Android viewers during host removal.
 - Adds React Native viewer refs for opening, closing, and retrying without a mounted thumbnail; opening snapshots retain their action callbacks during list updates.
+- Keeps Web drawer keyboard focus visible without shifting media, waits for drawer dismissal before action callbacks, and prevents video playback from resuming after a media-load callback closes the viewer.
 - Fixes the React Native Swift new-architecture build flag so the iOS bridge uses the host's configured architecture.
 
 ## 1.3.0 - 2026-09-07
