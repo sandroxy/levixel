@@ -38,6 +38,7 @@ public final class LevixelVideoPlayerView extends FrameLayout {
     private final AppCompatImageButton closeButton;
     @Nullable
     private Runnable contentReadyListener;
+    @Nullable private Runnable loadFailedListener;
     @Nullable
     private LevixelMediaItem item;
     @Nullable
@@ -66,9 +67,8 @@ public final class LevixelVideoPlayerView extends FrameLayout {
 
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
-            if (presentationState.onPlayerError()) {
-                notifyContentReady();
-            }
+            presentationState.onPlayerError();
+            if (loadFailedListener != null) loadFailedListener.run();
         }
     };
 
@@ -148,6 +148,8 @@ public final class LevixelVideoPlayerView extends FrameLayout {
         this.contentReadyListener = contentReadyListener;
     }
 
+    public void setOnLoadFailedListener(@Nullable Runnable listener) { loadFailedListener = listener; }
+
     public void bind(@NonNull LevixelMediaItem item) {
         boolean retainsPreparedSource = player != null
                 && item.getSourceUrl().equals(preparedSourceUrl);
@@ -166,8 +168,12 @@ public final class LevixelVideoPlayerView extends FrameLayout {
                 .load(item.getThumbnailUrl())
                 .dontAnimate()
                 .into(posterImageView);
-        if (retainsPreparedSource && presentationState.isContentSettled()) {
-            notifyContentReady();
+        if (retainsPreparedSource) {
+            if (presentationState.isPlaybackFailed()) {
+                if (loadFailedListener != null) loadFailedListener.run();
+            } else if (presentationState.isFrameReady()) {
+                notifyContentReady();
+            }
         }
         if (active) {
             ensurePlayerPrepared(item.getSourceUrl());

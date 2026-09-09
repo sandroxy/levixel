@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -28,8 +29,12 @@ public final class LevixelViewerPageView extends FrameLayout {
         void onDismissRequested(@NonNull LevixelViewerPageView pageView);
 
         void onVideoCloseRequested(@NonNull LevixelViewerPageView pageView);
+
+        default void onMediaState(@NonNull LevixelViewerPageView page, @NonNull LevixelMediaItem item, boolean loaded) {}
     }
 
+    private final TextView retryButton;
+    private boolean loadFailed;
     private final FrameLayout mediaContainer;
     private final PhotoView photoView;
     private final ImageView previewImageView;
@@ -93,7 +98,8 @@ public final class LevixelViewerPageView extends FrameLayout {
                 listener.onVideoCloseRequested(this);
             }
         });
-        videoPlayerView.setOnContentReadyListener(() -> setLoadingVisible(false));
+        videoPlayerView.setOnContentReadyListener(() -> reportMediaState(true));
+        videoPlayerView.setOnLoadFailedListener(() -> reportMediaState(false));
         mediaContainer.addView(videoPlayerView);
 
         loadingContainer = new FrameLayout(context);
@@ -109,6 +115,16 @@ public final class LevixelViewerPageView extends FrameLayout {
         loadingContainer.setVisibility(GONE);
         addView(loadingContainer);
 
+        retryButton = new TextView(context);
+        retryButton.setText(java.util.Locale.getDefault().getLanguage().equals("zh") ? "加载失败，重试" : "Unable to load. Retry");
+        retryButton.setTextColor(Color.WHITE);
+        retryButton.setBackgroundColor(0xDD252525);
+        retryButton.setPadding(dp(20), dp(12), dp(20), dp(12));
+        retryButton.setFocusable(true);
+        retryButton.setVisibility(GONE);
+        retryButton.setOnClickListener(view -> retry());
+        addView(retryButton, new LayoutParams(-2, -2, Gravity.CENTER));
+
         loadingPulseAnimator = ObjectAnimator.ofFloat(loadingContainer, View.ALPHA, 0.62f, 1f);
         loadingPulseAnimator.setDuration(760L);
         loadingPulseAnimator.setRepeatMode(ObjectAnimator.REVERSE);
@@ -123,6 +139,8 @@ public final class LevixelViewerPageView extends FrameLayout {
         bindGeneration += 1;
         this.item = item;
         fullImageReady = false;
+        loadFailed = false;
+        retryButton.setVisibility(GONE);
         if (item.getMediaType() == LevixelMediaItem.MediaType.IMAGE) {
             bindImage(item);
         } else {
@@ -138,6 +156,22 @@ public final class LevixelViewerPageView extends FrameLayout {
         videoPlayerView.setActive(active);
     }
 
+    public boolean retry() {
+        if (!loadFailed || item == null) return false;
+        LevixelMediaItem media = item;
+        videoPlayerView.release();
+        bind(media);
+        return true;
+    }
+
+    private void reportMediaState(boolean loaded) {
+        if (item == null) return;
+        loadFailed = !loaded;
+        retryButton.setVisibility(loaded ? GONE : VISIBLE);
+        setLoadingVisible(false);
+        if (listener != null) listener.onMediaState(this, item, loaded);
+    }
+
     public void release() {
         bindGeneration += 1;
         Glide.with(photoView.getContext().getApplicationContext()).clear(photoView);
@@ -150,6 +184,8 @@ public final class LevixelViewerPageView extends FrameLayout {
         videoPlayerView.release();
         videoPlayerView.setVisibility(GONE);
         item = null;
+        loadFailed = false;
+        retryButton.setVisibility(GONE);
         active = false;
         fullImageReady = false;
         setLoadingVisible(false);
@@ -189,6 +225,9 @@ public final class LevixelViewerPageView extends FrameLayout {
     }
 
     public boolean isTouchOnInteractiveVideoControls(float rawX, float rawY) {
+        android.graphics.Rect bounds = new android.graphics.Rect();
+        if (retryButton.getVisibility() == VISIBLE && retryButton.getGlobalVisibleRect(bounds)
+                && bounds.contains((int) rawX, (int) rawY)) return true;
         return item != null
                 && item.getMediaType() == LevixelMediaItem.MediaType.VIDEO
                 && videoPlayerView.isTouchOnInteractiveControls(rawX, rawY);
@@ -337,7 +376,7 @@ public final class LevixelViewerPageView extends FrameLayout {
                     @Override
                     public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
                         if (generation == bindGeneration) {
-                            setLoadingVisible(false);
+                            post(() -> { if (generation == bindGeneration) reportMediaState(false); });
                         }
                         return false;
                     }
@@ -348,6 +387,7 @@ public final class LevixelViewerPageView extends FrameLayout {
                             return true;
                         }
                         fullImageReady = true;
+                        post(() -> { if (generation == bindGeneration) reportMediaState(true); });
                         applyDynamicPhotoScaleBounds(generation, true);
                         return false;
                     }

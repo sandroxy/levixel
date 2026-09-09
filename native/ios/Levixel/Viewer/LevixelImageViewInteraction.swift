@@ -17,15 +17,27 @@ public final class LevixelViewerSession {
     }
 
     public func close(animated: Bool = true) {
+        close(animated: animated, completion: nil)
+    }
+
+    public func close(animated: Bool = true, completion: (() -> Void)?) {
         let closeViewer: () -> Void = { [weak self] in
-            guard let viewerController = self?.viewerController else { return }
-            viewerController.requestDismissal(animated: animated)
+            guard let viewerController = self?.viewerController else { completion?(); return }
+            viewerController.requestDismissal(animated: animated, completion: completion)
         }
         if Thread.isMainThread {
             closeViewer()
         } else {
             DispatchQueue.main.async(execute: closeViewer)
         }
+    }
+
+    public var sessionId: String? { viewerController?.sessionId }
+
+    /// Retry the current failed media. Call on the main thread, like other UIKit interactions.
+    @discardableResult public func retry() -> Bool {
+        precondition(Thread.isMainThread, "LevixelViewerSession.retry must run on the main thread.")
+        return viewerController?.retry() ?? false
     }
 
     func invalidate() {
@@ -53,6 +65,7 @@ extension UIImageView {
         var configuration = LevixelViewerConfiguration()
     }
 
+    private static var sourceCornerRadiusKey: UInt8 = 0
     private static var anchorRegistrationKey: UInt8 = 0
     private static var gestureRecognizerKey: UInt8 = 0
 
@@ -176,13 +189,19 @@ extension UIImageView {
     }
 
     public func registerLevixelSource(galleryId: String, itemIdentifier: String) {
+        registerLevixelSource(galleryId: galleryId, itemIdentifier: itemIdentifier, cornerRadius: nil)
+    }
+
+    public func registerLevixelSource(galleryId: String, itemIdentifier: String, cornerRadius: CGFloat?) {
+        if let cornerRadius { precondition(cornerRadius.isFinite && cornerRadius >= 0) }
         let reference = itemIdentifier.isEmpty
             ? nil
             : LevixelAnchorReference.itemIdentifier(itemIdentifier)
-        updateLevixelAnchorRegistration(galleryId: galleryId, reference: reference)
+        updateLevixelAnchorRegistration(galleryId: galleryId, reference: reference, cornerRadius: cornerRadius)
     }
 
     public func unregisterLevixelSource() {
+        levixelRegisteredSourceCornerRadius = nil
         guard let registration = levixelAnchorRegistration else { return }
         switch registration.reference {
         case .index(let index):
@@ -232,7 +251,8 @@ extension UIImageView {
         if let galleryId, galleryId.isEmpty == false {
             updateLevixelAnchorRegistration(
                 galleryId: galleryId,
-                reference: anchorReference(for: dataSource, index: safeInitialIndex)
+                reference: anchorReference(for: dataSource, index: safeInitialIndex),
+                cornerRadius: levixelRegisteredSourceCornerRadius
             )
         }
 
@@ -242,7 +262,11 @@ extension UIImageView {
             imageLoader: resolvedImageLoader
         )
         viewerController.attachPresentationSession(session)
-        presenter.present(viewerController, animated: false, completion: completion)
+        presenter.present(viewerController, animated: false) { [weak viewerController] in
+            viewerController?.presentationDidComplete()
+            completion?()
+        }
+        configuration.onSession?(session)
         return session
     }
 
@@ -298,7 +322,12 @@ extension UIImageView {
     }
 
     var levixelConfiguredSourceCornerRadius: CGFloat? {
-        levixelTapGestureRecognizer?.configuration.sourceCornerRadius
+        levixelRegisteredSourceCornerRadius ?? levixelTapGestureRecognizer?.configuration.sourceCornerRadius
+    }
+
+    private var levixelRegisteredSourceCornerRadius: CGFloat? {
+        get { objc_getAssociatedObject(self, &Self.sourceCornerRadiusKey) as? CGFloat }
+        set { objc_setAssociatedObject(self, &Self.sourceCornerRadiusKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
     }
 
     private var levixelAnchorRegistration: LevixelAnchorRegistration? {
@@ -358,7 +387,8 @@ extension UIImageView {
 
     private func updateLevixelAnchorRegistration(
         galleryId: String?,
-        reference: LevixelAnchorReference?
+        reference: LevixelAnchorReference?,
+        cornerRadius: CGFloat? = nil
     ) {
         unregisterLevixelSource()
 
@@ -384,5 +414,6 @@ extension UIImageView {
             galleryId: galleryId,
             reference: reference
         )
+        levixelRegisteredSourceCornerRadius = cornerRadius
     }
 }

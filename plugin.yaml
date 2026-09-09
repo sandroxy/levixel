@@ -26,6 +26,11 @@ targets:
     platform: android
     sourceRoot: native/android/levixel
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing
@@ -56,6 +61,11 @@ targets:
     platform: ios
     sourceRoot: native/ios/Levixel
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing

@@ -3,6 +3,8 @@ package com.sandrox.levixel;
 import android.content.Context;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -30,8 +32,17 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         void onOverlayDismissed();
 
         void onOverlayIndexChange(int index);
+
+        default void onViewerEvent(@NonNull LevixelViewerEvent event) {}
     }
 
+    private final String sessionId = java.util.UUID.randomUUID().toString();
+    private final List<LevixelAction> actions;
+    private final LevixelActionLayout actionLayout;
+    private final boolean actionListIcons;
+    @Nullable private LevixelActionSheetDialog actionSheet;
+    private boolean consumedLongPress;
+    private final Runnable longPress = this::performLongPress;
     private final List<LevixelMediaItem> items;
     private final List<LevixelSourceHint> sourceHints;
     @Nullable
@@ -111,7 +122,29 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             @Nullable String galleryId,
             @Nullable Listener listener
     ) {
+        this(context, sourceItems, sourceHints, startIndex, lightTheme, galleryId,
+                java.util.Collections.emptyList(), listener);
+    }
+
+    public LevixelViewerOverlayView(
+            @NonNull Context context, @NonNull List<LevixelMediaItem> sourceItems,
+            @Nullable List<LevixelSourceHint> sourceHints, int startIndex, boolean lightTheme,
+            @Nullable String galleryId, @NonNull List<LevixelAction> actions, @Nullable Listener listener
+    ) {
+        this(context, sourceItems, sourceHints, startIndex, lightTheme, galleryId,
+                actions, LevixelActionLayout.LIST, false, listener);
+    }
+
+    public LevixelViewerOverlayView(
+            @NonNull Context context, @NonNull List<LevixelMediaItem> sourceItems,
+            @Nullable List<LevixelSourceHint> sourceHints, int startIndex, boolean lightTheme,
+            @Nullable String galleryId, @NonNull List<LevixelAction> actions,
+            @NonNull LevixelActionLayout actionLayout, boolean actionListIcons, @Nullable Listener listener
+    ) {
         super(context);
+        this.actions = LevixelAction.snapshot(actions, actionLayout);
+        this.actionLayout = actionLayout;
+        this.actionListIcons = actionListIcons;
         this.items = copyValidatedItems(sourceItems);
         this.sourceHints = sourceHints == null ? new ArrayList<>() : new ArrayList<>(sourceHints);
         this.currentIndex = Math.max(0, Math.min(startIndex, items.size() - 1));
@@ -171,16 +204,16 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
 
     @Override
     protected void onDetachedFromWindow() {
-        if (!finished) {
-            cleanup();
-        }
+        // The parent may already be removing this view or traversing its children.
+        // Settle the session without reentering that removal operation.
+        finishWithoutAnimation(false);
         super.onDetachedFromWindow();
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
-            requestClose();
+            handleBack();
             return true;
         }
         return super.dispatchKeyEvent(event);
@@ -194,6 +227,15 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         }
 
         int action = event.getActionMasked();
+        if (consumedLongPress) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) consumedLongPress = false;
+            return true;
+        }
+        if (actionSheet != null) return super.dispatchTouchEvent(event);
+        if (action != MotionEvent.ACTION_DOWN && (action != MotionEvent.ACTION_MOVE
+                || Math.hypot(event.getRawX() - downX, event.getRawY() - downY) > touchSlop)) {
+            removeCallbacks(longPress);
+        }
         if (videoControlGestureActive && action != MotionEvent.ACTION_DOWN) {
             boolean terminal = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL;
             super.dispatchTouchEvent(event);
@@ -248,6 +290,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                 syncPagerGesturePolicy();
                 downX = event.getRawX();
                 downY = event.getRawY();
+                postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
                 dragging = false;
                 dragTarget = null;
                 dragPageView = null;
@@ -323,16 +366,73 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
 
     @Override
     public void onDismissRequested(@NonNull LevixelViewerPageView pageView) {
-        if (pageView == resolveCurrentPageView()) {
+        if (!consumedLongPress && actionSheet == null && pageView == resolveCurrentPageView()) {
             closeViewer();
         }
     }
 
     @Override
     public void onVideoCloseRequested(@NonNull LevixelViewerPageView pageView) {
-        if (pageView == resolveCurrentPageView()) {
+        if (!consumedLongPress && actionSheet == null && pageView == resolveCurrentPageView()) {
             closeViewer();
         }
+    }
+
+    /** Programmatic close always closes the viewer; platform back dismisses actions first. */
+    public void handleBack() {
+        if (actionSheet != null) closeActions();
+        else requestClose();
+    }
+
+    public boolean retry() {
+        LevixelViewerPageView page = resolveCurrentPageView();
+        return !closing && !finished && actionSheet == null && page != null && page.retry();
+    }
+
+    @NonNull public String getSessionId() { return sessionId; }
+
+    private LevixelViewerEvent emit(String type, int index, @Nullable String actionId) {
+        LevixelViewerEvent event = new LevixelViewerEvent(type, sessionId,
+                galleryId == null ? sessionId : galleryId, index, items.get(index), actionId);
+        if (listener != null) listener.onViewerEvent(event);
+        return event;
+    }
+
+    @Override public void onMediaState(@NonNull LevixelViewerPageView page, @NonNull LevixelMediaItem item, boolean loaded) {
+        if (closing || finished) return;
+        int index = items.indexOf(item);
+        if (index >= 0) emit(loaded ? "mediaLoad" : "mediaError", index, null);
+    }
+
+    private void performLongPress() {
+        if (closing || finished || !contentPresented || dragging || multiTouchLock || actionSheet != null
+                || viewPager.getScrollState() != ViewPager2.SCROLL_STATE_IDLE) return;
+        consumedLongPress = true;
+        MotionEvent cancel = MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_CANCEL, 0, 0, 0);
+        super.dispatchTouchEvent(cancel);
+        cancel.recycle();
+        releaseVelocityTracker();
+        emit("longPress", currentIndex, null);
+        if (closing || finished || actions.isEmpty()) return;
+        final int selectedIndex = currentIndex;
+        actionSheet = new LevixelActionSheetDialog(getContext(), actions, actionLayout, actionListIcons, action -> {
+            actionSheet = null;
+            consumedLongPress = false;
+            contentView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+            syncPagerGesturePolicy();
+            if (action == null || action.disabled || closing || finished) return;
+            LevixelViewerEvent event = emit("action", selectedIndex, action.id);
+            if (action.onPress != null) action.onPress.onPress(event);
+        });
+        contentView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        syncPagerGesturePolicy();
+        actionSheet.show();
+    }
+
+    private void closeActions() {
+        if (actionSheet == null) return;
+        actionSheet.close(null);
     }
 
     private void setupUi() {
@@ -374,6 +474,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                     if (listener != null) {
                         listener.onOverlayIndexChange(position);
                     }
+                    emit("indexChange", position, null);
                 }
             }
         });
@@ -434,6 +535,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         }
         pageView.setMediaHidden(false);
         transitionController.completeOpenTransition(() -> {
+            if (closing || finished) return;
             contentPresented = true;
             pagerAdapter.setActiveIndex(currentIndex);
             syncPagerGesturePolicy();
@@ -441,6 +543,9 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             if (listener != null) {
                 listener.onOverlayIndexChange(currentIndex);
             }
+            if (closing || finished) return;
+            emit("indexChange", currentIndex, null);
+            if (!closing && !finished) emit("opened", currentIndex, null);
         });
     }
 
@@ -448,8 +553,18 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         if (closing || finished) {
             return;
         }
-        syncCurrentIndexFromPager();
         closing = true;
+        if (actionSheet != null) {
+            actionSheet.close(this::performCloseViewer);
+        } else {
+            performCloseViewer();
+        }
+    }
+
+    private void performCloseViewer() {
+        if (finished) return;
+        syncCurrentIndexFromPager();
+        removeCallbacks(longPress);
         dragging = false;
         videoControlGestureActive = false;
         viewPager.setUserInputEnabled(false);
@@ -598,7 +713,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
 
     private void syncPagerGesturePolicy() {
         LevixelViewerPageView pageView = resolveCurrentPageView();
-        boolean canPage = items.size() > 1
+        boolean canPage = actionSheet == null && !consumedLongPress && items.size() > 1
                 && !videoControlGestureActive
                 && pageView != null
                 && pageView.canPageHorizontally();
@@ -777,6 +892,10 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     }
 
     private void finishWithoutAnimation() {
+        finishWithoutAnimation(true);
+    }
+
+    private void finishWithoutAnimation(boolean removeFromParent) {
         if (finished) {
             return;
         }
@@ -784,15 +903,31 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         closing = true;
         cleanup();
         ViewParent parent = getParent();
-        if (parent instanceof ViewGroup) {
+        if (removeFromParent && parent instanceof ViewGroup) {
             ((ViewGroup) parent).removeView(this);
         }
+        if (removeFromParent) {
+            notifyDismissed();
+        } else {
+            // Host callbacks may mount a replacement. Wait until the parent's
+            // current removal or detach traversal has finished before calling them.
+            new Handler(Looper.getMainLooper()).post(this::notifyDismissed);
+        }
+    }
+
+    private void notifyDismissed() {
+        emit("dismiss", currentIndex, null);
         if (listener != null) {
             listener.onOverlayDismissed();
         }
     }
 
     private void cleanup() {
+        removeCallbacks(longPress);
+        if (actionSheet != null) {
+            actionSheet.dismissImmediately();
+            actionSheet = null;
+        }
         videoControlGestureActive = false;
         restoreHiddenActiveSourceView();
         removeCallbacks(openTransitionReadyWatcher);

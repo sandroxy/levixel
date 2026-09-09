@@ -27,18 +27,21 @@ final class LevixelVideoPresentationState {
     }
 
     private boolean contentSettled;
+    private boolean playbackFailed;
     private boolean frameReady;
     private boolean playerPresented;
     private boolean transitionPosterForced;
 
     void resetForMedia() {
         contentSettled = false;
+        playbackFailed = false;
         frameReady = false;
         playerPresented = false;
         transitionPosterForced = false;
     }
 
     FrameUpdate onFrameRendered(boolean active) {
+        playbackFailed = false;
         boolean contentBecameReady = !contentSettled;
         contentSettled = true;
         frameReady = true;
@@ -46,6 +49,7 @@ final class LevixelVideoPresentationState {
     }
 
     boolean onPlayerError() {
+        playbackFailed = true;
         if (contentSettled) {
             return false;
         }
@@ -71,6 +75,8 @@ final class LevixelVideoPresentationState {
         playerPresented = true;
         return true;
     }
+
+    boolean isPlaybackFailed() { return playbackFailed; }
 
     boolean isContentSettled() {
         return contentSettled;

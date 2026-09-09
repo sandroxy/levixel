@@ -2,7 +2,46 @@ import UIKit
 import XCTest
 @testable import Levixel
 
+private final class MutableIdentifiedDataSource: LevixelIdentifiedDataSource {
+    var identifiers: [String?] = [nil, "detail"]
+    func numberOfItems() -> Int { identifiers.count }
+    func item(at index: Int) -> LevixelMediaItem { .image(nil) }
+    func itemIdentifier(at index: Int) -> String? { identifiers[index] }
+}
+
 final class LevixelMediaIdentityTests: XCTestCase {
+    func testCloseDuringOpeningSettlesSessionWithoutGhostOpenedEvent() throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        let presenter = UIViewController()
+        window.rootViewController = presenter
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previousKeyWindow?.makeKeyAndVisible() }
+        let source = UIImageView(frame: CGRect(x: 20, y: 40, width: 80, height: 80))
+        source.image = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 80)).image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 80))
+        }
+        presenter.view.addSubview(source)
+        var events: [String] = []
+        let closed = expectation(description: "Session closed")
+        var configuration = LevixelViewerConfiguration()
+        configuration.onEvent = { events.append($0.type) }
+        configuration.onSession = { session in session.close(animated: false) { closed.fulfill() } }
+        let session = source.presentLevixelViewer(dataSource: LevixelArrayDataSource(items: [.image(source.image)]),
+            configuration: configuration, from: presenter)
+        XCTAssertNotNil(session)
+        wait(for: [closed], timeout: 2)
+        let settled = expectation(description: "Original opening transition settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+        XCTAssertFalse(events.contains("opened"))
+        XCTAssertEqual(events.filter { $0 == "dismiss" }.count, 1)
+        XCTAssertNil(session?.sessionId)
+        XCTAssertNil(presenter.presentedViewController)
+    }
+
     func testArrayDataSourcePreservesStableItemIdentifiers() {
         let dataSource = LevixelArrayDataSource(
             items: [.image(nil), .image(nil)],
@@ -11,6 +50,61 @@ final class LevixelMediaIdentityTests: XCTestCase {
 
         XCTAssertEqual(dataSource.itemIdentifier(at: 0), "cover")
         XCTAssertEqual(dataSource.itemIdentifier(at: 1), "detail")
+    }
+
+    func testMixedIdentitySnapshotRetainsAnchorsAfterSourceMutation() {
+        let galleryId = "test-\(UUID().uuidString)"
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.isHidden = false
+        let source = UIImageView(frame: CGRect(x: 10, y: 10, width: 80, height: 80))
+        let identifiedSource = UIImageView(frame: CGRect(x: 110, y: 10, width: 80, height: 80))
+        window.addSubview(source)
+        window.addSubview(identifiedSource)
+        source.registerLevixelSource(galleryId: galleryId, index: 0)
+        identifiedSource.registerLevixelSource(galleryId: galleryId, itemIdentifier: "detail")
+        defer {
+            source.unregisterLevixelSource()
+            identifiedSource.unregisterLevixelSource()
+            window.isHidden = true
+        }
+        let dataSource = MutableIdentifiedDataSource()
+        let controller = LevixelViewerController(sourceView: source, dataSource: dataSource,
+            imageLoader: LevixelURLSessionImageLoader(), galleryId: galleryId)
+        dataSource.identifiers = ["replacement"]
+        XCTAssertTrue(controller.anchorView(for: 0) === source)
+        XCTAssertTrue(controller.anchorView(for: 1) === identifiedSource,
+            "A missing ID on another item must not erase this item's stable identity")
+    }
+
+    func testPresentingPreservesRegisteredSourceCornerRadius() throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        let presenter = UIViewController()
+        window.rootViewController = presenter
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previousKeyWindow?.makeKeyAndVisible() }
+        let source = UIImageView(frame: CGRect(x: 20, y: 40, width: 80, height: 80))
+        source.image = UIGraphicsImageRenderer(size: source.bounds.size).image { context in
+            UIColor.blue.setFill()
+            context.fill(source.bounds)
+        }
+        presenter.view.addSubview(source)
+        let galleryId = "test-\(UUID().uuidString)"
+        source.registerLevixelSource(galleryId: galleryId, itemIdentifier: "cover", cornerRadius: 18)
+        let opened = expectation(description: "Viewer opened")
+        let closed = expectation(description: "Viewer closed")
+        let configuration = LevixelViewerConfiguration(onEvent: { event in
+            if event.type == "opened" { opened.fulfill() }
+        })
+        let session = source.presentLevixelViewer(dataSource: LevixelArrayDataSource(items: [.image(source.image)], itemIdentifiers: ["cover"]),
+            configuration: configuration, from: presenter, galleryId: galleryId)
+        wait(for: [opened], timeout: 3)
+        XCTAssertEqual(source.levixelConfiguredSourceCornerRadius, 18)
+        session?.close(animated: false) { closed.fulfill() }
+        wait(for: [closed], timeout: 2)
+        source.unregisterLevixelSource()
+        XCTAssertNil(source.levixelConfiguredSourceCornerRadius)
     }
 
     func testLegacyArrayDataSourceResolvesAnIndexAnchor() {

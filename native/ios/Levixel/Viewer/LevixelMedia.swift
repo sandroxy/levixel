@@ -19,7 +19,7 @@ public protocol LevixelIdentifiedDataSource: LevixelDataSource {
 
 public final class LevixelArrayDataSource: LevixelIdentifiedDataSource {
     private let items: [LevixelMediaItem]
-    private let itemIdentifiers: [String]?
+    private let itemIdentifiers: [String?]?
 
     public init(items: [LevixelMediaItem]) {
         self.items = items
@@ -31,16 +31,32 @@ public final class LevixelArrayDataSource: LevixelIdentifiedDataSource {
             items.count == itemIdentifiers.count,
             "Levixel itemIdentifiers must contain one identifier for each media item."
         )
+        Self.validateIdentifiers(itemIdentifiers)
+        self.items = items
+        self.itemIdentifiers = itemIdentifiers
+    }
+
+    init(snapshotting dataSource: LevixelDataSource) {
+        let count = dataSource.numberOfItems()
+        items = (0..<count).map { dataSource.item(at: $0) }
+        if let identified = dataSource as? LevixelIdentifiedDataSource {
+            let identifiers = (0..<count).map { identified.itemIdentifier(at: $0) }
+            Self.validateIdentifiers(identifiers.compactMap { $0 })
+            itemIdentifiers = identifiers
+        } else {
+            itemIdentifiers = nil
+        }
+    }
+
+    private static func validateIdentifiers(_ identifiers: [String]) {
         precondition(
-            itemIdentifiers.allSatisfy { $0.isEmpty == false },
+            identifiers.allSatisfy { $0.isEmpty == false },
             "Levixel itemIdentifiers must be non-empty."
         )
         precondition(
-            Set(itemIdentifiers).count == itemIdentifiers.count,
+            Set(identifiers).count == identifiers.count,
             "Levixel itemIdentifiers must be unique."
         )
-        self.items = items
-        self.itemIdentifiers = itemIdentifiers
     }
 
     public func numberOfItems() -> Int {

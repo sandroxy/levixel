@@ -39,6 +39,14 @@ required_declarations=(
   'func itemIdentifier(at index: Swift.Int) -> Swift.String?'
   'itemIdentifiers: [Swift.String]'
   'func registerLevixelSource(galleryId: Swift.String, itemIdentifier: Swift.String)'
+  'func registerLevixelSource(galleryId: Swift.String, itemIdentifier: Swift.String, cornerRadius:'
+  'public enum LevixelActionLayout'
+  'public var actionLayout: Levixel.LevixelActionLayout'
+  'public var actionListIcons: Swift.Bool'
+  'public struct LevixelAction'
+  'public struct LevixelViewerEvent'
+  'public func retry() -> Swift.Bool'
+  'public var onEvent:'
 )
 
 for declaration in "${required_declarations[@]}"; do

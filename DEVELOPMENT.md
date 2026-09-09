@@ -16,6 +16,12 @@ is not inferred from the development branch's version. A target version can
 have multiple rejected builds, but each build receives a content-derived
 candidate id and only an accepted candidate may be published.
 
+## Current development work
+
+The upcoming native Android/iOS viewer actions, session events, and retry APIs
+are documented in [the next release notes](docs/next-release.md). The notes
+include native source checks and the separate consumer development workflow.
+
 ## Native Cores
 
 Build and inspect all native artifacts:

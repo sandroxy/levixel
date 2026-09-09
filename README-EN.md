@@ -1,5 +1,7 @@
 # Levixel
 
+The development branch adds native Android/iOS long-press actions, session events, and media retry. See the [next release development notes](docs/next-release.md). These additions are not yet published.
+
 [中文](README.md)
 
 Levixel is a native-feeling image and video viewer built around shared transitions, horizontal paging, pinch-to-zoom, zoomed panning, drag-to-dismiss, and video playback.

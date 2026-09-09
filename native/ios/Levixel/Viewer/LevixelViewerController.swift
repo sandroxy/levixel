@@ -1,7 +1,10 @@
 import UIKit
 
 final class LevixelViewerController: UIViewController {
-    private weak var dataSource: LevixelDataSource?
+    private let dataSource: LevixelDataSource?
+    let sessionId = UUID().uuidString
+    private var actionSheet: LevixelActionSheetController?
+    private var isClosingActionsForDismissal = false
     private weak var initialSourceView: UIImageView?
     private let imageLoader: LevixelImageLoading
     private let galleryId: String?
@@ -19,8 +22,10 @@ final class LevixelViewerController: UIViewController {
     private var hasPerformedOpenTransition = false
     private var hasCompletedOpenTransition = false
     private var hasViewAppeared = false
+    private var hasFinishedPresentation = false
     private var pendingDismissal = false
     private var hasNotifiedDismissal = false
+    private var dismissalCompletions: [() -> Void] = []
     private var pendingInitialScroll = false
 
     private var currentIndex = 0
@@ -81,11 +86,12 @@ final class LevixelViewerController: UIViewController {
         initialIndex: Int = 0,
         galleryId: String? = nil
     ) {
+        configuration.validateActionPresentation()
         self.initialSourceView = sourceView
-        self.dataSource = dataSource
+        self.dataSource = dataSource.map { LevixelArrayDataSource(snapshotting: $0) }
         self.imageLoader = imageLoader
         self.configuration = configuration
-        let itemCount = dataSource?.numberOfItems() ?? 0
+        let itemCount = self.dataSource?.numberOfItems() ?? 0
         self.initialIndex = itemCount > 0
             ? min(max(initialIndex, 0), itemCount - 1)
             : 0
@@ -149,18 +155,101 @@ final class LevixelViewerController: UIViewController {
         presentationSession = session
     }
 
-    func requestDismissal(animated: Bool = true) {
+    func presentationDidComplete() {
+        hasFinishedPresentation = true
+        if pendingDismissal && !hasNotifiedDismissal {
+            dismissWithoutTransition()
+        }
+    }
+
+    func requestDismissal(animated: Bool = true, completion: (() -> Void)? = nil) {
+        if hasNotifiedDismissal { completion?(); return }
+        if let completion { dismissalCompletions.append(completion) }
         guard pendingDismissal == false else { return }
-        guard animated, hasPerformedOpenTransition, transitionCoordinatorRef != nil else {
-            pendingDismissal = true
-            restoreHiddenActiveSourceView()
-            dismiss(animated: false) { [weak self] in
-                self?.notifyDismissed()
+        if actionSheet != nil {
+            guard !isClosingActionsForDismissal else { return }
+            isClosingActionsForDismissal = true
+            closeActions(animated: animated) { [weak self] in
+                guard let self else { return }
+                self.isClosingActionsForDismissal = false
+                self.requestDismissal(animated: animated)
             }
+            return
+        }
+        // UIKit ignores dismissal while the presentation is still in progress.
+        // Record the close now and finish it from the presentation completion.
+        guard hasFinishedPresentation else {
+            pendingDismissal = true
+            return
+        }
+        guard animated, hasCompletedOpenTransition, transitionCoordinatorRef != nil else {
+            pendingDismissal = true
+            dismissWithoutTransition()
             return
         }
         performDismissTransition()
     }
+
+    private func dismissWithoutTransition() {
+        restoreHiddenActiveSourceView()
+        dismiss(animated: false) { [weak self] in self?.notifyDismissed() }
+    }
+
+    @discardableResult func retry() -> Bool {
+        guard !pendingDismissal, !hasNotifiedDismissal, actionSheet == nil else { return false }
+        return currentPageView?.retry() ?? false
+    }
+
+    @discardableResult private func emit(_ type: String, index: Int? = nil, actionId: String? = nil) -> LevixelViewerEvent? {
+        let index = index ?? currentIndex
+        guard let dataSource, index >= 0, index < dataSource.numberOfItems() else { return nil }
+        let mediaType: String
+        if case .video = dataSource.item(at: index) { mediaType = "video" } else { mediaType = "image" }
+        let context = LevixelMediaContext(sessionId: sessionId, galleryId: galleryId ?? sessionId,
+            index: index, itemId: (dataSource as? LevixelIdentifiedDataSource)?.itemIdentifier(at: index) ?? String(index), mediaType: mediaType)
+        let event = LevixelViewerEvent(type: type, context: context, actionId: actionId, time: Date().timeIntervalSince1970 * 1000)
+        configuration.onEvent?(event)
+        return event
+    }
+
+    private func showActions() {
+        guard hasCompletedOpenTransition, !pendingDismissal, !isDraggingToDismiss,
+              !collectionView.isDecelerating, !collectionView.isDragging, actionSheet == nil else { return }
+        emit("longPress")
+        guard !pendingDismissal, !configuration.actions.isEmpty else { return }
+        let selectedIndex = currentIndex
+        let sheet = LevixelActionSheetController(actions: configuration.actions, imageLoader: imageLoader,
+            layout: configuration.actionLayout, listIcons: configuration.actionListIcons) { [weak self] action in
+            guard let self else { return }
+            self.actionSheet = nil
+            self.contentView.isUserInteractionEnabled = true
+            self.contentView.accessibilityElementsHidden = false
+            self.recalculateHorizontalPagingEnabled()
+            guard let action, !self.pendingDismissal, !self.isClosingActionsForDismissal, !action.disabled else { return }
+            if let event = self.emit("action", index: selectedIndex, actionId: action.id) { action.onPress?(event) }
+        }
+        actionSheet = sheet
+        contentView.isUserInteractionEnabled = false
+        contentView.accessibilityElementsHidden = true
+        recalculateHorizontalPagingEnabled()
+        present(sheet, animated: true) { [weak sheet] in sheet?.presentationDidComplete() }
+    }
+
+    private func closeActions(animated: Bool = true, completion: (() -> Void)? = nil) {
+        guard let sheet = actionSheet else { completion?(); return }
+        sheet.close(animated: animated, completion: completion)
+    }
+
+    override func accessibilityPerformEscape() -> Bool {
+        if actionSheet != nil { closeActions() } else { requestDismissal() }
+        return true
+    }
+
+    override var keyCommands: [UIKeyCommand]? {
+        [UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(handleEscape))]
+    }
+
+    @objc private func handleEscape() { _ = accessibilityPerformEscape() }
 
     private var currentPageView: LevixelViewerPageView? {
         pageView(at: currentIndex)
@@ -253,7 +342,7 @@ final class LevixelViewerController: UIViewController {
             backgroundView: backgroundView,
             contentView: contentView
         ) { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, !self.pendingDismissal, !self.hasNotifiedDismissal else { return }
             self.hasCompletedOpenTransition = true
             self.completeOpenTransitionPreviewHandoffForVisiblePages()
             self.setVideoRevealAllowedForVisiblePages(true)
@@ -262,6 +351,9 @@ final class LevixelViewerController: UIViewController {
             self.setNavigationBarHidden(self.shouldHideNavigationBarForCurrentPage, animated: false)
             self.hideActiveSourceViewForCurrentIndex()
             self.configuration.onIndexChange?(self.currentIndex)
+            guard !self.pendingDismissal, !self.hasNotifiedDismissal else { return }
+            self.emit("indexChange")
+            if !self.pendingDismissal && !self.hasNotifiedDismissal { self.emit("opened") }
         }
     }
 
@@ -290,7 +382,7 @@ final class LevixelViewerController: UIViewController {
     }
 
     private func beginOpenTransitionIfReady() {
-        guard hasViewAppeared, hasPerformedOpenTransition == false else { return }
+        guard hasViewAppeared, !hasPerformedOpenTransition, !pendingDismissal, !hasNotifiedDismissal else { return }
         guard prepareCollectionLayoutForPresentation() else {
             view.setNeedsLayout()
             return
@@ -330,9 +422,13 @@ final class LevixelViewerController: UIViewController {
     private func notifyDismissed() {
         guard hasNotifiedDismissal == false else { return }
         hasNotifiedDismissal = true
+        emit("dismiss")
         configuration.onDismiss?()
         presentationSession?.invalidate()
         presentationSession = nil
+        let completions = dismissalCompletions
+        dismissalCompletions.removeAll()
+        completions.forEach { $0() }
     }
 
     func anchorView(for index: Int) -> UIImageView? {
@@ -431,6 +527,7 @@ final class LevixelViewerController: UIViewController {
         hideActiveSourceViewForCurrentIndex()
         if notify {
             configuration.onIndexChange?(currentIndex)
+            emit("indexChange")
         }
     }
 
@@ -504,7 +601,7 @@ final class LevixelViewerController: UIViewController {
 
     private func recalculateHorizontalPagingEnabled() {
         let canPageHorizontally = currentPageView?.canPageHorizontally ?? true
-        horizontalPagingEnabled = canPageHorizontally
+        horizontalPagingEnabled = actionSheet == nil && canPageHorizontally
             && !isDraggingToDismiss
             && !isRestoringDismissDrag
             && !verticalDismissLocked
@@ -767,6 +864,7 @@ extension LevixelViewerController: UICollectionViewDataSource, UICollectionViewD
 
 extension LevixelViewerController: UIGestureRecognizerDelegate {
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if actionSheet != nil { return false }
         if gestureRecognizer === panGestureRecognizer {
             recalculateHorizontalPagingEnabled()
             if verticalDismissLocked
@@ -794,8 +892,18 @@ extension LevixelViewerController: UIGestureRecognizerDelegate {
 }
 
 extension LevixelViewerController: LevixelViewerPageViewDelegate {
-    func levixelViewerPageViewDidRequestDismiss(_ pageView: LevixelViewerPageView) {
+    func levixelViewerPageViewDidLongPress(_ pageView: LevixelViewerPageView) {
         guard pageView.index == currentIndex else { return }
+        showActions()
+    }
+
+    func levixelViewerPageView(_ pageView: LevixelViewerPageView, didLoad loaded: Bool) {
+        guard !pendingDismissal, !hasNotifiedDismissal else { return }
+        emit(loaded ? "mediaLoad" : "mediaError", index: pageView.index)
+    }
+
+    func levixelViewerPageViewDidRequestDismiss(_ pageView: LevixelViewerPageView) {
+        guard actionSheet == nil, pageView.index == currentIndex else { return }
         requestDismissal()
     }
 

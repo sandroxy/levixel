@@ -7,6 +7,22 @@ import org.junit.Test;
 
 public final class LevixelVideoPresentationStateTest {
     @Test
+    public void aSettledVideoErrorRemainsAFailureWhenRebound() {
+        LevixelVideoPresentationState state = new LevixelVideoPresentationState();
+        state.onPlayerError();
+        assertTrue(state.isContentSettled());
+        assertTrue(state.isPlaybackFailed());
+        assertFalse(state.isFrameReady());
+        state.resetForMedia();
+        assertFalse(state.isPlaybackFailed());
+        state.onFrameRendered(true);
+        state.onPlayerError();
+        assertTrue(state.isPlaybackFailed());
+        state.onFrameRendered(true);
+        assertFalse(state.isPlaybackFailed());
+    }
+
+    @Test
     public void repeatedFirstFrameAfterSeekDoesNotRestartHandoff() {
         LevixelVideoPresentationState state = new LevixelVideoPresentationState();
 

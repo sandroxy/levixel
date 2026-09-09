@@ -40,6 +40,13 @@ public struct LevixelViewerConfiguration {
     public var rightBarButton: LevixelViewerBarButton?
     public var onIndexChange: ((Int) -> Void)?
     public var onDismiss: (() -> Void)?
+    public var actions: [LevixelAction] {
+        didSet { Self.validateActions(actions) }
+    }
+    public var actionLayout: LevixelActionLayout
+    public var actionListIcons: Bool
+    public var onEvent: ((LevixelViewerEvent) -> Void)?
+    public var onSession: ((LevixelViewerSession) -> Void)?
 
     public init(
         theme: LevixelViewerTheme = .light,
@@ -48,7 +55,12 @@ public struct LevixelViewerConfiguration {
         rightBarButton: LevixelViewerBarButton? = nil,
         onIndexChange: ((Int) -> Void)? = nil,
         onDismiss: (() -> Void)? = nil,
-        sourceCornerRadius: CGFloat? = nil
+        sourceCornerRadius: CGFloat? = nil,
+        actions: [LevixelAction] = [],
+        actionLayout: LevixelActionLayout = .list,
+        actionListIcons: Bool = false,
+        onEvent: ((LevixelViewerEvent) -> Void)? = nil,
+        onSession: ((LevixelViewerSession) -> Void)? = nil
     ) {
         Self.validateSourceCornerRadius(sourceCornerRadius)
         self.theme = theme
@@ -58,6 +70,27 @@ public struct LevixelViewerConfiguration {
         self.rightBarButton = rightBarButton
         self.onIndexChange = onIndexChange
         self.onDismiss = onDismiss
+        Self.validateActions(actions)
+        self.actions = actions
+        self.actionLayout = actionLayout
+        self.actionListIcons = actionListIcons
+        self.onEvent = onEvent
+        self.onSession = onSession
+        validateActionPresentation()
+    }
+
+    // Validate the complete snapshot, allowing callers to configure mutable fields in either order.
+    func validateActionPresentation() {
+        Self.validateActions(actions)
+        if actionLayout == .grid {
+            for (index, action) in actions.enumerated() {
+                precondition(action.icon != nil, "Levixel actions[\(index)].icon is required for grid actionLayout.")
+            }
+        }
+    }
+
+    private static func validateActions(_ actions: [LevixelAction]) {
+        precondition(Set(actions.map(\.id)).count == actions.count, "Levixel action IDs must be unique.")
     }
 
     private static func validateSourceCornerRadius(_ value: CGFloat?) {

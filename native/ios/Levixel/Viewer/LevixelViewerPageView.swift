@@ -1,6 +1,8 @@
 import UIKit
 
 protocol LevixelViewerPageViewDelegate: AnyObject {
+    func levixelViewerPageViewDidLongPress(_ pageView: LevixelViewerPageView)
+    func levixelViewerPageView(_ pageView: LevixelViewerPageView, didLoad loaded: Bool)
     func levixelViewerPageViewDidRequestDismiss(_ pageView: LevixelViewerPageView)
     func levixelViewerPageViewDidToggleVideoChrome(_ pageView: LevixelViewerPageView)
     func levixelViewerPageView(_ pageView: LevixelViewerPageView, setHorizontalPagingEnabled enabled: Bool)
@@ -10,12 +12,20 @@ protocol LevixelViewerPageViewDelegate: AnyObject {
     func levixelViewerPageViewDidEndMultiTouch(_ pageView: LevixelViewerPageView)
 }
 
+extension LevixelViewerPageViewDelegate {
+    func levixelViewerPageViewDidLongPress(_ pageView: LevixelViewerPageView) {}
+    func levixelViewerPageView(_ pageView: LevixelViewerPageView, didLoad loaded: Bool) {}
+}
+
 final class LevixelViewerPageView: UIView {
     weak var delegate: LevixelViewerPageViewDelegate?
 
     private(set) var index: Int = 0
     private(set) var item: LevixelMediaItem?
 
+    private let retryButton = UIButton(type: .system)
+    private var loadFailed = false
+    private lazy var longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
     private let mediaContainer = UIView()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
 
@@ -30,6 +40,9 @@ final class LevixelViewerPageView: UIView {
     private var imageLoader: LevixelImageLoading?
     private var mediaContentMode: UIView.ContentMode = .scaleAspectFit
     private var loadGeneration = 0
+    // View-based image loaders may hold their target weakly. Own each request's
+    // temporary view until completion, without retaining obsolete page requests.
+    private var imageLoadTargets: [ObjectIdentifier: UIImageView] = [:]
     private var initialImageFitPending = false
     private var fullImageReady = false
     private var fullImageHandoffPending = false
@@ -150,6 +163,9 @@ final class LevixelViewerPageView: UIView {
         self.imageLoader = imageLoader
         self.mediaContentMode = normalizedContentMode(from: mediaContentMode)
         loadGeneration += 1
+        imageLoadTargets.removeAll()
+        loadFailed = false
+        retryButton.isHidden = true
         initialImageFitPending = false
         fullImageReady = false
         fullImageHandoffPending = false
@@ -196,6 +212,7 @@ final class LevixelViewerPageView: UIView {
         case .image(let image):
             fullImageReady = image != nil
             configureImagePage(image: image)
+            reportMediaState(image != nil)
         case .imageURL(let url, let thumbnailURL, let placeholder):
             configureImagePage(image: placeholder)
             if let sourcePreviewImage = sourcePreviewImage {
@@ -211,6 +228,9 @@ final class LevixelViewerPageView: UIView {
 
     func prepareForReuse() {
         loadGeneration += 1
+        imageLoadTargets.removeAll()
+        loadFailed = false
+        retryButton.isHidden = true
         cancelDelayedImageLoading()
         active = false
         videoRevealAllowed = false
@@ -353,6 +373,35 @@ final class LevixelViewerPageView: UIView {
         return nextVisible
     }
 
+    @discardableResult func retry() -> Bool {
+        guard loadFailed, let item, let imageLoader else { return false }
+        if case .image = item { return false }
+        let reveal = videoRevealAllowed
+        let preview = sharedElementView?.image
+        configure(index: index, item: item, imageLoader: imageLoader, mediaContentMode: mediaContentMode, sourcePreviewImage: preview)
+        completeOpenTransitionPreviewHandoff()
+        setVideoRevealAllowed(reveal)
+        return true
+    }
+
+    private func reportMediaState(_ loaded: Bool) {
+        guard item != nil else { return }
+        loadFailed = !loaded
+        retryButton.isHidden = loaded
+        hideLoading()
+        let generation = loadGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.loadGeneration == generation else { return }
+            self.delegate?.levixelViewerPageView(self, didLoad: loaded)
+        }
+    }
+
+    @objc private func retryMedia() { retry() }
+
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        if gesture.state == .began { delegate?.levixelViewerPageViewDidLongPress(self) }
+    }
+
     private func setupUI() {
         backgroundColor = .clear
 
@@ -382,6 +431,12 @@ final class LevixelViewerPageView: UIView {
         imageSingleTapGesture.numberOfTapsRequired = 1
         imageDoubleTapGesture.numberOfTapsRequired = 2
         imageSingleTapGesture.require(toFail: imageDoubleTapGesture)
+        imageSingleTapGesture.require(toFail: longPressGesture)
+        videoSingleTapGesture.require(toFail: longPressGesture)
+        longPressGesture.minimumPressDuration = 0.5
+        longPressGesture.allowableMovement = 8
+        longPressGesture.delegate = self
+        mediaContainer.addGestureRecognizer(longPressGesture)
         imageScrollView.addGestureRecognizer(imageSingleTapGesture)
         imageScrollView.addGestureRecognizer(imageDoubleTapGesture)
 
@@ -403,7 +458,7 @@ final class LevixelViewerPageView: UIView {
             self?.handleVideoFirstFrameReady()
         }
         videoPlayerView.onPlaybackFailed = { [weak self] in
-            self?.hideLoading()
+            self?.reportMediaState(false)
         }
         videoPlayerView.onControlsInteractStart = { [weak self] in
             guard let self = self else { return }
@@ -427,6 +482,25 @@ final class LevixelViewerPageView: UIView {
         videoSingleTapGesture.numberOfTapsRequired = 1
         videoSingleTapGesture.delegate = self
         videoContainer.addGestureRecognizer(videoSingleTapGesture)
+
+        retryButton.setTitle(Locale.preferredLanguages.first?.hasPrefix("zh") == true ? "加载失败，重试" : "Unable to load. Retry", for: .normal)
+        retryButton.setTitleColor(.white, for: .normal)
+        retryButton.backgroundColor = UIColor(white: 0.15, alpha: 0.9)
+        retryButton.layer.cornerRadius = 10
+        retryButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 20, bottom: 12, right: 20)
+        retryButton.addTarget(self, action: #selector(retryMedia), for: .touchUpInside)
+        retryButton.isHidden = true
+        addSubview(retryButton)
+        retryButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            retryButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+            retryButton.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+        accessibilityCustomActions = [UIAccessibilityCustomAction(name: "Media actions", actionHandler: { [weak self] _ in
+            guard let self else { return false }
+            self.delegate?.levixelViewerPageViewDidLongPress(self)
+            return true
+        })]
 
         activityIndicator.isHidden = true
         activityIndicator.color = .white
@@ -492,7 +566,7 @@ final class LevixelViewerPageView: UIView {
         requestImage(from: url, placeholder: placeholder, into: imageView) { [weak self] loadedImage in
             guard let self = self else { return }
             guard loadedImage != nil else {
-                self.hideLoading()
+                self.reportMediaState(false)
                 return
             }
             self.completeFullImageHandoff()
@@ -505,6 +579,7 @@ final class LevixelViewerPageView: UIView {
         // until the next layout pass, so capture the user's viewport before relayout.
         pendingFullImageViewportState = captureZoomedImageViewportState()
         fullImageReady = true
+        reportMediaState(true)
         fullImageHandoffPending = true
         setNeedsLayout()
         layoutIfNeeded()
@@ -560,12 +635,13 @@ final class LevixelViewerPageView: UIView {
         }
 
         let loadingImageView = UIImageView()
+        let requestId = ObjectIdentifier(loadingImageView)
+        imageLoadTargets[requestId] = loadingImageView
         imageLoader.loadImage(url, placeholder: placeholder, imageView: loadingImageView) { [weak self] loadedImage in
-            guard let self = self else { return }
-            guard self.loadGeneration == generation else { return }
-            DispatchQueue.main.async {
-                guard self.loadGeneration == generation else { return }
-                let resolvedImage = loadedImage ?? loadingImageView.image
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.loadGeneration == generation else { return }
+                self.imageLoadTargets.removeValue(forKey: requestId)
+                let resolvedImage = loadedImage
                 if let resolvedImage = resolvedImage {
                     LevixelDecodedImageCache.store(resolvedImage, for: url)
                     targetImageView.image = resolvedImage
@@ -662,6 +738,7 @@ final class LevixelViewerPageView: UIView {
     }
 
     private func handleVideoFirstFrameReady() {
+        reportMediaState(true)
         videoFirstFrameReady = true
         hideLoading()
         updateVideoPlaybackIfNeeded()
@@ -831,6 +908,11 @@ extension LevixelViewerPageView: UIScrollViewDelegate {
 
 extension LevixelViewerPageView: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if gestureRecognizer === longPressGesture {
+            guard !pinchInProgress, !videoControlsInteractionActive else { return false }
+            if isVideoPage { return !videoPlayerView.isPointInsideInteractiveControls(touch.location(in: videoPlayerView)) }
+            return true
+        }
         guard gestureRecognizer === videoSingleTapGesture else { return true }
         let location = touch.location(in: videoPlayerView)
         return !videoPlayerView.isPointInsideInteractiveControls(location)
