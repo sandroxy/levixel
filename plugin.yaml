@@ -3,7 +3,7 @@
 schemaVersion: 1
 id: levixel
 displayName: Levixel
-version: 1.3.0
+version: 1.4.0
 summary: Native-feeling shared-transition image and video viewer for Android, iOS, HarmonyOS, React Native, UniApp, and Web.
 
 contract:
@@ -46,13 +46,13 @@ targets:
     artifacts:
       - id: maven-repository
         format: maven-repository-zip
-        output: dist/native-android/levixel-1.3.0-maven.zip
+        output: dist/native-android/levixel-1.4.0-maven.zip
         distribution:
           channel: maven-central
           packageId: io.gitee.sandrox:levixel
       - id: aar
         format: aar
-        output: dist/native-android/levixel-1.3.0.aar
+        output: dist/native-android/levixel-1.4.0.aar
     constraints:
       - name: minimum-sdk
         value: 21
@@ -81,13 +81,13 @@ targets:
     artifacts:
       - id: xcframework
         format: xcframework-zip
-        output: dist/native-ios/levixel-1.3.0.xcframework.zip
+        output: dist/native-ios/levixel-1.4.0.xcframework.zip
         distribution:
           channel: swift-package
           packageId: Levixel
       - id: swift-package
         format: swift-package-zip
-        output: dist/native-ios/levixel-1.3.0-swift-package.zip
+        output: dist/native-ios/levixel-1.4.0-swift-package.zip
     constraints:
       - name: minimum-ios
         value: '13.0'
@@ -116,7 +116,7 @@ targets:
     artifacts:
       - id: har
         format: har
-        output: dist/native-harmonyos/levixel-1.3.0.har
+        output: dist/native-harmonyos/levixel-1.4.0.har
         distribution:
           channel: ohpm
           packageId: '@sandrox/levixel'
@@ -131,6 +131,11 @@ targets:
       - ios
     sourceRoot: adapters/react-native
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing
@@ -147,7 +152,7 @@ targets:
     artifacts:
       - id: npm-package
         format: npm-tarball
-        output: dist/react-native/levixel-react-native-1.3.0.tgz
+        output: dist/react-native/levixel-react-native-1.4.0.tgz
         distribution:
           channel: npm
           packageId: '@sandrox/levixel'
@@ -157,7 +162,7 @@ targets:
       - name: minimum-react-native
         value: '0.81'
   - id: uniapp
-    version: 1.3.0
+    version: 1.4.0
     kind: adapter
     runtime: uniapp
     platforms:
@@ -186,13 +191,13 @@ targets:
     artifacts:
       - id: uts-plugin
         format: uts-plugin-zip
-        output: dist/uniapp/levixel-uniapp-1.3.0.zip
+        output: dist/uniapp/levixel-uniapp-1.4.0.zip
         distribution:
           channel: uniapp-marketplace
           packageId: Sandrox-Levixel
     constraints:
       - name: native-release-version
-        value: '1.3.0'
+        value: '1.4.0'
       - name: minimum-hbuilderx
         value: '5.24'
       - name: uniapp-runtime
@@ -237,7 +242,7 @@ targets:
     artifacts:
       - id: app-native-plugin
         format: app-native-plugin-zip
-        output: dist/uniapp/levixel-uniapp-legacy-1.3.0.zip
+        output: dist/uniapp/levixel-uniapp-legacy-1.4.0.zip
         distribution:
           channel: github-release
           packageId: Sandrox-Levixel
@@ -257,7 +262,7 @@ targets:
       - name: minimum-ios
         value: '13.0'
   - id: web
-    version: 1.3.0
+    version: 1.4.0
     kind: adapter
     runtime: web
     platforms:
@@ -285,7 +290,7 @@ targets:
     artifacts:
       - id: npm-package
         format: npm-tarball
-        output: dist/web/levixel-web-1.3.0.tgz
+        output: dist/web/levixel-web-1.4.0.tgz
         distribution:
           channel: npm
           packageId: '@sandrox/levixel-web'

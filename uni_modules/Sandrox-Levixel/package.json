@@ -1,7 +1,7 @@
 {
   "id": "Sandrox-Levixel",
   "displayName": "Levixel 共享转场图片视频查看器",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "为经典 uni-app 与 uni-app x Vapor Android/iOS App 提供原生共享转场图片与视频浏览。",
   "keywords": [
     "UTS",

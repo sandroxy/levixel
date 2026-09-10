@@ -191,18 +191,15 @@ Tab 切换焦点时，仅滚动抽屉内部以保持目标按钮可见，不移�
 ## 主仓本地验证
 
 ```sh
-./native/android/gradlew -p native/android :levixel:testDebugUnitTest :levixel:assembleDebug :levixel:lintDebug --console=plain
+./scripts/test-source.sh
 ./scripts/test-native-ios-source.sh
-node --test adapters/uniapp/js_sdk/index.test.mjs
-./scripts/sync-uniapp-canonical-js.sh --check
-./scripts/verify-react-native-contract.sh
-./scripts/verify-react-native-ios-lifecycle.rb
-npm --prefix adapters/web run verify
 ```
 
-Android 检查需要本机 Android SDK；iOS 检查需要 Xcode 与可用 iPhone 模拟器。LevixelTestHost 仅给测试提供真实 UIWindowScene，不进入插件发布产物。
+Web 演示的启动、局域网访问和浏览器配置见 [Development / Web](../DEVELOPMENT.md#web)。打开图片或视频后长按；选择操作后返回页面可查看回调对应的媒体 ID。演示按钮不会修改或保存媒体。
 
-Web 检查需要已安装的 Web 开发依赖和本机 Chrome。Web 演示的启动、局域网访问和浏览器配置见 [Development / Web](../DEVELOPMENT.md#web)。
+第一条检查文档与共享契约、React Native 契约及 iOS 生命周期、UniApp SDK、HarmonyOS 会话生命周期与转场几何、Web 类型及真实 Chrome 交互、Android core 的编译/单测/lint，以及 UniApp Android runtime 的编译/单测。需要 Node.js、Ruby、Web 开发依赖、Android SDK 和 Chrome；脚本会检查 Node.js 是否提供 HarmonyOS 源码测试所需的模块加载 API，任一步失败即停止。第二条使用本机 Xcode 与可用 iPhone 模拟器运行 iOS 源码测试；`LevixelTestHost` 仅给测试提供真实 UIWindowScene，不进入插件发布产物。
+
+HarmonyOS 编译可在 `native/harmonyos` 使用本机 DevEco 的 hvigorw 执行 `assembleHar --mode module -p module=levixel@default -p product=default -p buildMode=debug`。iOS framework 和 RN/UniApp 桥的源码编译产物放在被忽略的 `dist/development` 下；它们不充当正式发布包。
 
 ## 消费宿主与发布衔接
 

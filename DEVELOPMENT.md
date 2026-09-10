@@ -16,11 +16,22 @@ is not inferred from the development branch's version. A target version can
 have multiple rejected builds, but each build receives a content-derived
 candidate id and only an accepted candidate may be published.
 
-## Current development work
+## Source checks
 
-The upcoming viewer actions, session events, retry APIs, repository boundaries,
-and source checks are documented in [the next release notes](docs/next-release.md).
-The notes include source checks and the separate consumer development workflow.
+Run `./scripts/test-source.sh` for documentation and contract checks, React Native
+contract tests and iOS lifecycle checks, UniApp SDK tests, HarmonyOS logic tests,
+Web type and Chrome interaction tests, Android core tests/build/lint, and the
+UniApp Android runtime tests/build. It requires Node.js, Ruby, the installed Web
+development dependencies, Android SDK, and Chrome. The script checks that Node.js
+provides the module hooks needed by the HarmonyOS tests and stops on any failure.
+
+`./scripts/test-native-ios-source.sh` separately runs iOS regression tests using
+Xcode and an available iPhone simulator. HarmonyOS component compilation requires
+DevEco; its command and the viewer API notes are in
+[the maintainer notes](docs/next-release.md#主仓本地验证).
+
+These are source checks; release metadata and artifact-consumer verification use
+the entries documented below.
 
 ## Repository layout
 
