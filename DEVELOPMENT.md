@@ -18,8 +18,8 @@ candidate id and only an accepted candidate may be published.
 
 ## Current development work
 
-The upcoming native Android/iOS, React Native, and Web viewer actions, session
-events, and retry APIs are documented in [the next release notes](docs/next-release.md).
+The upcoming viewer actions, session events, retry APIs, repository boundaries,
+and source checks are documented in [the next release notes](docs/next-release.md).
 The notes include source checks and the separate consumer development workflow.
 
 ## Repository layout

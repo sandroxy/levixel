@@ -44,6 +44,15 @@ UNI_EXPORT_METHOD(@selector(close:callback:))
     });
 }
 
+UNI_EXPORT_METHOD(@selector(retry:callback:))
+- (void)retry:(id)options callback:(UniModuleKeepAliveCallback)callback {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[LevixelUniPresenter shared] retryWithOptions:options completion:^(NSDictionary *result) {
+            if (callback) callback(result, NO);
+        }];
+    });
+}
+
 - (void)dealloc {
     self.eventCallback = nil;
     [LevixelUniPresenter shared].eventHandler = nil;

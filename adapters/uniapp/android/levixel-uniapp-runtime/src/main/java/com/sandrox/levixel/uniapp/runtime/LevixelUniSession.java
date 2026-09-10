@@ -11,12 +11,17 @@ import com.sandrox.levixel.LevixelLayoutSupport;
 import com.sandrox.levixel.LevixelMediaItem;
 import com.sandrox.levixel.LevixelSourceHint;
 import com.sandrox.levixel.LevixelViewerOverlayView;
+import com.sandrox.levixel.LevixelViewerEvent;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 final class LevixelUniSession {
     interface Listener {
+        void onViewerEvent(LevixelUniSession session, LevixelViewerEvent event);
         void onOpened(@NonNull LevixelUniSession session);
 
         void onOpenCancelled(@NonNull LevixelUniSession session);
@@ -31,10 +36,12 @@ final class LevixelUniSession {
     @NonNull private final LevixelUniContract.OpenRequest request;
     @NonNull private final Listener listener;
     @NonNull private final List<LevixelMediaItem> nativeItems;
+    @NonNull private final List<Runnable> closeCompletions = new ArrayList<>();
     @NonNull private final String galleryId = "uni-levixel-" + UUID.randomUUID();
 
     @Nullable private LevixelViewerOverlayView overlayView;
     @Nullable private LevixelUniViewerWindow viewerWindow;
+    private String sessionId = UUID.randomUUID().toString();
     private int currentIndex;
     private boolean opened;
     private boolean finished;
@@ -61,9 +68,15 @@ final class LevixelUniSession {
     }
 
     void close(boolean animated) {
+        close(animated, null);
+    }
+
+    void close(boolean animated, @Nullable Runnable completion) {
         if (finished) {
+            if (completion != null) completion.run();
             return;
         }
+        if (completion != null) closeCompletions.add(completion);
         LevixelViewerOverlayView overlay = overlayView;
         if (overlay == null) {
             finish(false);
@@ -74,6 +87,18 @@ final class LevixelUniSession {
         } else {
             overlay.dismissImmediately();
         }
+    }
+
+    boolean retry() { return !finished && overlayView != null && overlayView.retry(); }
+
+    Map<String, Object> context() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("sessionId", sessionId);
+        payload.put("galleryId", galleryId);
+        payload.put("index", currentIndex);
+        payload.put("itemId", itemIdAt(currentIndex));
+        payload.put("mediaType", request.items.get(currentIndex).type);
+        return payload;
     }
 
     @NonNull
@@ -118,7 +143,8 @@ final class LevixelUniSession {
                 new LevixelUniViewerWindow.Listener() {
                     @Override
                     public void onBackRequested() {
-                        close(true);
+                        if (overlayView != null) overlayView.handleBack();
+                        else close(true);
                     }
 
                     @Override
@@ -142,7 +168,14 @@ final class LevixelUniSession {
                 request.initialIndex,
                 request.lightTheme,
                 galleryId,
+                request.actions,
+                request.actionLayout,
+                request.actionListIcons,
                 new LevixelViewerOverlayView.Listener() {
+                    @Override public void onViewerEvent(@NonNull LevixelViewerEvent event) {
+                        if (!finished) listener.onViewerEvent(LevixelUniSession.this, event);
+                    }
+
                     @Override
                     public void onOverlayDismissed() {
                         overlayView = null;
@@ -161,6 +194,7 @@ final class LevixelUniSession {
                 }
         );
         overlayView = overlay;
+        sessionId = overlay.getSessionId();
         window.setContent(overlay);
         opened = true;
         listener.onOpened(this);
@@ -181,5 +215,8 @@ final class LevixelUniSession {
             listener.onOpenCancelled(this);
         }
         listener.onDismissed(this, emitDismissEvent && opened);
+        List<Runnable> completions = new ArrayList<>(closeCompletions);
+        closeCompletions.clear();
+        for (Runnable completion : completions) completion.run();
     }
 }

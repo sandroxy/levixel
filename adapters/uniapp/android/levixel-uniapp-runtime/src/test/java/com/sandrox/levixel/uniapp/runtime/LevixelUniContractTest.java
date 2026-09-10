@@ -14,6 +14,50 @@ import java.util.List;
 import java.util.Map;
 
 public final class LevixelUniContractTest {
+    @Test public void drawerLayoutAndIconOptionsCrossTheNativeContract() throws Exception {
+        Map<String, Object> options = openOptions(imageItem());
+        LevixelUniContract.OpenRequest defaults = LevixelUniContract.parseOpenRequest(options);
+        assertEquals(com.sandrox.levixel.LevixelActionLayout.LIST, defaults.actionLayout);
+        assertFalse(defaults.actionListIcons);
+        Map<String, Object> action = new HashMap<>();
+        action.put("id", "inspect");
+        action.put("label", "Inspect");
+        options.put("actions", Arrays.asList(action));
+        options.put("actionLayout", "grid");
+        assertContractError("INVALID_VALUE", "$.actions[0].icon", options);
+        action.put("icon", "https://example.com/icon.png");
+        assertEquals(com.sandrox.levixel.LevixelActionLayout.GRID, LevixelUniContract.parseOpenRequest(options).actionLayout);
+        options.put("actionLayout", "list");
+        options.put("actionListIcons", true);
+        assertEquals(true, LevixelUniContract.parseOpenRequest(options).actionListIcons);
+        options.put("actionListIcons", "true");
+        assertContractError("INVALID_TYPE", "$.actionListIcons", options);
+        options.remove("actionListIcons");
+        options.put("actionLayout", "auto");
+        assertContractError("UNKNOWN_ENUM", "$.actionLayout", options);
+    }
+
+    @Test
+    public void actionsAcceptBusinessIdsAndRejectDuplicatesAndCallbacks() throws Exception {
+        Map<String, Object> action = new HashMap<>();
+        action.put("id", "inspect");
+        action.put("label", "Inspect");
+        action.put("group", "tools");
+        Map<String, Object> options = openOptions(imageItem());
+        options.put("actions", Arrays.asList(action));
+        assertEquals("inspect", LevixelUniContract.parseOpenRequest(options).actions.get(0).id);
+        options.put("actions", Arrays.asList(action, action));
+        assertContractError("INVALID_VALUE", "$.actions[1].id", options);
+        options.put("actions", Arrays.asList(action));
+        action.put("onPress", "callback");
+        assertContractError("UNKNOWN_FIELD", "$.actions[0].onPress", options);
+        action.remove("onPress");
+        action.put("disabled", "true");
+        assertContractError("INVALID_TYPE", "$.actions[0].disabled", options);
+        options.put("actions", null);
+        assertContractError("INVALID_TYPE", "$.actions", options);
+    }
+
     @Test
     public void parsesCanonicalDefaults() throws Exception {
         LevixelUniContract.OpenRequest request = LevixelUniContract.parseOpenRequest(

@@ -29,6 +29,9 @@ const SOURCE_BINDING_KEYS = new Set([
 const PREPARE_ITEM_KEYS = new Set(['priority'])
 const NATIVE_MEDIA_PATH_KEYS = ['url', 'thumbnailUrl', 'posterUrl']
 const SELECTOR_OPEN_KEYS = new Set([
+  'actions',
+  'actionLayout',
+  'actionListIcons',
   'items',
   'index',
   'initialItemId',
@@ -46,6 +49,11 @@ let nativePlugin
 let injectedNativeTransport
 let eventChannelStarted = false
 const eventListeners = new Set()
+const actionsByGallery = new Map()
+const earlyActions = new Map()
+const dismissedDuringOpen = new Set()
+let pendingActionRegistrations = 0
+let openRequestGeneration = 0
 const imageInfoCache = new Map()
 const previewJobs = new Map()
 const previewQueue = []
@@ -156,6 +164,23 @@ async function resolveOpenNativeMediaPaths(options, transport) {
       })
     })
   })
+  const iconPaths = (options.actions ?? []).map(action => action.icon)
+  const localIcons = iconPaths.filter(shouldResolveNativeMediaPath)
+  let resolvedActions
+  if (localIcons.length) {
+    try {
+      const paths = await Promise.resolve(transport.resolvePaths(localIcons))
+      if (Array.isArray(paths) && paths.length === localIcons.length) {
+        let cursor = 0
+        resolvedActions = options.actions.map(action => {
+          if (!shouldResolveNativeMediaPath(action.icon)) return action
+          const path = paths[cursor++]
+          return { ...action, icon: typeof path === 'string' && path.length ? path : action.icon }
+        })
+      }
+    } catch (_) {}
+  }
+  if (resolvedActions) options = { ...options, actions: resolvedActions }
   if (resolutions.length === 0)
     return options
 
@@ -195,12 +220,27 @@ function invokeNativeWithTransport(transport, method, options) {
   }
 }
 
-function invokeNative(method, options) {
+function assertCurrentOpen(generation) {
+  if (generation !== openRequestGeneration) {
+    const error = new Error('Levixel open was cancelled')
+    error.code = 'CANCELLED'
+    error.path = '$'
+    throw error
+  }
+}
+
+function invokeNative(method, options, generation) {
   const transport = getNativeTransport()
-  if (method !== 'open' || typeof transport.resolvePaths !== 'function')
+  if (method !== 'open')
+    return invokeNativeWithTransport(transport, method, options)
+  assertCurrentOpen(generation)
+  if (typeof transport.resolvePaths !== 'function')
     return invokeNativeWithTransport(transport, method, options)
   return resolveOpenNativeMediaPaths(options, transport)
-    .then(resolvedOptions => invokeNativeWithTransport(transport, method, resolvedOptions))
+    .then((resolvedOptions) => {
+      assertCurrentOpen(generation)
+      return invokeNativeWithTransport(transport, method, resolvedOptions)
+    })
 }
 
 function rejectUnknownKeys(value, allowed, path) {
@@ -1262,12 +1302,29 @@ function startEventChannel() {
   const transport = getNativeTransport()
   try {
     const subscribed = transport.subscribe((event) => {
+      const galleryId = event && event.payload && event.payload.galleryId
+      const context = event?.type === 'action' ? { ...event.payload } : undefined
+      const action = event && event.type === 'action'
+        ? actionsByGallery.get(galleryId)?.find(action => action.id === event.payload.actionId)
+        : undefined
+      if (event && event.type === 'dismiss') {
+        actionsByGallery.delete(galleryId)
+        if (pendingActionRegistrations > 0) dismissedDuringOpen.add(galleryId)
+      }
+      if (event?.type === 'action' && !actionsByGallery.has(galleryId) && pendingActionRegistrations > 0) {
+        const queued = earlyActions.get(galleryId) ?? []
+        queued.push(context)
+        earlyActions.set(galleryId, queued)
+      }
       eventListeners.forEach((listener) => {
         try {
           listener(event)
         }
         catch (_) {}
       })
+      if (action && !action.disabled) {
+        try { action.onPress?.(context) } catch (_) {}
+      }
     })
     if (subscribed !== false)
       eventChannelStarted = true
@@ -1283,11 +1340,87 @@ export function __setLevixelNativeTransport(transport) {
   injectedNativeTransport = transport
 }
 
-export function openLevixel(options) {
-  return invokeNative('open', options)
+function normalizeActions(value, layout = 'list') {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('$.actions must be an array')
+  const ids = new Set()
+  return value.map((entry, index) => {
+    const path = `$.actions[${index}]`
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${path} must be an object`)
+    rejectUnknownKeys(entry, new Set(['id', 'label', 'icon', 'group', 'disabled', 'destructive', 'onPress']), path)
+    const result = {}
+    for (const key of ['id', 'label', 'icon', 'group']) {
+      if (key !== 'id' && key !== 'label' && entry[key] === undefined) continue
+      result[key] = requireNonEmptyString(entry[key], `${path}.${key}`)
+      if (!result[key].trim()) throw new Error(`${path}.${key} must not be blank`)
+    }
+    if (ids.has(result.id)) throw new Error(`${path}.id must be unique within $.actions`)
+    ids.add(result.id)
+    for (const key of ['disabled', 'destructive']) {
+      if (entry[key] === undefined) continue
+      if (typeof entry[key] !== 'boolean') throw new Error(`${path}.${key} must be boolean`)
+      result[key] = entry[key]
+    }
+    if (entry.onPress !== undefined) {
+      if (typeof entry.onPress !== 'function') throw new Error(`${path}.onPress must be a function`)
+      result.onPress = entry.onPress
+    }
+    if (layout === 'grid' && result.icon === undefined)
+      throw new Error(`${path}.icon is required for grid actionLayout`)
+    return result
+  })
+}
+
+function snapshotActionOptions(options) {
+  const layout = options?.actionLayout === undefined ? 'list' : options.actionLayout
+  if (layout !== 'list' && layout !== 'grid') throw new Error('$.actionLayout must be list or grid')
+  if (options?.actionListIcons !== undefined && typeof options.actionListIcons !== 'boolean')
+    throw new Error('$.actionListIcons must be boolean')
+  const actions = normalizeActions(options?.actions, layout)
+  return {
+    ...(options?.actions === undefined ? {} : { actions }),
+    ...(options?.actionLayout === undefined ? {} : { actionLayout: layout }),
+    ...(options?.actionListIcons === undefined ? {} : { actionListIcons: options.actionListIcons }),
+  }
+}
+
+export async function openLevixel(options) {
+  const actionOptions = snapshotActionOptions(options)
+  return openWithActions(options, actionOptions, ++openRequestGeneration)
+}
+
+async function openWithActions(options, actionOptions, generation) {
+  assertCurrentOpen(generation)
+  const actions = actionOptions.actions ?? []
+  const request = options?.actions === undefined ? options : {
+    ...options, ...actionOptions, actions: actions.map(({ onPress, ...descriptor }) => descriptor),
+  }
+  pendingActionRegistrations += 1
+  try {
+    startEventChannel()
+    const result = await invokeNative('open', request, generation)
+    if (result?.galleryId) {
+      if (!dismissedDuringOpen.has(result.galleryId) && actions.length) actionsByGallery.set(result.galleryId, actions)
+      const queued = earlyActions.get(result.galleryId) ?? []
+      earlyActions.delete(result.galleryId)
+      for (const context of queued) {
+        const action = actions.find(action => action.id === context.actionId && !action.disabled)
+        try { action?.onPress?.(context) } catch (_) {}
+      }
+    }
+    return result
+  } finally {
+    pendingActionRegistrations -= 1
+    if (pendingActionRegistrations === 0) { earlyActions.clear(); dismissedDuringOpen.clear() }
+  }
+}
+
+export function retryLevixel() {
+  return invokeNative('retry', {})
 }
 
 export function closeLevixel() {
+  openRequestGeneration += 1
   return invokeNative('close', {})
 }
 
@@ -1340,6 +1473,7 @@ export async function openLevixelFromSelector(options) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new Error('$ must be an object')
   rejectUnknownKeys(options, SELECTOR_OPEN_KEYS, '$')
+  const actionOptions = snapshotActionOptions(options)
   const items = sanitizeItems(options.items)
   const index = normalizeInitialIndex(options, items)
   const theme = options.theme === undefined ? 'dark' : options.theme
@@ -1373,6 +1507,7 @@ export async function openLevixelFromSelector(options) {
       cornerRadius: binding.cornerRadius,
     }
   })
+  const generation = ++openRequestGeneration
   const rectScale = readSourceRectScale()
   const previewURLs = items.map(transitionURL)
   const selectedPreviewURL = previewURLs[index]
@@ -1413,18 +1548,20 @@ export async function openLevixelFromSelector(options) {
     return hint
   })
 
-  return openLevixel({
+  return openWithActions({
     items: resolvedItems,
+    ...actionOptions,
     index,
     theme,
     sourceHints,
     sourceVisibility,
-  })
+  }, actionOptions, generation)
 }
 
 export default {
   open: openLevixel,
   close: closeLevixel,
+  retry: retryLevixel,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,

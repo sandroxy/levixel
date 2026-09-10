@@ -1,5 +1,6 @@
 import {
   closeLevixelNative,
+  retryLevixelNative,
   onLevixelNativeEvent,
   openLevixelNative,
   resolveLevixelNativePaths,
@@ -7,6 +8,7 @@ import {
 import {
   __setLevixelNativeTransport,
   closeLevixel as closeLevixelCanonical,
+  retryLevixel as retryLevixelCanonical,
   onLevixelEvent as onLevixelEventCanonical,
   openLevixel as openLevixelCanonical,
   openLevixelFromSelector as openLevixelFromSelectorCanonical,
@@ -16,6 +18,9 @@ import {
 
 const OPTIONAL_ITEM_KEYS = ['thumbnailUrl', 'posterUrl', 'width', 'height', 'alt']
 const OPTIONAL_OPEN_KEYS = [
+  'actions',
+  'actionLayout',
+  'actionListIcons',
   'index',
   'initialItemId',
   'theme',
@@ -28,6 +33,7 @@ const OPTIONAL_OPEN_KEYS = [
   'sourceBindings',
   'queryContext',
 ]
+const OPTIONAL_ACTION_KEYS = ['icon', 'group', 'disabled', 'destructive', 'onPress']
 const OPTIONAL_SOURCE_HINT_KEYS = ['imageSize', 'rectScale', 'cornerRadius']
 const OPTIONAL_SOURCE_STYLE_KEYS = ['objectFit', 'cornerRadius']
 const OPTIONAL_SOURCE_BINDING_KEYS = ['objectFit', 'cornerRadius', 'queryContext']
@@ -85,17 +91,22 @@ function normalizeOpenOptions(options) {
   if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized))
     return normalized
 
+  const actions = normalizeArrayEntries(normalized.actions,
+    action => omitNullOptionalFields(action, OPTIONAL_ACTION_KEYS))
   const items = normalizeArrayEntries(normalized.items, normalizeMediaItem)
   const sourceHints = normalizeArrayEntries(normalized.sourceHints, normalizeSourceHint)
   const sourceStyles = normalizeArrayEntries(normalized.sourceStyles, normalizeSourceStyle)
   const sourceBindings = normalizeArrayEntries(normalized.sourceBindings, normalizeSourceBinding)
-  if (items === normalized.items
+  if (actions === normalized.actions
+    && items === normalized.items
     && sourceHints === normalized.sourceHints
     && sourceStyles === normalized.sourceStyles
     && sourceBindings === normalized.sourceBindings)
     return normalized
 
   normalized = { ...normalized }
+  if (actions !== normalized.actions)
+    normalized.actions = actions
   if (items !== normalized.items)
     normalized.items = items
   if (sourceHints !== normalized.sourceHints)
@@ -116,6 +127,7 @@ function normalizePrepareOptions(options) {
 const nativeMethods = {
   open: openLevixelNative,
   close: closeLevixelNative,
+  retry: retryLevixelNative,
 }
 
 function decodeNativeJSON(json, kind) {
@@ -199,6 +211,10 @@ function openLevixel(options) {
   return openLevixelCanonical(normalizeOpenOptions(options))
 }
 
+function retryLevixel() {
+  return retryLevixelCanonical()
+}
+
 function closeLevixel() {
   return closeLevixelCanonical()
 }
@@ -225,6 +241,7 @@ function openLevixelFromSelector(options) {
 const levixel = {
   open: openLevixel,
   close: closeLevixel,
+  retry: retryLevixel,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,
@@ -233,6 +250,7 @@ const levixel = {
 
 export {
   closeLevixel,
+  retryLevixel,
   onLevixelEvent,
   openLevixel,
   openLevixelFromSelector,

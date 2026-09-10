@@ -40,9 +40,45 @@
     },
     "closeButton": {
       "type": "boolean"
+    },
+    "actions": {
+      "type": "array",
+      "x-levixel-uniqueBy": "id",
+      "$comment": "JSON Schema cannot compare IDs across sibling items; runtime validators enforce unique action IDs. JavaScript callbacks stay outside the serialized request.",
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "actionLayout": {
+      "enum": ["list", "grid"],
+      "default": "list"
+    },
+    "actionListIcons": {
+      "type": "boolean",
+      "default": false
     }
   },
+  "allOf": [{
+    "if": {
+      "required": ["actionLayout"],
+      "properties": { "actionLayout": { "const": "grid" } }
+    },
+    "then": {
+      "properties": { "actions": { "items": { "required": ["icon"] } } }
+    }
+  }],
   "$defs": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "label": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "icon": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "group": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "disabled": { "type": "boolean", "default": false },
+        "destructive": { "type": "boolean", "default": false }
+      }
+    },
     "mediaItem": {
       "type": "object",
       "additionalProperties": false,

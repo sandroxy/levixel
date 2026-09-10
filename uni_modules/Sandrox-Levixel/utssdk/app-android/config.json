@@ -1,6 +1,7 @@
 {
   "minSdkVersion": 21,
   "dependencies": [
+    "com.google.android.material:material:1.13.0",
     "androidx.appcompat:appcompat:1.7.1",
     "androidx.recyclerview:recyclerview:1.4.0",
     "androidx.viewpager2:viewpager2:1.1.0",

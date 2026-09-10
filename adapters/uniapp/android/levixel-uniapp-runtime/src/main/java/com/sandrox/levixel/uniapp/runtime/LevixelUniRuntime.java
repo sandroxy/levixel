@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.sandrox.levixel.LevixelViewerEvent;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -108,6 +109,28 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         });
     }
 
+    public void retry(@Nullable Object options, @Nullable LevixelUniResultCallback callback) {
+        runOnMain(() -> {
+            try { LevixelUniContract.validateCloseRequest(options); }
+            catch (LevixelUniContract.ContractException exception) {
+                invoke(callback, error(exception.code, exception.path, exception.getMessage()));
+                return;
+            }
+            invoke(callback, ok(mapOf("retried", activeSession != null && activeSession.retry())));
+        });
+    }
+
+    public void retryJson(@NonNull String optionsJson, @Nullable LevixelUniJsonCallback callback) {
+        runOnMain(() -> {
+            try { retry(parseJsonObject(optionsJson), result -> invoke(callback, toJson(result))); }
+            catch (JSONException exception) { invoke(callback, errorJson("INVALID_JSON", "$", "Request must be a valid JSON object")); }
+        });
+    }
+
+    @Override public void onViewerEvent(@NonNull LevixelUniSession session, @NonNull LevixelViewerEvent event) {
+        if (activeSession == session && !"dismiss".equals(event.type)) emit(event.type, event.payload);
+    }
+
     public void closeImmediately() {
         runOnMain(() -> closeActiveSession(false));
     }
@@ -148,10 +171,6 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             emitSourceVisibility(false, previousIndex, session);
             emitSourceVisibility(true, currentIndex, session);
         }
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("currentIndex", currentIndex);
-        payload.put("itemId", session.itemIdAt(currentIndex));
-        emit("indexChange", payload);
     }
 
     @Override
@@ -164,7 +183,7 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             emitSourceVisibility(false, session.currentIndex(), session);
         }
         if (emitDismissEvent) {
-            emit("dismiss", new HashMap<>());
+            emit("dismiss", session.context());
         }
     }
 
@@ -209,8 +228,12 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             invoke(callback, error(exception.code, exception.path, exception.getMessage()));
             return;
         }
-        closeActiveSession(true);
-        invoke(callback, ok(mapOf("closed", true)));
+        LevixelUniSession session = activeSession;
+        if (session == null) {
+            invoke(callback, ok(mapOf("closed", true)));
+        } else {
+            session.close(true, () -> invoke(callback, ok(mapOf("closed", true))));
+        }
     }
 
     private void closeActiveSession(boolean animated) {

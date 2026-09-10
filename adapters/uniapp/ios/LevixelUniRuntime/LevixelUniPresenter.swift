@@ -10,6 +10,7 @@ private final class LevixelUniSession {
     let anchors: [UIImageView?]
 
     var viewerSession: LevixelViewerSession?
+    var lastContext: [String: Any] = [:]
     var currentIndex: Int
     var emitDismissEvent = true
     var afterDismiss: (() -> Void)?
@@ -50,6 +51,7 @@ public final class LevixelUniPresenter: NSObject {
     private let imagePipeline = LevixelUniImagePipeline()
     private var activeSession: LevixelUniSession?
     private var pendingOpenID: UUID?
+    private var cancelPendingOpen: (() -> Void)?
 
     private override init() {
         super.init()
@@ -105,6 +107,31 @@ public final class LevixelUniPresenter: NSObject {
                 return
             }
             self.close(options: options) { [weak self] result in
+                guard let self else { return }
+                completion(self.jsonString(result))
+            }
+        }
+    }
+
+    @objc(retryWithJSON:completion:)
+    public func retryJSON(
+        _ optionsJSON: String,
+        completion: @escaping (String) -> Void
+    ) {
+        performOnMain { [weak self] in
+            guard let self else { return }
+            guard
+                let data = optionsJSON.data(using: .utf8),
+                let options = try? JSONSerialization.jsonObject(with: data)
+            else {
+                completion(self.jsonString(self.error(
+                    code: "INVALID_JSON",
+                    path: "$",
+                    message: "Request must be a valid JSON object"
+                )))
+                return
+            }
+            self.retry(options: options) { [weak self] result in
                 guard let self else { return }
                 completion(self.jsonString(result))
             }
@@ -171,8 +198,23 @@ public final class LevixelUniPresenter: NSObject {
             return
         }
 
+        cancelPendingOpen?()
         let openID = UUID()
         pendingOpenID = openID
+        var completed = false
+        let finish: (NSDictionary) -> Void = { [weak self] result in
+            guard !completed else { return }
+            completed = true
+            if self?.pendingOpenID == openID {
+                self?.pendingOpenID = nil
+                self?.cancelPendingOpen = nil
+            }
+            completion(result)
+        }
+        cancelPendingOpen = { [weak self] in
+            guard let self else { return }
+            finish(self.error(code: "CANCELLED", path: "$", message: "Levixel open was cancelled"))
+        }
         closeExistingSessionIfNeeded { [weak self] in
             guard let self, self.pendingOpenID == openID else { return }
             self.resolveInitialPreview(
@@ -181,8 +223,7 @@ public final class LevixelUniPresenter: NSObject {
             ) { [weak self] image in
                 guard let self, self.pendingOpenID == openID else { return }
                 guard let currentPresenter = self.topMostViewController(from: viewController) else {
-                    self.pendingOpenID = nil
-                    completion(self.error(
+                    finish(self.error(
                         code: "NO_VIEW_CONTROLLER",
                         path: "$",
                         message: "Unable to find the current view controller after closing the previous viewer"
@@ -194,7 +235,7 @@ public final class LevixelUniPresenter: NSObject {
                     initialPreview: image,
                     viewportView: viewportView,
                     from: currentPresenter,
-                    completion: completion
+                    completion: finish
                 )
             }
         }
@@ -220,23 +261,47 @@ public final class LevixelUniPresenter: NSObject {
             ))
             return
         }
+        cancelPendingOpen?()
+        cancelPendingOpen = nil
         pendingOpenID = nil
         guard let session = activeSession else {
             completion(ok(data: ["closed": true]))
             return
         }
         session.emitDismissEvent = true
-        session.viewerSession?.close(animated: true)
-        completion(ok(data: ["closed": true]))
+        if let viewerSession = session.viewerSession {
+            viewerSession.close(animated: true) { [weak self] in
+                guard let self else { return }
+                completion(self.ok(data: ["closed": true]))
+            }
+        } else {
+            finishSession(session)
+            completion(ok(data: ["closed": true]))
+        }
+    }
+
+    @objc(retryWithOptions:completion:)
+    public func retry(options: Any?, completion: @escaping (NSDictionary) -> Void) {
+        precondition(Thread.isMainThread)
+        do {
+            try LevixelUniContract.validateCloseRequest(options)
+            completion(ok(data: ["retried": activeSession?.viewerSession?.retry() ?? false]))
+        } catch let failure as LevixelUniContractError {
+            completion(error(code: failure.code, path: failure.path, message: failure.message))
+        } catch {
+            completion(self.error(code: "INVALID_REQUEST", path: "$", message: "Unable to validate the retry request"))
+        }
     }
 
     @objc
     public func closeImmediately() {
         let close = { [weak self] in
             guard let self else { return }
+            self.cancelPendingOpen?()
+            self.cancelPendingOpen = nil
             self.pendingOpenID = nil
             guard let session = self.activeSession else { return }
-            session.emitDismissEvent = false
+            session.emitDismissEvent = true
             if let viewerSession = session.viewerSession {
                 viewerSession.close(animated: false)
             } else {
@@ -258,7 +323,6 @@ public final class LevixelUniPresenter: NSObject {
         completion: @escaping (NSDictionary) -> Void
     ) {
         guard let window = viewportView.window ?? presenter.viewIfLoaded?.window ?? activeWindow() else {
-            pendingOpenID = nil
             completion(error(
                 code: "NO_WINDOW",
                 path: "$",
@@ -307,8 +371,18 @@ public final class LevixelUniPresenter: NSObject {
 
         var configuration = LevixelViewerConfiguration(
             theme: request.theme,
-            contentMode: .scaleAspectFit
+            contentMode: .scaleAspectFit,
+            actions: request.actions,
+            actionLayout: request.actionLayout,
+            actionListIcons: request.actionListIcons
         )
+        configuration.onEvent = { [weak self, weak session] event in
+            guard let self, let session, self.activeSession === session else { return }
+            session.lastContext = event.context.dictionary
+            if event.type != "dismiss", let payload = event.dictionary["payload"] as? [String: Any] {
+                self.emit(type: event.type, payload: payload)
+            }
+        }
         configuration.onIndexChange = { [weak self, weak session] index in
             guard let self, let session, self.activeSession === session else { return }
             let previousIndex = session.currentIndex
@@ -317,10 +391,6 @@ public final class LevixelUniPresenter: NSObject {
                 self.emitSourceVisibility(hidden: false, index: previousIndex, session: session)
                 self.emitSourceVisibility(hidden: true, index: index, session: session)
             }
-            self.emit(type: "indexChange", payload: [
-                "currentIndex": index,
-                "itemId": session.request.items[index].id,
-            ])
         }
         configuration.onDismiss = { [weak self, weak session] in
             guard let self, let session else { return }
@@ -351,7 +421,6 @@ public final class LevixelUniPresenter: NSObject {
                         session: session
                     )
                 }
-                self.pendingOpenID = nil
                 completion(self.ok(data: [
                     "index": request.initialIndex,
                     "itemId": request.items[request.initialIndex].id,
@@ -361,7 +430,6 @@ public final class LevixelUniPresenter: NSObject {
             }
         ) else {
             activeSession = nil
-            pendingOpenID = nil
             session.cleanup()
             completion(error(
                 code: "PRESENTATION_FAILED",
@@ -378,7 +446,7 @@ public final class LevixelUniPresenter: NSObject {
             completion()
             return
         }
-        session.emitDismissEvent = false
+        session.emitDismissEvent = true
         session.afterDismiss = completion
         if let viewerSession = session.viewerSession {
             viewerSession.close(animated: false)
@@ -395,7 +463,7 @@ public final class LevixelUniPresenter: NSObject {
         }
         session.cleanup()
         if session.emitDismissEvent {
-            emit(type: "dismiss", payload: [:])
+            emit(type: "dismiss", payload: session.lastContext)
         }
         let afterDismiss = session.afterDismiss
         session.afterDismiss = nil

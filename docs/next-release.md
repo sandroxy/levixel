@@ -68,7 +68,7 @@ await openLevixel({ items, actions, actionListIcons: true });
 
 ## 事件与重试
 
-JavaScript 事件保持 `{ type, payload, time }` 结构。公共媒体上下文：`{ sessionId, galleryId, index, itemId, mediaType }`。`sessionId` 标识一次打开；`galleryId` 用于画廊/来源关联，未指定画廊时由查看器生成。原生 iOS 未提供稳定媒体 ID 的旧 data source 以打开时的下标字符串作为 `itemId`，动态列表应使用带 ID 的 data source。
+JavaScript 事件保持 `{ type, payload, time }` 结构。公共媒体上下文：`{ sessionId, galleryId, index, itemId, mediaType }`。`sessionId` 标识一次打开；`galleryId` 用于画廊/来源关联，各平台未指定画廊时可自动生成。原生 iOS 未提供稳定媒体 ID 的旧 data source 以打开时的下标字符串作为 `itemId`，动态列表应使用带 ID 的 data source。
 
 | 事件 | 时机 / 附加字段 |
 | --- | --- |
@@ -82,11 +82,11 @@ JavaScript 事件保持 `{ type, payload, time }` 结构。公共媒体上下文
 
 Android/iOS 保留打开时的首次 `indexChange` 通知（在 `opened` 前）。
 
-`ready` 表示 Web 事件通道就绪，不表示查看器已打开；既有来源显隐事件保留。相邻页预加载可能在 `opened` 之前或当前页事件之间派发媒体事件，应根据 `itemId` 判断对应媒体。未真正打开就被取消的请求会结束其 Promise，不承诺派发 `opened`。
+`ready`（Web/UniApp 的事件通道就绪）和既有来源显隐事件保留。`ready` 不表示查看器已打开。相邻页预加载可能在 `opened` 之前或当前页事件之间派发媒体事件，必须根据事件的 `itemId` 判断对应媒体，不能假定都是当前页。未真正打开就被取消的请求会结束其 Promise，不承诺派发 `opened`。
 
 失败后显示重试按钮；重试仅重载当前失败媒体，不创建新会话。加载中、无失败页或查看器已关闭时不重复发起请求。
 
-- Web：`await retryLevixel()` → `{ retried: boolean }`。
+- Web/UniApp：`await retryLevixel()` → `{ retried: boolean }`。
 - React Native：`await ref.current.retry()` → `boolean`；`await ref.current.close()` 在查看器关闭完成后返回。
 - Android：`overlay.retry()` → `boolean`；`overlay.requestClose()`；宿主 Back 应调用 `overlay.handleBack()`。
 - iOS：`session.retry()` → `Bool`（主线程）；`session.close()`，可传 completion 等待关闭完成。自动点击接入可从 `configuration.onSession` 接收 session。
@@ -168,11 +168,23 @@ Tab 切换焦点时，仅滚动抽屉内部以保持目标按钮可见，不移�
 
 重新打开会结束旧会话并派发带上下文的 `dismiss`。`ready`、`opened`、预加载事件和回调快照均遵循上方事件约定。
 
+## UniApp 接入
+
+经典 uni-app 与 uni-app x Vapor 从 `@/uni_modules/Sandrox-Levixel/js_sdk/index.js` 引入新增的 `retryLevixel`，原有打开、关闭和事件入口不变。`openLevixel` 与 `openLevixelFromSelector` 均接受 `actions`、`actionLayout`、`actionListIcons`，示例使用上方公共 JavaScript 配置。媒体字段、选择器和组件查询范围沿用 [UniApp 接入说明](../uni_modules/Sandrox-Levixel/readme.md)。
+
+`onLevixelEvent` 增加 `opened`、`longPress`、`mediaLoad`、`mediaError` 和 `action`。`dismiss` 包含会话媒体上下文，替换旧会话同样通知。原图失败不会把缩略图当作加载成功，视频以首帧就绪为成功；`ready` 仅表示事件通道就绪。
+
+`await retryLevixel()` 返回 `{ retried: boolean }`。系统返回优先关闭抽屉，`closeLevixel()` 关闭整个查看器，并在退场完成后返回 `{ closed: true }`。需要展示宿主业务弹窗时，可在按钮回调中先等待查看器关闭。按钮回调与 `action` 事件均会通知，同一次业务操作只在一处执行。
+
+关闭或发起新的打开请求，会使仍在测量来源、解析本地路径的旧请求以 `CANCELLED` 结束，避免页面退出后又打开查看器。
+
 ## 主仓本地验证
 
 ```sh
 ./native/android/gradlew -p native/android :levixel:testDebugUnitTest :levixel:assembleDebug :levixel:lintDebug --console=plain
 ./scripts/test-native-ios-source.sh
+node --test adapters/uniapp/js_sdk/index.test.mjs
+./scripts/sync-uniapp-canonical-js.sh --check
 ./scripts/verify-react-native-contract.sh
 ./scripts/verify-react-native-ios-lifecycle.rb
 npm --prefix adapters/web run verify

@@ -97,6 +97,7 @@ ruby -rjson -e '
   android = JSON.parse(File.read(ARGV.fetch(0)))
   abort "unexpected Android minimum" unless android.fetch("minSdkVersion") == 21
   required = [
+    "com.google.android.material:material:1.13.0",
     "androidx.appcompat:appcompat:1.7.1",
     "androidx.recyclerview:recyclerview:1.4.0",
     "androidx.viewpager2:viewpager2:1.1.0",

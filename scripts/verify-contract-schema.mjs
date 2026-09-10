@@ -24,4 +24,9 @@ assert.ok(
   'The uniqueness key must be a required, non-empty media item property',
 )
 
+assert.equal(schema.properties.actions['x-levixel-uniqueBy'], 'id')
+assert.deepEqual(schema.$defs.action.required, ['id', 'label'])
+assert.equal(schema.$defs.action.additionalProperties, false)
+assert.equal('onPress' in schema.$defs.action.properties, false, 'Callbacks must not cross the native JSON bridge')
+
 console.log(`Verified contract schema boundary: ${schemaPath}`)

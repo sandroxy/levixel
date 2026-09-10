@@ -158,6 +158,11 @@ targets:
       - ios
     sourceRoot: uni_modules/Sandrox-Levixel
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing
@@ -205,6 +210,11 @@ targets:
       - ios
     sourceRoot: adapters/uniapp
     capabilities:
+      - action-sheet
+      - long-press
+      - media-load-events
+      - media-retry
+      - session-events
       - drag-dismiss
       - horizontal-paging
       - image-viewing

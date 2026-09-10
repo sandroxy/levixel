@@ -18,3 +18,5 @@ export type ResolveLevixelNativePaths = (
   pathsJson: string,
   callback: LevixelNativeCallback
 ) => void
+
+export type RetryLevixelNative = CloseLevixelNative

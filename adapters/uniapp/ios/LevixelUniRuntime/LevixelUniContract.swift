@@ -69,6 +69,9 @@ struct LevixelUniItem {
 }
 
 struct LevixelUniOpenRequest {
+    let actions: [LevixelAction]
+    let actionLayout: LevixelActionLayout
+    let actionListIcons: Bool
     let items: [LevixelUniItem]
     let sourceHints: [LevixelUniSourceHint?]
     let initialIndex: Int
@@ -88,6 +91,9 @@ struct LevixelUniContractError: Error {
 
 enum LevixelUniContract {
     private static let openKeys: Set<String> = [
+        "actions",
+        "actionLayout",
+        "actionListIcons",
         "items",
         "index",
         "theme",
@@ -177,13 +183,43 @@ enum LevixelUniContract {
             )
         }
 
+        let layoutValue = try optionalEnum(options["actionLayout"], fallback: "list", path: "$.actionLayout", values: ["list", "grid"])
+        let actionLayout: LevixelActionLayout = layoutValue == "grid" ? .grid : .list
         return LevixelUniOpenRequest(
+            actions: try parseActions(options["actions"], layout: actionLayout),
+            actionLayout: actionLayout,
+            actionListIcons: try optionalBoolean(options["actionListIcons"], fallback: false, path: "$.actionListIcons"),
             items: items,
             sourceHints: try parseSourceHints(options["sourceHints"], itemCount: items.count),
             initialIndex: initialIndex,
             theme: themeValue == "light" ? .light : .dark,
             hidesHTMLSource: sourceVisibility == "hidden"
         )
+    }
+
+    private static func parseActions(_ raw: Any?, layout: LevixelActionLayout) throws -> [LevixelAction] {
+        guard let raw else { return [] }
+        guard let values = raw as? [Any] else { throw failure("INVALID_TYPE", "$.actions", "must be an array") }
+        var ids = Set<String>()
+        return try values.enumerated().map { index, entry in
+            let path = "$.actions[\(index)]"
+            let value = try requireObject(entry, path: path)
+            try rejectUnknownKeys(value, allowed: ["id", "label", "icon", "group", "disabled", "destructive"], path: path)
+            let id = try requireString(value["id"], path: "\(path).id")
+            let label = try requireString(value["label"], path: "\(path).label")
+            let icon = try optionalString(value["icon"], path: "\(path).icon")
+            if layout == .grid && icon == nil {
+                throw failure("INVALID_VALUE", "\(path).icon", "is required for grid actionLayout")
+            }
+            let group = try optionalString(value["group"], path: "\(path).group")
+            guard ids.insert(id).inserted else { throw failure("INVALID_VALUE", "\(path).id", "must be unique") }
+            guard [id, label, icon, group].compactMap({ $0 }).allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+                throw failure("INVALID_VALUE", path, "text must not be blank")
+            }
+            return LevixelAction(id: id, label: label, icon: try optionalURL(icon, path: "\(path).icon"), group: group,
+                disabled: try optionalBoolean(value["disabled"], fallback: false, path: "\(path).disabled"),
+                destructive: try optionalBoolean(value["destructive"], fallback: false, path: "\(path).destructive"))
+        }
     }
 
     static func validateCloseRequest(_ rawOptions: Any?) throws {

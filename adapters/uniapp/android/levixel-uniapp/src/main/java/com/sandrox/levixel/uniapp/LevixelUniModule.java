@@ -43,6 +43,11 @@ public final class LevixelUniModule extends UniModule {
         runtime.close(options, result -> invoke(callback, result));
     }
 
+    @UniJSMethod(uiThread = true)
+    public void retry(@Nullable Object options, @Nullable UniJSCallback callback) {
+        runtime.retry(options, result -> invoke(callback, result));
+    }
+
     @Override
     public void onActivityDestroy() {
         runtime.closeImmediately();

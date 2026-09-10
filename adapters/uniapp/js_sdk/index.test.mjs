@@ -1091,6 +1091,9 @@ export function openLevixelNative(optionsJson, callback) {
 export function closeLevixelNative(_optionsJson, callback) {
   callback(JSON.stringify({ ok: true, data: { closed: true } }))
 }
+export function retryLevixelNative(_optionsJson, callback) {
+  callback(JSON.stringify({ ok: true, data: { retried: true } }))
+}
 export function onLevixelNativeEvent(callback) {
   globalThis.__levixelWrapperEventCallback = callback
 }
@@ -1182,6 +1185,9 @@ const utsTypedVideo = {
 assert.deepEqual(
   await executableUtsWrapper.openLevixel({
     items: [utsTypedImage, utsTypedVideo],
+    actions: null,
+    actionLayout: null,
+    actionListIcons: null,
     index: null,
     theme: null,
     sourceHints: null,
@@ -1217,6 +1223,9 @@ await executableUtsWrapper.warmupLevixelItem(
 )
 await executableUtsWrapper.openLevixelFromSelector({
   items: [utsTypedImage],
+  actions: null,
+  actionLayout: null,
+  actionListIcons: null,
   index: null,
   initialItemId: null,
   theme: null,
@@ -1235,6 +1244,9 @@ assert.equal(normalizedUtsTypedSelectorOpen.index, 0)
 assert.equal(normalizedUtsTypedSelectorOpen.theme, 'dark')
 assert.equal(normalizedUtsTypedSelectorOpen.sourceVisibility, 'visible')
 assert.deepEqual(normalizedUtsTypedSelectorOpen.sourceHints, [null])
+assert.equal('actions' in normalizedUtsTypedSelectorOpen, false)
+assert.equal('actionLayout' in normalizedUtsTypedSelectorOpen, false)
+assert.equal('actionListIcons' in normalizedUtsTypedSelectorOpen, false)
 
 globalThis.uni.createSelectorQuery = () => {
   let measurement
@@ -1284,3 +1296,165 @@ assert.throws(
   }),
   /posterUrl must be a non-empty string/,
 )
+
+const utsTypedAction = {
+  id: 'inspect', label: 'Inspect', icon: null, group: null,
+  disabled: false, destructive: null, onPress: null,
+}
+await executableUtsWrapper.openLevixel({
+  items: [utsTypedImage], actions: [utsTypedAction], actionLayout: 'list', actionListIcons: true,
+})
+const normalizedUtsActionOpen = globalThis.__levixelWrapperNativeCalls.at(-1)
+assert.equal(normalizedUtsActionOpen.actionLayout, 'list')
+assert.equal(normalizedUtsActionOpen.actionListIcons, true)
+assert.deepEqual(normalizedUtsActionOpen.actions, [{ id: 'inspect', label: 'Inspect', disabled: false }])
+assert.equal(utsTypedAction.icon, null)
+await assert.rejects(executableUtsWrapper.openLevixel({
+  items: [utsTypedImage], actions: [utsTypedAction], actionLayout: 'grid',
+}), /icon is required/)
+assert.deepEqual(await executableUtsWrapper.retryLevixel(), { retried: true })
+
+// Action callbacks are scoped to the native opening result, including synchronous early events.
+const actionSdk = await import(`data:text/javascript;base64,${Buffer.from(sdkSource).toString('base64')}#actions`)
+let actionRelay
+let actionOpenSequence = 0
+let lastActionRequest
+const businessCalls = []
+actionSdk.__setLevixelNativeTransport({
+  subscribe(listener) { actionRelay = listener; return true },
+  resolvePaths(paths) { return paths.map(path => `file:///resolved/${path.split('/').at(-1)}`) },
+  invoke(method, options) {
+    if (method === 'retry') return { ok: true, data: { retried: true } }
+    if (method === 'close') return { ok: true, data: { closed: true } }
+    lastActionRequest = options
+    const galleryId = `actions-${++actionOpenSequence}`
+    if (actionOpenSequence === 2) {
+      actionRelay({ type: 'action', payload: { galleryId, sessionId: galleryId, index: 0, itemId: 'early', mediaType: 'image', actionId: 'inspect' }, time: 1 })
+      actionRelay({ type: 'dismiss', payload: { galleryId }, time: 2 })
+    }
+    return { ok: true, data: { galleryId, itemId: 'image', index: 0, count: 1 } }
+  },
+})
+const actionConfig = [{ id: 'inspect', label: 'Inspect', icon: '/static/tool.png', onPress: context => businessCalls.push(context.itemId) }]
+await actionSdk.openLevixel({ items: [{ id: 'image', type: 'image', url: 'https://example.com/image.jpg' }], actions: actionConfig })
+assert.equal('onPress' in lastActionRequest.actions[0], false)
+assert.equal(lastActionRequest.actions[0].icon, 'file:///resolved/tool.png')
+
+actionConfig[0].onPress = () => { throw new Error('Must not read live callback') }
+actionRelay({ type: 'action', payload: { galleryId: 'actions-1', itemId: 'original', actionId: 'inspect' } })
+assert.deepEqual(businessCalls, ['original'])
+await actionSdk.openLevixel({ items: [{ id: 'image', type: 'image', url: 'https://example.com/image.jpg' }],
+  actions: [{ id: 'inspect', label: 'Inspect', onPress: context => businessCalls.push(context.itemId) }] })
+assert.deepEqual(businessCalls, ['original', 'early'])
+actionRelay({ type: 'action', payload: { galleryId: 'actions-2', itemId: 'stale', actionId: 'inspect' } })
+assert.deepEqual(businessCalls, ['original', 'early'])
+assert.deepEqual(await actionSdk.retryLevixel(), { retried: true })
+await assert.rejects(actionSdk.openLevixel({ items: [], actions: [{ id: 'x', label: 'A' }, { id: 'x', label: 'B' }] }), /unique/)
+
+const actionLayoutItems = [{ id: 'image', type: 'image', url: 'https://example.com/image.jpg' }]
+const listActions = Array.from({ length: 10 }, (_, index) => ({ id: `a${index}`, label: `Action ${index}` }))
+await assert.rejects(actionSdk.openLevixel({ items: actionLayoutItems, actions: listActions, actionLayout: 'grid' }), /actions\[0\]\.icon/)
+await assert.rejects(actionSdk.openLevixel({ items: actionLayoutItems, actionLayout: 'auto' }), /actionLayout/)
+await assert.rejects(actionSdk.openLevixel({ items: actionLayoutItems, actionListIcons: 'true' }), /actionListIcons/)
+await actionSdk.openLevixel({ items: actionLayoutItems, actions: listActions, actionLayout: 'list', actionListIcons: true })
+assert.equal(lastActionRequest.actions.length, 10)
+assert.equal(lastActionRequest.actionLayout, 'list')
+assert.equal(lastActionRequest.actionListIcons, true)
+await actionSdk.openLevixel({ items: actionLayoutItems, actions: [{ ...listActions[0], icon: '/static/tool.png' }], actionLayout: 'grid' })
+assert.equal(lastActionRequest.actionLayout, 'grid')
+assert.equal(lastActionRequest.actions.length, 1)
+assert.equal(lastActionRequest.actions[0].icon, 'file:///resolved/tool.png')
+
+// Observers see the action first; their mutations cannot change its business context.
+const dispatchOrder = []
+await actionSdk.openLevixel({ items: actionLayoutItems, actions: [{
+  id: 'inspect', label: 'Inspect',
+  onPress: context => dispatchOrder.push(['callback', context.itemId]),
+}] })
+const currentActionGallery = `actions-${actionOpenSequence}`
+const stopActionObserver = actionSdk.onLevixelEvent(event => {
+  if (event.type !== 'action') return
+  dispatchOrder.push(['event', event.payload.itemId])
+  event.payload.itemId = 'mutated-by-observer'
+  throw new Error('An observer must not suppress the business callback')
+})
+actionRelay({ type: 'action', payload: { galleryId: currentActionGallery, itemId: 'original', actionId: 'inspect' } })
+assert.deepEqual(dispatchOrder, [['event', 'original'], ['callback', 'original']])
+stopActionObserver()
+
+// Selector measurement must not read live action descriptors or callbacks after awaiting.
+const selectorCalls = []
+const selectorActions = [{ id: 'inspect', label: 'Original', onPress: context => selectorCalls.push(context.itemId) }]
+const selectorOptions = { items: actionLayoutItems, actions: selectorActions, actionLayout: 'list', actionListIcons: false }
+const selectorOpening = actionSdk.openLevixelFromSelector(selectorOptions)
+selectorActions[0].label = 'Changed'
+selectorActions[0].onPress = () => selectorCalls.push('wrong-callback')
+selectorActions.push({ id: 'added', label: 'Added after opening' })
+selectorOptions.actionLayout = 'grid'
+selectorOptions.actionListIcons = true
+const selectorResult = await selectorOpening
+assert.equal(lastActionRequest.actionLayout, 'list')
+assert.equal(lastActionRequest.actionListIcons, false)
+assert.equal(lastActionRequest.actions.length, 1)
+assert.equal(lastActionRequest.actions[0].label, 'Original')
+actionRelay({ type: 'action', payload: { galleryId: selectorResult.galleryId, itemId: 'snapshot', actionId: 'inspect' } })
+assert.deepEqual(selectorCalls, ['snapshot'])
+
+// Closing or opening newer media invalidates work that has not reached the native viewer.
+const cancellationSdk = await import(`data:text/javascript;base64,${Buffer.from(sdkSource).toString('base64')}#cancellation`)
+const dispatchedRequests = []
+let resolveHeldPaths
+cancellationSdk.__setLevixelNativeTransport({
+  subscribe() { return true },
+  resolvePaths(paths) {
+    return new Promise(resolve => { resolveHeldPaths = () => resolve(paths) })
+  },
+  invoke(method, options) {
+    dispatchedRequests.push({ method, options })
+    return { ok: true, data: method === 'open'
+      ? { galleryId: `request-${dispatchedRequests.length}` }
+      : { closed: true } }
+  },
+})
+const heldIconOptions = {
+  items: actionLayoutItems,
+  actions: [{ id: 'inspect', label: 'Inspect', icon: '/static/tool.png' }],
+}
+const cancelledByClose = cancellationSdk.openLevixel(heldIconOptions)
+await cancellationSdk.closeLevixel()
+resolveHeldPaths()
+await assert.rejects(cancelledByClose, { code: 'CANCELLED', path: '$' })
+assert.deepEqual(dispatchedRequests.map(request => request.method), ['close'])
+
+const supersededByOpen = cancellationSdk.openLevixel(heldIconOptions)
+await cancellationSdk.openLevixel({ items: actionLayoutItems })
+resolveHeldPaths()
+await assert.rejects(supersededByOpen, { code: 'CANCELLED' })
+assert.equal(dispatchedRequests.filter(request => request.method === 'open').length, 1)
+
+const originalQueryFactory = globalThis.uni.createSelectorQuery
+let finishHeldMeasurement
+globalThis.uni.createSelectorQuery = () => ({
+  selectAll() { return this },
+  boundingClientRect(callback) {
+    finishHeldMeasurement = () => callback([])
+    return this
+  },
+  exec() {},
+})
+try {
+  const selectorRequest = { items: actionLayoutItems, sourceSelector: '.held-source' }
+  const cancelledSelector = cancellationSdk.openLevixelFromSelector(selectorRequest)
+  await cancellationSdk.closeLevixel()
+  finishHeldMeasurement()
+  await assert.rejects(cancelledSelector, { code: 'CANCELLED' })
+  assert.equal(dispatchedRequests.filter(request => request.method === 'open').length, 1)
+
+  const supersededSelector = cancellationSdk.openLevixelFromSelector(selectorRequest)
+  await cancellationSdk.openLevixel({ items: actionLayoutItems })
+  finishHeldMeasurement()
+  await assert.rejects(supersededSelector, { code: 'CANCELLED' })
+  assert.equal(dispatchedRequests.filter(request => request.method === 'open').length, 2)
+} finally {
+  globalThis.uni.createSelectorQuery = originalQueryFactory
+}

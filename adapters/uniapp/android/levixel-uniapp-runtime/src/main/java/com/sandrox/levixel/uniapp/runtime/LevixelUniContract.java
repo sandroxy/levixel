@@ -4,6 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.sandrox.levixel.LevixelMediaItem;
+import com.sandrox.levixel.LevixelAction;
+import com.sandrox.levixel.LevixelActionLayout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +17,9 @@ import java.util.Set;
 
 final class LevixelUniContract {
     private static final Set<String> OPEN_KEYS = keys(
+            "actions",
+            "actionLayout",
+            "actionListIcons",
             "items",
             "index",
             "theme",
@@ -99,13 +104,48 @@ final class LevixelUniContract {
         }
 
         List<SourceHint> sourceHints = parseSourceHints(options.get("sourceHints"), items.size());
+        if (options.containsKey("actionLayout") && options.get("actionLayout") == null)
+            throw error("INVALID_TYPE", "$.actionLayout", "must be list or grid");
+        if (options.containsKey("actionListIcons") && options.get("actionListIcons") == null)
+            throw error("INVALID_TYPE", "$.actionListIcons", "must be boolean");
+        LevixelActionLayout actionLayout = LevixelActionLayout.fromValue(
+                optionalEnum(options.get("actionLayout"), "list", "$.actionLayout", "list", "grid"));
         return new OpenRequest(
                 items,
                 sourceHints,
                 initialIndex,
                 "light".equals(theme),
-                "hidden".equals(sourceVisibility)
+                "hidden".equals(sourceVisibility),
+                parseActions(options.get("actions"), actionLayout),
+                actionLayout,
+                optionalBoolean(options.get("actionListIcons"), false, "$.actionListIcons")
         );
+    }
+
+    private static List<LevixelAction> parseActions(Object raw, LevixelActionLayout layout) throws ContractException {
+        if (raw == null) return Collections.emptyList();
+        if (!(raw instanceof List)) throw error("INVALID_TYPE", "$.actions", "must be an array");
+        List<LevixelAction> actions = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        for (Object entry : (List<?>) raw) {
+            String path = "$.actions[" + actions.size() + "]";
+            Map<String, Object> value = requireObject(entry, path);
+            rejectUnknownKeys(value, keys("id", "label", "icon", "group", "disabled", "destructive"), path);
+            String id = requireString(value.get("id"), path + ".id");
+            String label = requireString(value.get("label"), path + ".label");
+            String icon = optionalString(value.get("icon"), path + ".icon");
+            if (layout == LevixelActionLayout.GRID && icon == null)
+                throw error("INVALID_VALUE", path + ".icon", "is required for grid actionLayout");
+            String group = optionalString(value.get("group"), path + ".group");
+            if (!ids.add(id)) throw error("INVALID_VALUE", path + ".id", "must be unique");
+            if (id.trim().isEmpty() || label.trim().isEmpty()
+                    || (icon != null && icon.trim().isEmpty()) || (group != null && group.trim().isEmpty()))
+                throw error("INVALID_VALUE", path, "text must not be blank");
+            actions.add(new LevixelAction(id, label, icon, group,
+                    optionalBoolean(value.get("disabled"), false, path + ".disabled"),
+                    optionalBoolean(value.get("destructive"), false, path + ".destructive"), null));
+        }
+        return LevixelAction.snapshot(actions);
     }
 
     static void validateCloseRequest(@Nullable Object rawOptions) throws ContractException {
@@ -356,19 +396,28 @@ final class LevixelUniContract {
         final int initialIndex;
         final boolean lightTheme;
         final boolean hidesHtmlSource;
+        @NonNull final List<LevixelAction> actions;
+        @NonNull final LevixelActionLayout actionLayout;
+        final boolean actionListIcons;
 
         OpenRequest(
                 @NonNull List<Item> items,
                 @NonNull List<SourceHint> sourceHints,
                 int initialIndex,
                 boolean lightTheme,
-                boolean hidesHtmlSource
+                boolean hidesHtmlSource,
+                @NonNull List<LevixelAction> actions,
+                @NonNull LevixelActionLayout actionLayout,
+                boolean actionListIcons
         ) {
             this.items = items;
             this.sourceHints = sourceHints;
             this.initialIndex = initialIndex;
             this.lightTheme = lightTheme;
             this.hidesHtmlSource = hidesHtmlSource;
+            this.actions = actions;
+            this.actionLayout = actionLayout;
+            this.actionListIcons = actionListIcons;
         }
 
         @NonNull

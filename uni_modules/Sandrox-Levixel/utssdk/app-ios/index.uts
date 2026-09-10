@@ -1,5 +1,6 @@
 import {
   CloseLevixelNative,
+  RetryLevixelNative,
   LevixelNativeCallback,
   OnLevixelNativeEvent,
   OpenLevixelNative,
@@ -26,6 +27,18 @@ export const closeLevixelNative: CloseLevixelNative = function (
   callback: LevixelNativeCallback
 ): void {
   LevixelUniPresenter.shared.closeJSON(
+    optionsJson,
+    completion = (resultJson: string) => {
+      callback(resultJson)
+    }
+  )
+}
+
+export const retryLevixelNative: RetryLevixelNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniPresenter.shared.retryJSON(
     optionsJson,
     completion = (resultJson: string) => {
       callback(resultJson)
