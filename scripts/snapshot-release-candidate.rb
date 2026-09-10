@@ -7,7 +7,7 @@ require "open3"
 require "optparse"
 require "pathname"
 require "tempfile"
-require_relative "release-policy"
+require_relative "native-artifact-reuse"
 
 options = {
   automated_targets: [],
@@ -176,7 +176,7 @@ begin
 rescue ReleasePolicy::Error => error
   abort(error.message)
 end
-manifest_json = JSON.pretty_generate(manifest) + "\n"
+manifest_json = NativeArtifactReuse.canonical_json(manifest)
 
 # Retention protects the latest release tag and the files explicitly selected
 # above. A tag is a local retention boundary, not proof of registry publication.

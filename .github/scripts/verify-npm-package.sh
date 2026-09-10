@@ -15,6 +15,7 @@ ios_artifact="$6"
 release_source="$(cd "$7" && pwd)"
 artifact_name="levixel-react-native-${version}.tgz"
 release_adapter="${release_source}/adapters/react-native"
+verifier_scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)"
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Only stable semantic versions are publishable: ${version}" >&2
@@ -79,7 +80,7 @@ if [[ "${recorded_package_sha}" != "${actual_package_sha}" \
 fi
 
 read -r expected_android_sha expected_android_bytes expected_ios_sha expected_ios_bytes native_commit < <(
-  ruby -I "${release_source}/scripts" -rjson -r native-release-manifest -e '
+  ruby -I "${verifier_scripts}" -rjson -r native-release-manifest -e '
     manifest = JSON.parse(File.read(ARGV.fetch(0)))
     version = ARGV.fetch(1)
     NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
@@ -100,8 +101,8 @@ if [[ "${native_commit}" != "${tag_commit}" ]]; then
   echo "Native manifest commit ${native_commit} does not equal canonical ${version} tag commit ${tag_commit}." >&2
   exit 1
 fi
-"${release_source}/scripts/verify-native-manifest-ios-provenance.sh" \
-  "${native_manifest}" "${ios_artifact}" "${version}"
+"${verifier_scripts}/verify-native-manifest-ios-provenance.sh" \
+  "${native_manifest}" "${ios_artifact}" "${version}" "${release_source}"
 
 file_size() {
   if stat -f '%z' "$1" >/dev/null 2>&1; then

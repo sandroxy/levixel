@@ -80,6 +80,44 @@ class NativeArtifactReuseTest < Minitest::Test
     }
   end
 
+  def test_canonical_json_preserves_the_published_layout_including_empty_containers
+    value = {"manualTargets" => [], "nested" => [{}, []], "text" => "[] {} \"换行\"\n", "flags" => [true, false, nil, 12]}
+    expected = <<~'JSON'
+      {
+        "manualTargets": [
+
+        ],
+        "nested": [
+          {
+          },
+          [
+
+          ]
+        ],
+        "text": "[] {} \"换行\"\n",
+        "flags": [
+          true,
+          false,
+          null,
+          12
+        ]
+      }
+    JSON
+    assert_equal expected, NativeArtifactReuse.canonical_json(value)
+    assert_equal value, JSON.parse(NativeArtifactReuse.canonical_json(value))
+    assert_equal "[\n\n]\n", NativeArtifactReuse.canonical_json([])
+    assert_equal "{\n}\n", NativeArtifactReuse.canonical_json({})
+  end
+
+  def test_source_snapshot_content_changes_still_invalidate_its_digest
+    record = proof
+    record.fetch("sourceCandidate").fetch("acceptance")["manualTargets"] = ["device"]
+    error = assert_raises(NativeArtifactReuse::Error) do
+      NativeArtifactReuse.validate!(record, manifest: @manifest)
+    end
+    assert_match(/source manifest digest differs/, error.message)
+  end
+
   def test_each_configured_group_can_be_reused_independently
     @definitions.each_key do |name|
       record = proof([name])
@@ -278,7 +316,7 @@ class NativeArtifactReuseTest < Minitest::Test
     @candidate["source"]["commit"] = @before
     @candidate["artifactSetSha256"] = Digest::SHA256.hexdigest(payload)
     @candidate["candidateId"] = "levixel-1.0.0-#{@before[0, 12]}-#{@candidate.fetch('artifactSetSha256')[0, 12]}"
-    @candidate_path.write(JSON.pretty_generate(@candidate) + "\n")
+    @candidate_path.write(NativeArtifactReuse.canonical_json(@candidate))
     @root.join("dist").mkpath
     @environment = {
       "LEVIXEL_SIGNING_KEY" => nil, "LEVIXEL_SIGNING_PASSWORD" => nil,
@@ -309,6 +347,25 @@ class NativeArtifactReuseTest < Minitest::Test
       end
     end
     assert_equal @after, GitInputDigest.clean_head!(@root)
+  end
+
+  def test_current_provenance_verifier_uses_the_explicit_release_source_and_history
+    preparation_fixture
+    @manifest["commit"] = @after
+    @manifest.fetch("buildProvenance")["artifactReuse"] = proof
+    manifest_path = @root.join("manifest.json")
+    manifest_path.write(JSON.pretty_generate(@manifest) + "\n")
+    ios = @entries.find { |entry| entry.fetch("role") == "native-ios-xcframework" }
+    # A frozen tag can contain the old validator. Only its source/digest helpers
+    # and history should be used, not that outdated manifest reader.
+    @root.join("scripts/native-artifact-reuse.rb").write("abort 'Outdated manifest reader was used'\n")
+    output, error, status = Open3.capture3(
+      "/bin/bash", @repository.join("scripts/verify-native-manifest-ios-provenance.sh").to_s,
+      manifest_path.to_s, @snapshot.join(ios.fetch("file")).to_s, "1.0.0", @root.to_s,
+      chdir: @root.to_s
+    )
+    assert status.success?, output + error
+    assert_match(/Verified iOS binary provenance/, output)
   end
 
   def test_current_platform_outputs_are_reused_in_place

@@ -13,8 +13,23 @@ module NativeArtifactReuse
     raise Error, "Unexpected #{label} fields" unless value.is_a?(Hash) && value.keys.sort == fields.sort
   end
 
-  def canonical_json(value)
-    JSON.pretty_generate(value) + "\n"
+  # Preserve the JSON 2.1 layout used by published candidate digests. Newer
+  # JSON gems compact empty containers even when pretty_generate is requested.
+  def canonical_json(value, depth = 0)
+    indent = "  " * depth
+    encoded = case value
+              when Hash
+                members = value.map do |key, item|
+                  "#{indent}  #{JSON.generate(key.to_s)}: #{canonical_json(item, depth + 1)}"
+                end
+                "{\n" + members.join(",\n") + (members.empty? ? "" : "\n") + "#{indent}}"
+              when Array
+                members = value.map { |item| "#{indent}  #{canonical_json(item, depth + 1)}" }
+                "[\n" + members.join(",\n") + "\n#{indent}]"
+              else
+                JSON.generate(value)
+              end
+    depth.zero? ? encoded + "\n" : encoded
   end
 
   def groups(policy: ReleasePolicy.load(File.expand_path("../release-policy.json", __dir__)),

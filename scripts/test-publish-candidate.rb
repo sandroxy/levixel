@@ -6,7 +6,7 @@ require "open3"
 require "pathname"
 require "tmpdir"
 require "time"
-require_relative "release-policy"
+require_relative "native-artifact-reuse"
 
 class PublishCandidateTest < Minitest::Test
   def setup
@@ -195,6 +195,8 @@ class PublishCandidateTest < Minitest::Test
     assert status.success?, error
     assert_equal @candidate_path.realpath.to_s, output.lines.first.strip
     manifest = JSON.parse(@candidate_path.read)
+    loaded, = NativeArtifactReuse.load_candidate!(@candidate_path, policy: @policy)
+    assert_equal manifest, loaded
     assert_equal files.map(&:to_s).sort,
                  manifest.fetch("artifacts").map { |entry| @candidate_root.join(entry.fetch("file")).to_s }.sort
     assert_equal original_stat.ino, files.first.stat.ino

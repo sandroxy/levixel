@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 NATIVE_MANIFEST IOS_XCFRAMEWORK_ZIP VERSION" >&2
+if [[ $# -ne 3 && $# -ne 4 ]]; then
+  echo "Usage: $0 NATIVE_MANIFEST IOS_XCFRAMEWORK_ZIP VERSION [RELEASE_SOURCE]" >&2
   exit 1
 fi
 
@@ -10,6 +10,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 manifest_path="$1"
 xcframework_zip="$2"
 version="$3"
+# The verifier may be newer than the immutable source checkout being checked.
+release_source="$(cd "${4:-${script_dir}/..}" && pwd)"
 
 for required_file in "${manifest_path}" "${xcframework_zip}"; do
   if [[ ! -f "${required_file}" ]]; then
@@ -33,11 +35,11 @@ ruby -I "${script_dir}" -rdigest -rjson -r native-release-manifest -e '
     File.size(artifact_path) == artifact.fetch("bytes")
   abort("iOS XCFramework checksum differs from the native manifest") unless
     Digest::SHA256.file(artifact_path).hexdigest == artifact.fetch("sha256")
-' "${manifest_path}" "${version}" "${xcframework_zip}" "${script_dir}/.."
+' "${manifest_path}" "${version}" "${xcframework_zip}" "${release_source}"
 
-source_digest="$("${script_dir}/compute-ios-source-digest.rb")"
+source_digest="$("${release_source}/scripts/compute-ios-source-digest.rb")"
 read -r binary_source_commit binary_source_digest < <(
-  "${script_dir}/verify-ios-xcframework-provenance.sh" \
+  "${release_source}/scripts/verify-ios-xcframework-provenance.sh" \
     "${xcframework_zip}" "${version}" "${source_digest}"
 )
 read -r manifest_commit manifest_dirty manifest_source_commit manifest_source_digest < <(
@@ -60,17 +62,16 @@ if [[ "${manifest_source_commit}" != "${binary_source_commit}" \
   echo "Native manifest iOS provenance differs from the XCFramework." >&2
   exit 1
 fi
-plugin_dir="$(cd "${script_dir}/.." && pwd)"
-if ! git -C "${plugin_dir}" cat-file -e "${binary_source_commit}^{commit}" 2>/dev/null \
-    || ! git -C "${plugin_dir}" cat-file -e "${manifest_commit}^{commit}" 2>/dev/null \
-    || ! git -C "${plugin_dir}" merge-base --is-ancestor \
+if ! git -C "${release_source}" cat-file -e "${binary_source_commit}^{commit}" 2>/dev/null \
+    || ! git -C "${release_source}" cat-file -e "${manifest_commit}^{commit}" 2>/dev/null \
+    || ! git -C "${release_source}" merge-base --is-ancestor \
       "${binary_source_commit}" "${manifest_commit}"; then
   echo "XCFramework source commit is not an ancestor of the native release commit." >&2
   exit 1
 fi
 if [[ "${manifest_dirty}" == false ]]; then
   committed_source_digest="$(
-    "${script_dir}/compute-ios-source-digest.rb" --commit "${binary_source_commit}"
+    "${release_source}/scripts/compute-ios-source-digest.rb" --commit "${binary_source_commit}"
   )"
   if [[ "${committed_source_digest}" != "${binary_source_digest}" ]]; then
     echo "XCFramework source digest does not belong to its embedded source commit." >&2

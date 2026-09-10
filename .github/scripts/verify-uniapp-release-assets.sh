@@ -18,6 +18,7 @@ uts_accepted_sha256="$9"
 legacy_artifact="${10:-}"
 legacy_checksum="${11:-}"
 legacy_accepted_sha256="${12:-}"
+verifier_scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)"
 
 for declared_version in "${version}" "${native_version}"; do
   if [[ ! "${declared_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -131,7 +132,7 @@ verify_safe_zip() {
 }
 
 read -r expected_android_sha expected_android_bytes expected_ios_sha expected_ios_bytes native_commit < <(
-  ruby -I "${release_source}/scripts" -rjson -r native-release-manifest -e '
+  ruby -I "${verifier_scripts}" -rjson -r native-release-manifest -e '
     manifest = JSON.parse(File.read(ARGV.fetch(0)))
     version = ARGV.fetch(1)
     NativeReleaseManifest.validate!(manifest, plugin: "levixel", version: version)
@@ -159,8 +160,8 @@ if [[ "${native_commit}" != "${native_tag_commit}" ]]; then
   echo "Native manifest commit ${native_commit} does not equal native tag ${native_version} commit ${native_tag_commit}." >&2
   exit 1
 fi
-"${release_source}/scripts/verify-native-manifest-ios-provenance.sh" \
-  "${native_manifest}" "${ios_artifact}" "${native_version}"
+"${verifier_scripts}/verify-native-manifest-ios-provenance.sh" \
+  "${native_manifest}" "${ios_artifact}" "${native_version}" "${release_source}"
 
 read -r source_version source_uts_version source_native_version source_legacy_version uts_source_version < <(
   ruby -ryaml -rjson -e '
