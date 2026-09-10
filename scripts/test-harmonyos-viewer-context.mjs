@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 
-// The registry contains no ArkUI syntax or platform dependencies. Execute its
-// actual ArkTS source; only the .ets extension and type syntax need a loader.
+// Execute the actual ArkTS logic. Component builders are excluded from these
+// unit tests; the ArkUI compiler and simulator validate rendering separately.
 const contextUrl = new URL(
   '../native/harmonyos/levixel/src/main/ets/controller/LevixelViewerContext.ets',
   import.meta.url,
@@ -21,20 +21,34 @@ const geometryUrl = new URL(
   '../native/harmonyos/levixel/src/main/ets/model/LevixelTransitionGeometry.ets',
   import.meta.url,
 );
-const sourceUrls = new Set([contextUrl.href, modelUrl.href, controllerUrl.href, geometryUrl.href]);
+const hostUrl = new URL(
+  '../native/harmonyos/levixel/src/main/ets/components/LevixelViewerHost.ets',
+  import.meta.url,
+);
+const videoUrl = new URL(
+  '../native/harmonyos/levixel/src/main/ets/components/LevixelVideoPlayer.ets',
+  import.meta.url,
+);
+const componentUrls = new Set([hostUrl.href, videoUrl.href]);
+const sourceUrls = new Set([contextUrl.href, modelUrl.href, controllerUrl.href, geometryUrl.href, ...componentUrls]);
+
+function componentLogic(source) {
+  return source
+    .replace(/^import .+ from '@[^']+';\n/gm, '')
+    .replace(/^import .+ from '\.\/Levixel(?:ImageViewer|VideoPlayer)';\n/gm, '')
+    .replace(/^  @Builder\n[\s\S]*?^  }\n/gm, '')
+    .replace(/^  build\(\) \{[\s\S]*?^  }\n/gm, '')
+    .replace(/^@Component\n/gm, '')
+    .replace(/export struct /g, 'export class ')
+    .replace(/@(State|Prop)\s+/g, '')
+    .replace(/@Watch\('[^']+'\)\s*/g, '');
+}
+
 const loader = registerHooks({
   resolve(specifier, context, nextResolve) {
-    if (context.parentURL === contextUrl.href && specifier === '../model/LevixelModels') {
-      return { url: modelUrl.href, shortCircuit: true };
-    }
-    if (context.parentURL === controllerUrl.href && specifier === './LevixelViewerContext') {
-      return { url: contextUrl.href, shortCircuit: true };
-    }
-    if (context.parentURL === contextUrl.href && specifier === '../model/LevixelTransitionGeometry') {
-      return { url: geometryUrl.href, shortCircuit: true };
-    }
-    if (context.parentURL === geometryUrl.href && specifier === './LevixelModels') {
-      return { url: modelUrl.href, shortCircuit: true };
+    if (sourceUrls.has(context.parentURL) && specifier.startsWith('.')) {
+      const url = new URL(`${specifier}.ets`, context.parentURL).href;
+      if (sourceUrls.has(url)) return { url, shortCircuit: true };
     }
     return nextResolve(specifier, context);
   },
@@ -42,10 +56,14 @@ const loader = registerHooks({
     if (!sourceUrls.has(url)) {
       return nextLoad(url, context);
     }
+    let source = readFileSync(new URL(url), 'utf8');
+    if (componentUrls.has(url)) {
+      source = 'const Curve = { EaseOut: 0 }; class XComponentController {}\n' + componentLogic(source);
+    }
     return {
       format: 'module',
       shortCircuit: true,
-      source: stripTypeScriptTypes(readFileSync(new URL(url), 'utf8'), {
+      source: stripTypeScriptTypes(source, {
         mode: 'transform',
         sourceUrl: url,
       }),
@@ -53,8 +71,10 @@ const loader = registerHooks({
   },
 });
 const { LevixelViewerContext } = await import(contextUrl.href);
-const { LevixelSourceImageFit } = await import(modelUrl.href);
+const { LevixelSourceImageFit, clampLevixelPan, snapshotLevixelActions } = await import(modelUrl.href);
 const { LevixelController, resolveLevixelContext } = await import(controllerUrl.href);
+const { LevixelViewerHost } = await import(hostUrl.href);
+const { LevixelVideoPlayer } = await import(videoUrl.href);
 const { imageContentFrame, intersectRects, resolveImageGeometry, mapSourceSnapshotToTarget } =
   await import(geometryUrl.href);
 loader.deregister();
@@ -511,3 +531,229 @@ test('invalid media dimensions cannot produce infinite or stretched image geomet
     Number.MIN_VALUE, Number.MAX_VALUE, frame, LevixelSourceImageFit.COVER,
   ), /finite positive content frame/);
 });
+
+test('zoomed pan clamps to actual contained image edges on each axis', () => {
+  assert.deepEqual(clampLevixelPan(1, 90, -90, 390, 260, 390, 844), { x: 0, y: 0 });
+  assert.deepEqual(clampLevixelPan(2, 999, -999, 390, 260, 390, 844), { x: 195, y: 0 });
+  assert.deepEqual(clampLevixelPan(3, -999, 999, 300, 600, 390, 844), { x: -255, y: 478 });
+});
+
+test('drawer configuration is snapshotted and cannot use duplicate action IDs', () => {
+  const actions = [{ id: 'inspect', label: 'Inspect', group: 'tools', onPress() {} }];
+  const copy = snapshotLevixelActions(actions);
+  actions[0].label = 'Changed';
+  actions.push({ id: 'other', label: 'Other' });
+  assert.equal(copy.length, 1);
+  assert.equal(copy[0].label, 'Inspect');
+  assert.throws(() => snapshotLevixelActions([copy[0], copy[0]]), /unique/);
+});
+
+test('controller close, retry, Back, and event subscriptions follow mounted viewer lifetime', () => {
+  const controller = new LevixelController();
+  const context = resolveLevixelContext(controller);
+  const calls = [];
+  const unsubscribe = controller.onEvent(event => calls.push(event.type));
+  const registration = context.registerViewer(() => {}, () => {}, () => calls.push('close'), () => true, () => true);
+  context.emit({ type: 'opened', payload: {}, time: 1 });
+  assert.equal(controller.retry(), true);
+  assert.equal(controller.handleBack(), true);
+  controller.close();
+  unsubscribe();
+  context.emit({ type: 'dismiss', payload: {}, time: 2 });
+  context.unregisterViewer(registration);
+  assert.equal(controller.retry(), false);
+  assert.equal(controller.handleBack(), false);
+  controller.close();
+  assert.deepEqual(calls, ['opened', 'close']);
+});
+
+test('an event listener cannot corrupt another listener media identity', () => {
+  const controller = new LevixelController();
+  const context = resolveLevixelContext(controller);
+  const identities = [];
+  controller.onEvent(event => { event.payload.itemId = 'changed'; });
+  controller.onEvent(event => identities.push(event.payload.itemId));
+  const event = { type: 'action', payload: { sessionId: 'one', galleryId: 'one', index: 0,
+    itemId: 'original', mediaType: 'image', actionId: 'inspect' }, time: 1 };
+  context.emit(event);
+  assert.equal(event.payload.itemId, 'original');
+  assert.deepEqual(identities, ['original']);
+});
+
+test('action layout is explicit and grid icons are required', () => {
+  const actions = Array.from({ length: 10 }, (_, index) => ({ id: `a${index}`, label: `Action ${index}` }));
+  assert.equal(snapshotLevixelActions(actions).length, 10);
+  assert.throws(() => snapshotLevixelActions(actions, 'grid'), /actions\[0\]\.icon/);
+  assert.equal(snapshotLevixelActions([{ ...actions[0], icon: 'https://example.com/icon.png' }], 'grid').length, 1);
+  assert.throws(() => snapshotLevixelActions(actions, 'auto'), /actionLayout/);
+});
+
+test('subscriptions added during dispatch start with the next event', () => {
+  const context = new LevixelViewerContext();
+  const calls = [];
+  const second = () => calls.push('second');
+  context.onEvent(() => { calls.push('first'); context.onEvent(second); });
+  const event = { type: 'opened', payload: { sessionId: 'one', galleryId: 'one', index: 0,
+    itemId: 'media-a', mediaType: 'image' }, time: 1 };
+  context.emit(event);
+  assert.deepEqual(calls, ['first']);
+  context.emit(event);
+  assert.deepEqual(calls, ['first', 'first', 'second']);
+});
+
+test('simultaneous viewers and remounts cannot share a session identity', t => {
+  t.mock.method(Date, 'now', () => 123);
+  const first = new LevixelViewerContext();
+  const second = new LevixelViewerContext();
+  const ids = [first.createSessionId(), second.createSessionId(), first.createSessionId()];
+  const mounted = first.registerViewer(() => {}, () => {});
+  first.unregisterViewer(mounted);
+  first.registerViewer(() => {}, () => {});
+  ids.push(first.createSessionId());
+  assert.equal(new Set(ids).size, 4);
+});
+
+function openedHost() {
+  const host = new LevixelViewerHost();
+  host.controller = new LevixelController();
+  host.items = [{ id: 'media-a', mediaType: 'image', sourceUrl: 'https://example.com/full.jpg',
+    thumbnailUrl: 'https://example.com/preview.jpg', aspectWidth: 400, aspectHeight: 300 }];
+  host.aboutToAppear();
+  host.rootWidth = 400;
+  host.rootHeight = 800;
+  host.sessionItems = host.items.slice();
+  host.sessionId = 'one';
+  host.viewerOpen = true;
+  host.contentVisible = true;
+  return host;
+}
+
+test('repeated close preserves the first in-flight transition and emits one dismiss', async () => {
+  const host = openedHost();
+  const events = [];
+  host.onEvent = event => events.push(event.type);
+  let resolveCapture;
+  host.captureViewerState = () => new Promise(resolve => { resolveCapture = resolve; });
+  host.performCloseFadeFallback = () => host.finishClose();
+  const closing = host.closeViewer();
+  const token = host.transitionToken;
+  await host.closeViewer();
+  assert.equal(host.viewerOpen, true);
+  assert.equal(host.transitionToken, token);
+  assert.deepEqual(events, []);
+  resolveCapture(null);
+  await closing;
+  assert.equal(host.viewerOpen, false);
+  assert.deepEqual(events, ['dismiss']);
+});
+
+test('zoomed close captures the current image scale and viewport crop without a reset', async () => {
+  const host = openedHost();
+  host.zoomScale = 2;
+  host.panX = -75;
+  const pixelMap = {};
+  host.imageResourceCache.set(host.items[0].thumbnailUrl, { pixelMap, width: 400, height: 300 });
+  let captured;
+  const capture = host.captureViewerState.bind(host);
+  host.captureViewerState = async item => { captured = await capture(item); return captured; };
+  host.resolveCloseTargetState = async () => null;
+  host.performCloseFadeFallback = () => {};
+  await host.closeViewer();
+  assert.equal(host.zoomScale, 2);
+  assert.equal(host.panX, -75);
+  assertRect(captured.geometry.visibleFrame, { left: 0, top: 100, width: 400, height: 600 });
+  assertRect(captured.geometry.contentFrame, { left: -275, top: 0, width: 800, height: 600 });
+  host.finishClose();
+  assert.equal(host.zoomScale, 1);
+});
+
+test('host removal cannot reopen a session from its dismiss callback', async () => {
+  const host = openedHost();
+  host.captureSourceState = async () => null;
+  const events = [];
+  host.onEvent = event => {
+    events.push(event.type);
+    if (event.type === 'dismiss') host.controller.open('media-a');
+  };
+  host.aboutToDisappear();
+  await Promise.resolve();
+  assert.deepEqual(host.sessionItems, []);
+  assert.equal(host.viewerOpen, false);
+  assert.equal(host.controller.handleBack(), false);
+  assert.deepEqual(events, ['dismiss']);
+});
+
+test('media callbacks stop as soon as a session starts closing', () => {
+  const host = openedHost();
+  const events = [];
+  host.onEvent = event => events.push(event.type);
+  host.closing = true;
+  host.mediaState('media-a', 'one', false);
+  assert.deepEqual(host.failedIds, []);
+  assert.deepEqual(events, []);
+});
+
+test('programmatic close waits for the action sheet to finish dismissing', async () => {
+  const host = openedHost();
+  host.actionsVisible = true;
+  host.actionSheetActive = true;
+  let closeCount = 0;
+  host.performCloseViewer = async () => { closeCount += 1; host.finishClose(); };
+  await host.closeViewer();
+  assert.equal(host.actionsVisible, false);
+  assert.equal(closeCount, 0);
+  assert.equal(host.controller.handleBack(), true);
+  assert.equal(closeCount, 0);
+  host.finishAction();
+  assert.equal(closeCount, 1);
+  assert.equal(host.viewerOpen, false);
+});
+
+test('an action dispatches once after dismissal and keeps its original media context', () => {
+  const host = openedHost();
+  host.actionsVisible = true;
+  host.actionSheetActive = true;
+  const callbacks = [];
+  host.onEvent = event => { event.payload.itemId = 'changed-by-listener'; };
+  const action = { id: 'inspect', label: 'Inspect', onPress: event => callbacks.push(event.payload) };
+  host.selectAction(action);
+  assert.deepEqual(callbacks, []);
+  host.finishAction();
+  host.finishAction();
+  assert.equal(callbacks.length, 1);
+  assert.equal(callbacks[0].itemId, 'media-a');
+  assert.equal(host.viewerOpen, true);
+});
+
+test('an opening keeps its theme and rejects unknown theme values', () => {
+  const host = openedHost();
+  host.finishClose();
+  host.continueOpeningViewer = () => {};
+  host.theme = 'unknown';
+  assert.throws(() => host.openViewer('media-a'), /theme must be/);
+  host.theme = 'light';
+  host.openViewer('media-a');
+  host.theme = 'dark';
+  assert.equal(host.sessionTheme, 'light');
+  host.finishClose();
+});
+
+for (const [command, state] of [['playPlayer', 'prepared'], ['pausePlayer', 'playing']]) {
+  test(`a late ${command} rejection cannot fail a replacement video player`, async () => {
+    const video = new LevixelVideoPlayer();
+    let rejectCommand;
+    const pending = new Promise((_resolve, reject) => { rejectCommand = reject; });
+    video.active = true;
+    video.player = { state, play: () => pending, pause: () => pending };
+    video.playbackGeneration = 1;
+    const states = [];
+    video.onMediaState = loaded => states.push(loaded);
+    video[command]();
+    video.playbackGeneration = 2;
+    video.player = { state: 'prepared' };
+    rejectCommand(new Error('Old player was released'));
+    await Promise.resolve();
+    assert.equal(video.playbackFailed, false);
+    assert.deepEqual(states, []);
+  });
+}

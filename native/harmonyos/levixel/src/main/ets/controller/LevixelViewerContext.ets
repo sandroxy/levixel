@@ -1,8 +1,9 @@
 import {
   cloneRect,
+  cloneLevixelViewerEvent,
   LevixelSourceImageFit
 } from '../model/LevixelModels';
-import type { RectMetrics } from '../model/LevixelModels';
+import type { LevixelViewerEvent, RectMetrics } from '../model/LevixelModels';
 import { intersectRects, isUsableRect } from '../model/LevixelTransitionGeometry';
 
 interface LevixelSourceEntry {
@@ -41,6 +42,11 @@ export class LevixelViewerContext {
   private readonly contextId: number;
   private nextRegistrationId: number = 0;
   private viewerRegistrationId: number = 0;
+  private sessionSequence: number = 0;
+  private closeHandler: (() => void) | null = null;
+  private retryHandler: (() => boolean) | null = null;
+  private backHandler: (() => boolean) | null = null;
+  private listeners: Set<(event: LevixelViewerEvent) => void> = new Set<(event: LevixelViewerEvent) => void>();
   private openHandler: ((itemId: string) => void) | null = null;
   private prepareHandler: ((itemId: string) => void) | null = null;
   private readonly sources: Map<number, LevixelSourceEntry> = new Map<number, LevixelSourceEntry>();
@@ -50,6 +56,26 @@ export class LevixelViewerContext {
   constructor() {
     LevixelViewerContext.nextContextId += 1;
     this.contextId = LevixelViewerContext.nextContextId;
+  }
+
+  public close(): void { if (this.closeHandler !== null) this.closeHandler(); }
+  public retry(): boolean { return this.retryHandler !== null ? this.retryHandler() : false; }
+  public handleBack(): boolean { return this.backHandler !== null ? this.backHandler() : false; }
+
+  public createSessionId(): string {
+    this.sessionSequence += 1;
+    return `levixel-harmony-${Date.now()}-${this.contextId}-${this.sessionSequence}`;
+  }
+
+  public onEvent(listener: (event: LevixelViewerEvent) => void): () => void {
+    this.listeners.add(listener);
+    return (): void => { this.listeners.delete(listener); };
+  }
+
+  public emit(event: LevixelViewerEvent): void {
+    Array.from(this.listeners).forEach((listener: (event: LevixelViewerEvent) => void) => {
+      listener(cloneLevixelViewerEvent(event));
+    });
   }
 
   public open(itemId: string): void {
@@ -69,7 +95,10 @@ export class LevixelViewerContext {
 
   public registerViewer(
     openHandler: (itemId: string) => void,
-    prepareHandler: (itemId: string) => void
+    prepareHandler: (itemId: string) => void,
+    closeHandler: (() => void) | null = null,
+    retryHandler: (() => boolean) | null = null,
+    backHandler: (() => boolean) | null = null
   ): number {
     if (this.openHandler !== null) {
       throw new Error('A LevixelController cannot be attached to more than one mounted LevixelViewer.');
@@ -77,6 +106,9 @@ export class LevixelViewerContext {
     this.viewerRegistrationId = this.allocateRegistrationId();
     this.openHandler = openHandler;
     this.prepareHandler = prepareHandler;
+    this.closeHandler = closeHandler;
+    this.retryHandler = retryHandler;
+    this.backHandler = backHandler;
     return this.viewerRegistrationId;
   }
 
@@ -86,6 +118,9 @@ export class LevixelViewerContext {
     }
     this.openHandler = null;
     this.prepareHandler = null;
+    this.closeHandler = null;
+    this.retryHandler = null;
+    this.backHandler = null;
     this.viewerRegistrationId = 0;
     this.setHiddenSource('');
   }

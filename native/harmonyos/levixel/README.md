@@ -162,6 +162,44 @@ Its navigation header is optional: set `showsNavigationHeader` to `true`,
 provide `navigationTitle`, pass the window's top safe-area inset through
 `navigationTopInset`, and handle `onNavigateBack` with the host router.
 
+## Actions and viewer events
+
+`LevixelViewer` and `LevixelGallery` accept an `actions: LevixelAction[]` array.
+Each action has a unique, non-blank `id` and `label`, with optional `icon`,
+`group`, `disabled`, `destructive`, and `onPress` fields. Actions and their
+callbacks are snapshotted when the viewer opens.
+
+Set `actionLayout` explicitly to `'list'` or `'grid'`; the default is `'list'`
+and the number of actions does not change the layout. List icons are optional
+and hidden unless `actionListIcons` is `true`. Grid actions require an `icon`
+URL. Each distinct `group` forms a separate horizontal row in the grid, in
+first-appearance order. Long menus scroll while Cancel remains available.
+
+A long press emits `longPress`. When `actions` is non-empty, it also opens a
+system bottom sheet above the viewer. An empty array keeps only the event.
+Selecting an enabled action dismisses the sheet before emitting `action`
+and calling that action's `onPress`. The host implements the business operation.
+
+Use the component's `onEvent` callback or `controller.onEvent(listener)` to
+receive `LevixelViewerEvent` values. The controller subscription returns a
+function that removes the listener. Event types are `opened`, `indexChange`,
+`dismiss`, `longPress`, `action`, `mediaLoad`, and `mediaError`.
+Each event includes `type`, `time`, and a `payload` identifying the session,
+media item, media type, and index. An action adds `actionId`; a load failure
+adds `code` and `message`.
+
+`controller.close()` closes the viewer after dismissing an open action sheet.
+Forward the page's `onBackPress()`
+to `controller.handleBack()`: it dismisses an open sheet first, then the
+viewer, and returns whether it handled the request. `controller.retry()`
+retries the current failed item and returns whether a retry started; the
+viewer also displays a retry button after a media load failure.
+
+Images support pinch zoom, double-tap zoom, and panning within the image
+bounds. Paging and vertical drag dismissal resume at the base zoom scale.
+Set `theme` to `'light'` for a white media canvas or leave its default `'dark'`.
+The action sheet keeps the same light palette in either theme.
+
 ## License and source
 
 Levixel is released under the MIT License. See

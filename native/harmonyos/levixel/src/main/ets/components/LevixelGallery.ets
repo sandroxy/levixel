@@ -1,3 +1,4 @@
+import { LevixelAction, LevixelActionLayout, LevixelViewerEvent } from '../model/LevixelModels';
 import {
   LevixelMediaItem,
   LevixelMediaType,
@@ -15,13 +16,18 @@ const THUMBNAIL_RADIUS: number = 8;
 export struct LevixelGallery {
   private readonly controller: LevixelController = new LevixelController();
   @Prop items: LevixelMediaItem[] = [];
+  @Prop actions: LevixelAction[] = [];
+  @Prop actionLayout: LevixelActionLayout = 'list';
+  @Prop actionListIcons: boolean = false;
+  @Prop theme: 'dark' | 'light' = 'dark';
+  onEvent: (event: LevixelViewerEvent) => void = (_event: LevixelViewerEvent): void => {};
   @Prop showsNavigationHeader: boolean = false;
   @Prop navigationTitle: string = 'Levixel';
   @Prop navigationTopInset: number = 0;
   onNavigateBack: () => void = (): void => {};
 
   build() {
-    LevixelViewer({ controller: this.controller, items: this.items }) {
+    LevixelViewer({ controller: this.controller, items: this.items, actions: this.actions, actionLayout: this.actionLayout, actionListIcons: this.actionListIcons, theme: this.theme, onEvent: this.onEvent }) {
       Column() {
         if (this.showsNavigationHeader) {
           this.NavigationHeader()

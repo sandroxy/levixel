@@ -7,10 +7,11 @@
 ## 本次范围
 
 - 图片和视频长按事件，既可仅响应事件，也可配置内置操作抽屉。
-- 抽屉由查看器持有：Android 使用 Material BottomSheetDialog，iOS 15 及以上使用 UIKit 系统 Sheet（iOS 13–14 使用自定义 UIKit 转场），Web 位于查看器的 Shadow DOM 内。接入方无需调整宿主页层级。
+- 抽屉由查看器持有：Android 使用 Material BottomSheetDialog，iOS 15 及以上使用 UIKit 系统 Sheet（iOS 13–14 使用自定义 UIKit 转场），HarmonyOS 使用原生 overlay sheet，Web 位于查看器的 Shadow DOM 内。接入方无需调整宿主页层级。
 - 任意业务按钮、显式列表/网格布局、分组和超高内容滚动、图标和两行文字、禁用/危险操作样式、取消和安全区。抽屉使用独立浅色配色，画廊的 `theme` 继续控制媒体背景；原生 iOS/Android 内容底色为 `#DEDEDE`，网格按钮字号 12、列表和取消字号 16（iOS 为 pt，Android 为 sp），跟随系统字体缩放，系统抽屉负责形态和转场。
 - 打开、切页、关闭、加载成功/失败和按钮选择事件；失败提示及手动重试。
 - React Native 的 `ref.open(itemId)`、`ref.close()`、`ref.retry()`；不要求目标缩略图挂载。
+- HarmonyOS 双指缩放、放大后平移及与翻页/竖拖关闭/长按之间的手势协调。
 
 点按关闭仍采用原有行为。插件不实现下载、保存、分享、权限申请或任意业务内容插槽。
 
@@ -90,6 +91,7 @@ Android/iOS 保留打开时的首次 `indexChange` 通知（在 `opened` 前）�
 - React Native：`await ref.current.retry()` → `boolean`；`await ref.current.close()` 在查看器关闭完成后返回。
 - Android：`overlay.retry()` → `boolean`；`overlay.requestClose()`；宿主 Back 应调用 `overlay.handleBack()`。
 - iOS：`session.retry()` → `Bool`（主线程）；`session.close()`，可传 completion 等待关闭完成。自动点击接入可从 `configuration.onSession` 接收 session。
+- HarmonyOS：`controller.retry()` → `boolean`、`controller.close()`、`controller.handleBack()`；宿主 `onBackPress()` 返回 `controller.handleBack()`。
 
 ## Android / iOS
 
@@ -177,6 +179,14 @@ Tab 切换焦点时，仅滚动抽屉内部以保持目标按钮可见，不移�
 `await retryLevixel()` 返回 `{ retried: boolean }`。系统返回优先关闭抽屉，`closeLevixel()` 关闭整个查看器，并在退场完成后返回 `{ closed: true }`。需要展示宿主业务弹窗时，可在按钮回调中先等待查看器关闭。按钮回调与 `action` 事件均会通知，同一次业务操作只在一处执行。
 
 关闭或发起新的打开请求，会使仍在测量来源、解析本地路径的旧请求以 `CANCELLED` 结束，避免页面退出后又打开查看器。
+
+## HarmonyOS 接入
+
+`LevixelViewer` / `LevixelGallery` 增加 `actions: LevixelAction[]`、`actionLayout`、`actionListIcons`、`theme: 'dark' | 'light'`、`onEvent`。按钮字段和布局沿用上方公共约定；原生按钮回调接收 `LevixelViewerEvent`，媒体上下文为 `event.payload`。
+
+`controller.close()` 关闭查看器，`controller.retry()` 返回是否重试当前失败媒体。宿主的 `onBackPress()` 返回 `controller.handleBack()`，使返回键优先关闭抽屉。`controller.onEvent(listener)` 返回取消订阅函数；与组件 `onEvent`、按钮回调同时使用时，应避免重复执行业务。控制器和源组件的组织方式沿用 [HarmonyOS 接入说明](../native/harmonyos/levixel/README.md)。
+
+图片支持双指缩放、双击放大/复位和有边界的平移；回到适应屏幕大小后恢复翻页与竖拖关闭。宿主列表变化时，源映射和操作回调保持对应打开会话的媒体身份。
 
 ## 主仓本地验证
 

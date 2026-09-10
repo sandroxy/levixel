@@ -1,3 +1,4 @@
+import type { LevixelViewerEvent } from '../model/LevixelModels';
 import { LevixelViewerContext } from './LevixelViewerContext';
 
 const contexts: WeakMap<LevixelController, LevixelViewerContext> =
@@ -6,6 +7,16 @@ const contexts: WeakMap<LevixelController, LevixelViewerContext> =
 export class LevixelController {
   constructor() {
     contexts.set(this, new LevixelViewerContext());
+  }
+
+  public close(): void { resolveLevixelContext(this).close(); }
+
+  public retry(): boolean { return resolveLevixelContext(this).retry(); }
+
+  public handleBack(): boolean { return resolveLevixelContext(this).handleBack(); }
+
+  public onEvent(listener: (event: LevixelViewerEvent) => void): () => void {
+    return resolveLevixelContext(this).onEvent(listener);
   }
 
   public open(itemId: string): void {

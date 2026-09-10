@@ -4,6 +4,10 @@ export { LevixelSourceViewport } from './src/main/ets/components/LevixelSourceVi
 export { LevixelViewer } from './src/main/ets/components/LevixelViewer';
 export { LevixelController } from './src/main/ets/controller/LevixelController';
 export {
+  LevixelAction,
+  LevixelActionLayout,
+  LevixelMediaContext,
+  LevixelViewerEvent,
   cloneRect,
   LevixelMediaItem,
   LevixelMediaType,

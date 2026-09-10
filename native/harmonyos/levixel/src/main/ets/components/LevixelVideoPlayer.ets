@@ -3,6 +3,7 @@ import { media } from '@kit.MediaKit';
 
 @Component
 export struct LevixelVideoPlayer {
+  onMediaState: (loaded: boolean) => void = (_loaded: boolean): void => {};
   @Prop itemId: string = '';
   @Prop sourceUrl: string = '';
   @Prop active: boolean = false;
@@ -71,8 +72,6 @@ export struct LevixelVideoPlayer {
         return;
       }
       if (this.playbackFailed) {
-        this.releasePlayer();
-        this.preparePlayer();
         return;
       }
       this.controlsVisible = !this.controlsVisible;
@@ -210,9 +209,11 @@ export struct LevixelVideoPlayer {
       if (!this.isCurrentPlayer(player, generation)) {
         return;
       }
+      const notifyLoaded: boolean = !this.firstFrameReady;
       this.firstFrameReady = true;
       this.loading = false;
       this.playbackFailed = false;
+      if (notifyLoaded) this.onMediaState(true);
     });
     player.on('timeUpdate', (timeMs: number) => {
       if (!this.isCurrentPlayer(player, generation) || this.scrubbing) {
@@ -243,8 +244,9 @@ export struct LevixelVideoPlayer {
     if (player.state !== 'prepared' && player.state !== 'paused' && player.state !== 'completed') {
       return;
     }
+    const generation: number = this.playbackGeneration;
     player.play().catch((_error: BusinessError) => {
-      this.handlePlayerFailure(this.playbackGeneration);
+      this.handlePlayerFailure(generation);
     });
   }
 
@@ -253,8 +255,9 @@ export struct LevixelVideoPlayer {
     if (player === null || player.state !== 'playing') {
       return;
     }
+    const generation: number = this.playbackGeneration;
     player.pause().catch((_error: BusinessError) => {
-      this.handlePlayerFailure(this.playbackGeneration);
+      this.handlePlayerFailure(generation);
     });
   }
 
@@ -330,10 +333,12 @@ export struct LevixelVideoPlayer {
     if (!this.isCurrentGeneration(generation)) {
       return;
     }
+    const notifyFailure: boolean = !this.playbackFailed;
     this.loading = false;
     this.playbackFailed = true;
     this.playing = false;
     this.firstFrameReady = false;
+    if (notifyFailure) this.onMediaState(false);
   }
 
   private releasePlayer(): void {

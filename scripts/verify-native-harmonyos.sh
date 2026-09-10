@@ -59,20 +59,54 @@ ruby -e '
   %w[LevixelViewerContext LevixelViewerHost resolveLevixelContext].each do |internal_symbol|
     abort("Packaged HarmonyOS root API exposes internal #{internal_symbol}.") if index.include?(internal_symbol)
   end
-  abort("Packaged HarmonyOS public API is missing LevixelSourceImageFit.") unless
-    index.include?("LevixelSourceImageFit")
+  %w[LevixelSourceImageFit LevixelAction LevixelActionLayout LevixelMediaContext LevixelViewerEvent].each do |symbol|
+    abort("Packaged HarmonyOS public API is missing #{symbol}.") unless index.match?(/\b#{symbol}\b/)
+  end
 
   declarations = {
     "src/main/ets/controller/LevixelController.d.ets" => [
       "export declare class LevixelController",
       "constructor();",
       "open(itemId: string): void;",
+      "close(): void;",
+      "retry(): boolean;",
+      "handleBack(): boolean;",
+      "onEvent(listener: (event: LevixelViewerEvent) => void): () => void;",
     ],
     "src/main/ets/components/LevixelViewer.d.ets" => [
       "export declare struct LevixelViewer",
       "controller: LevixelController | null;",
       "items: LevixelMediaItem[];",
+      "actions: LevixelAction[];",
+      "actionLayout: LevixelActionLayout;",
+      "actionListIcons: boolean;",
+      "theme: \x27dark\x27 | \x27light\x27;",
+      "onEvent: (event: LevixelViewerEvent) => void;",
       "content: () => void;",
+    ],
+    "src/main/ets/components/LevixelGallery.d.ets" => [
+      "export declare struct LevixelGallery",
+      "actions: LevixelAction[];",
+      "actionLayout: LevixelActionLayout;",
+      "actionListIcons: boolean;",
+      "theme: \x27dark\x27 | \x27light\x27;",
+      "onEvent: (event: LevixelViewerEvent) => void;",
+    ],
+    "src/main/ets/model/LevixelModels.d.ets" => [
+      "export interface LevixelAction",
+      "export type LevixelActionLayout = \x27list\x27 | \x27grid\x27;",
+      "icon?: string;",
+      "group?: string;",
+      "disabled?: boolean;",
+      "destructive?: boolean;",
+      "onPress?: (event: LevixelViewerEvent) => void;",
+      "export interface LevixelMediaContext",
+      "sessionId: string;",
+      "galleryId: string;",
+      "itemId: string;",
+      "actionId?: string;",
+      "export interface LevixelViewerEvent",
+      "payload: LevixelMediaContext;",
     ],
     "src/main/ets/components/LevixelSource.d.ets" => [
       "export declare struct LevixelSource",

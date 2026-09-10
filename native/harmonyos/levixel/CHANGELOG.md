@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - Unreleased
+
+- Adds long-press events and a native action drawer with configurable groups and callbacks.
+- Supports explicit list and grid layouts, optional list icons, and required grid icons.
+- Adds pinch zoom and bounded panning, coordinated with paging and drag dismissal.
+- Adds session events, media load/error events, and visible/programmatic retry.
+- Preserves zoomed image geometry during closing, waits for sheet dismissal, and isolates late video callbacks from replacement players.
+
 ## 1.3.0 - 2026-09-07
 
 - Aligns the package version with the coordinated Levixel 1.3.0 release.
