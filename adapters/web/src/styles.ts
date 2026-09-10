@@ -98,6 +98,14 @@ export const LEVIXEL_STYLES = String.raw`
     user-select: none;
   }
 
+  /* Keep image hit tests on the gesture surface or button. Some mobile
+     browsers show their own image menu even after contextmenu is canceled. */
+  .image,
+  .poster,
+  .action-icon img {
+    pointer-events: none;
+  }
+
   .video,
   .poster {
     inset: 0;
@@ -305,6 +313,7 @@ export const LEVIXEL_STYLES = String.raw`
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    outline: none;
     border-radius: 20px 20px 0 0;
     background: #dedede;
     color: #4b5057;

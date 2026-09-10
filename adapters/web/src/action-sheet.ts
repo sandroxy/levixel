@@ -30,6 +30,7 @@ export class ActionSheet {
     dismiss.addEventListener('click', cancel);
     const sheet = this.sheet;
     sheet.className = 'action-sheet';
+    sheet.tabIndex = -1;
     sheet.dataset.layout = layout;
     sheet.dataset.icons = String(layout === 'grid' || listIcons);
     sheet.setAttribute('role', 'dialog');
@@ -97,13 +98,17 @@ export class ActionSheet {
     this.element.append(dismiss, sheet);
   }
 
-  present(shadow: ShadowRoot): void {
+  present(shadow: ShadowRoot, input: 'pointer' | 'keyboard'): void {
     this.previousFocus = shadow.activeElement instanceof HTMLElement ? shadow.activeElement : null;
     if (!this.reducedMotion) {
       this.animate('translateY(100%)', 'translateY(0)', '0', '1', 280, 'cubic-bezier(0.22, 1, 0.36, 1)');
     }
     // The entering sheet starts below the viewport; scrolling to its focus target moves the media too.
-    this.element.querySelector<HTMLButtonElement>('.action-sheet button:not(:disabled)')?.focus({ preventScroll: true });
+    // Pointing input enters the dialog without inheriting a focus ring on its first action.
+    const target = input === 'keyboard'
+      ? this.sheet.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? this.sheet
+      : this.sheet;
+    target.focus({ preventScroll: true });
   }
 
   focusButton(button: HTMLElement): void {

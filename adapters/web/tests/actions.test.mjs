@@ -23,6 +23,11 @@ export async function verifyActions(browser, fixtureURL) {
       actions[0].onPress = () => { throw new Error('Live action mutated the open session'); };
       actions[0].label = 'Changed';
     });
+    assert.equal(await page.evaluate(() => {
+      const shadow = document.querySelector('[data-levixel-web-root]').shadowRoot;
+      const target = shadow.elementFromPoint(195, 400);
+      return target instanceof HTMLElement && target.closest('.media-shell') !== null && target.tagName !== 'IMG';
+    }), true, 'media gestures must hit the gesture surface instead of triggering a browser image menu');
     await page.mouse.move(195, 400);
     await page.mouse.down();
     await page.waitForTimeout(570);
@@ -34,6 +39,11 @@ export async function verifyActions(browser, fixtureURL) {
     assert.equal(await page.locator('[data-action-id="custom-1"]').isDisabled(), true);
     assert.equal(await page.locator('[data-action-id="custom-0"] .action-label').innerText(), 'Custom 0');
     assert.equal(await page.locator('.action-row').first().evaluate(row => row.scrollWidth > row.clientWidth), true);
+    assert.equal(await page.locator('[data-action-id="custom-0"] .action-icon img').evaluate(image => {
+      const rect = image.getBoundingClientRect();
+      const target = image.getRootNode().elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return target?.tagName !== 'IMG' && target?.closest('[data-action-id]')?.dataset.actionId === 'custom-0';
+    }), true, 'drawer icon taps must still hit their action without targeting a browser image');
     const menus = await page.evaluate(() => {
       const root = document.querySelector('[data-levixel-web-root]').shadowRoot;
       const prevented = target => {
@@ -325,13 +335,28 @@ async function verifyDrawerMediaStability(browser, fixtureURL) {
         ['x', 'y', 'width', 'height', 'scrollX', 'scrollY'].map(key => Math.abs(frame[key] - baseline[key]))));
       assert.ok(displacement < 0.5, `${scenario.name}: opening the drawer moved the image/viewer by ${displacement}px`);
       if (scenario.input === 'keyboard') {
-        assert.equal(await page.locator('.action-button').first().evaluate(button => button.getRootNode().activeElement === button), true,
-          'keyboard opening must still focus the first action');
+        assert.equal(await page.locator('.action-button').first().evaluate(button =>
+          button.getRootNode().activeElement === button && button.matches(':focus-visible')), true,
+          'keyboard opening must still visibly focus the first action');
+      } else {
+        assert.equal(await page.locator('.action-sheet').evaluate(sheet =>
+          sheet.getRootNode().activeElement === sheet && getComputedStyle(sheet).outlineStyle === 'none'), true,
+          `${scenario.name}: focus must enter the dialog without highlighting an action`);
+        await page.keyboard.press('Shift+Tab');
+        assert.equal(await page.locator('.action-cancel').evaluate(button =>
+          button.getRootNode().activeElement === button && button.matches(':focus-visible')), true,
+          'backward keyboard navigation from the dialog must visibly focus Cancel');
+        await page.keyboard.press('Tab');
+        assert.equal(await page.locator('.action-button').first().evaluate(button =>
+          button.getRootNode().activeElement === button && button.matches(':focus-visible')), true,
+          'keyboard navigation after pointing input must visibly focus the first action');
       }
       await page.keyboard.press('Escape');
       await page.locator('.action-sheet').waitFor({ state: 'detached' });
       assert.equal(await page.locator('.action-sheet').count(), 0);
       assert.equal(await page.locator('[data-levixel-web-root]').count(), 1);
+      assert.equal(await page.locator('.root').evaluate(root => root.getRootNode().activeElement === root), true,
+        'dismissing the drawer must restore focus to the viewer');
     } finally { await page.close(); }
   }
 }

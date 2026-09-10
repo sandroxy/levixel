@@ -301,10 +301,12 @@ export class LevixelWebViewer {
     this.longPressTimer = undefined;
   }
 
-  private readonly handleClick = (event: MouseEvent): void => {
+  private readonly handleSuppressedMouseEvent = (event: MouseEvent): void => {
     // Keyboard activation is independent of the pointer that opened the drawer.
-    if (event.detail === 0 && this.currentPage().isControlTarget(event.target)) return;
+    if (event.type === 'click' && event.detail === 0 && this.currentPage().isControlTarget(event.target)) return;
     if (performance.now() < this.suppressClickUntil) {
+      // Touch release can synthesize a mousedown on the newly opened drawer,
+      // moving focus before the already-suppressed click arrives.
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -317,7 +319,7 @@ export class LevixelWebViewer {
     if (performance.now() >= this.suppressClickUntil && this.gesture?.mode !== 'reanchor') this.longPress();
   };
 
-  private longPress(): void {
+  private longPress(input: 'pointer' | 'keyboard' = 'pointer'): void {
     this.clearLongPress();
     if (!this.opened || this.closing || this.destroyed || this.navigating || this.actionSheet) return;
     this.clearTapTimer();
@@ -331,7 +333,7 @@ export class LevixelWebViewer {
       action => { void this.selectAction(action, payload); },
       () => { void this.closeActions(); }, this.options.actionLayout, this.options.actionListIcons);
     this.root.append(this.actionSheet.element);
-    this.actionSheet.present(this.shadow);
+    this.actionSheet.present(this.shadow, input);
     this.content.inert = true;
   }
 
@@ -357,7 +359,8 @@ export class LevixelWebViewer {
 
   private installListeners(): void {
     this.root.addEventListener('contextmenu', this.handleContextMenu);
-    this.root.addEventListener('click', this.handleClick, true);
+    this.root.addEventListener('mousedown', this.handleSuppressedMouseEvent, true);
+    this.root.addEventListener('click', this.handleSuppressedMouseEvent, true);
     this.root.addEventListener('pointerdown', this.handlePointerDown);
     this.root.addEventListener('pointermove', this.handlePointerMove);
     this.root.addEventListener('pointerup', this.handlePointerEnd);
@@ -374,7 +377,8 @@ export class LevixelWebViewer {
 
   private removeListeners(): void {
     this.root.removeEventListener('contextmenu', this.handleContextMenu);
-    this.root.removeEventListener('click', this.handleClick, true);
+    this.root.removeEventListener('mousedown', this.handleSuppressedMouseEvent, true);
+    this.root.removeEventListener('click', this.handleSuppressedMouseEvent, true);
     this.root.removeEventListener('pointerdown', this.handlePointerDown);
     this.root.removeEventListener('pointermove', this.handlePointerMove);
     this.root.removeEventListener('pointerup', this.handlePointerEnd);
@@ -594,7 +598,7 @@ export class LevixelWebViewer {
     if (this.actionSheet) return;
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
       event.preventDefault();
-      this.longPress();
+      this.longPress('keyboard');
       return;
     }
     if (this.currentPage().isZoomed() || this.controlsInteractionActive || this.navigating)
