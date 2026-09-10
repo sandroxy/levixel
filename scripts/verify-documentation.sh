@@ -13,6 +13,8 @@ package_json="${plugin_dir}/uni_modules/Sandrox-Levixel/package.json"
 public_integration_guides=(
   "${plugin_dir}/README.md"
   "${plugin_dir}/README-EN.md"
+  "${plugin_dir}/native/android/README.md"
+  "${plugin_dir}/native/ios/README.md"
   "${plugin_dir}/adapters/react-native/README.md"
   "${plugin_dir}/adapters/web/README.md"
   "${plugin_dir}/native/harmonyos/levixel/README.md"
@@ -100,6 +102,7 @@ fi
 for public_api in \
   openLevixel \
   closeLevixel \
+  retryLevixel \
   onLevixelEvent \
   prepareLevixelItem \
   warmupLevixelItem \
@@ -229,7 +232,9 @@ ruby -ryaml -e '
     ARGV.fetch(1) => ["最低支持 Android API #{android}", "最低支持 iOS #{ios}", "最低支持 HarmonyOS API #{harmony}"],
     ARGV.fetch(2) => ["minimum supported Android version is API #{android}", "minimum supported iOS version is #{ios}", "minimum supported HarmonyOS version is API #{harmony}"],
     ARGV.fetch(3) => ["HarmonyOS API #{harmony} or newer"],
-    ARGV.fetch(4) => ["iOS #{ios} and newer"]
+    ARGV.fetch(4) => ["iOS #{ios} and newer"],
+    ARGV.fetch(5) => ["Android API #{android} and newer"],
+    ARGV.fetch(6) => ["iOS #{ios} and newer"]
   }
   failures = []
   checks.each do |path, phrases|
@@ -242,7 +247,9 @@ ruby -ryaml -e '
   "${plugin_dir}/README.md" \
   "${plugin_dir}/README-EN.md" \
   "${plugin_dir}/native/harmonyos/levixel/README.md" \
-  "${plugin_dir}/packaging/swift-package/README.md"
+  "${plugin_dir}/packaging/swift-package/README.md" \
+  "${plugin_dir}/native/android/README.md" \
+  "${plugin_dir}/native/ios/README.md"
 
 node -e '
   const fs = require("fs")
@@ -283,7 +290,7 @@ ruby -e '
     end
   end
   abort("Broken local Markdown links:\n#{failures.join("\n")}") unless failures.empty?
-' "${version_neutral_docs[@]}" "${plugin_dir}/RELEASING.md" "${plugin_dir}/PROVENANCE.md" "${plugin_dir}/docs/next-release.md"
+' "${version_neutral_docs[@]}" "${plugin_dir}/RELEASING.md" "${plugin_dir}/PROVENANCE.md"
 
 rendered_marketplace="$(mktemp)"
 trap 'rm -f "${rendered_marketplace}"' EXIT

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.0 - Unreleased
+## 1.4.0 - 2026-09-10
 
 - Adds long-press events and a viewer-owned action drawer for images and videos, with explicit list/grid layouts, optional list icons, groups, and arbitrary business callbacks.
 - Adds session-aware opened, dismiss, media-load, media-error, and action events, together with visible retry controls and programmatic retry.

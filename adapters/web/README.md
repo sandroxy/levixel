@@ -22,6 +22,7 @@ import {
   openLevixel,
   openLevixelFromSelector,
   prepareLevixelItem,
+  retryLevixel,
   type LevixelMediaItem,
   warmupLevixelItem,
 } from '@sandrox/levixel-web';
@@ -106,20 +107,117 @@ not fetch another host page from inside an already open viewer.
 
 `openLevixel` accepts already measured `sourceHints` for hosts that own their DOM geometry. `prepareLevixelItem` preloads the transition preview (thumbnail or poster, falling back to the image URL), while `warmupLevixelItem` first reuses dimensions from an already loaded source element and otherwise preloads the same preview. Neither function runs automatically merely because the host renders a thumbnail list.
 
+## Long press and actions
+
+Both opening functions accept `actions`, `actionLayout`, and `actionListIcons`:
+
+```ts
+await openLevixelFromSelector({
+  items,
+  initialItemId: 'coast',
+  sourceBindings: sourceBindings(),
+  actionLayout: 'list',
+  actions: [
+    { id: 'inspect', label: 'View details', group: 'tools',
+      onPress: context => showDetails(context.itemId) },
+  ],
+});
+```
+
+`showDetails` is application code. The viewer provides the sheet and its layer
+above the media; saving, sharing, navigation, and permissions belong to the host.
+
+| Action field | Meaning |
+| --- | --- |
+| `id` | Unique, non-blank action identifier |
+| `label` | Non-blank text, displayed on up to two lines |
+| `icon` | Image URI; optional for a list, required for a grid |
+| `group` | Optional non-blank group; omitted actions share the default group |
+| `disabled` | Defaults to `false`; prevents selection and callbacks |
+| `destructive` | Defaults to `false`; danger styling, without business confirmation |
+| `onPress` | Optional callback receiving media context and `actionId` |
+
+The default `actionLayout` is `'list'`, independent of the action count. List
+icons are hidden unless `actionListIcons` is `true`; a missing list icon then
+keeps an aligned empty space. `'grid'` always shows icons and requires one for
+every action. Failed icon loads use a neutral placeholder. Invalid action
+configuration is rejected before opening.
+
+Groups and their actions keep first-appearance order. List groups are separated;
+each grid group forms one horizontally scrollable row. Tall content scrolls
+vertically while Cancel stays available. The sheet keeps a light palette in
+either viewer theme, accounts for safe areas, and supports keyboard navigation.
+
+Images and videos recognize long press, excluding video controls and retry
+buttons. Moving or adding another pointer cancels recognition. Empty or omitted
+`actions` emits only `longPress`. The viewer suppresses image context menus and
+selection within its own media, including the iOS Safari image callout; source
+elements in the host page keep their normal browser behavior.
+
+Selection dismisses the sheet before the `action` event and `onPress` callback,
+leaving the viewer open. If both callbacks handle an action, execute the business
+operation in only one. Cancel, the backdrop, and Escape close the sheet first;
+`closeLevixel()` closes the whole viewer. Await it before presenting host UI
+that requires the viewer to be gone.
+
+## Events and retry
+
+```ts
+const removeListener = onLevixelEvent(event => {
+  console.log(event.type, event.payload);
+});
+
+// From a host retry control:
+const { retried } = await retryLevixel();
+// When the host no longer needs viewer events:
+removeListener();
+```
+
+Events use `{ type, payload, time }`, with `time` in Unix milliseconds.
+Media context contains `sessionId`, `galleryId`, `index`, `itemId`, and
+`mediaType` (`image` or `video`).
+
+| Event | Meaning |
+| --- | --- |
+| `ready` | The event channel is ready; the viewer need not be open |
+| `opened` | The opening transition has finished |
+| `longPress` | Long press is recognized, before the sheet opens |
+| `indexChange` | The page changes; includes `currentIndex` and media identity |
+| `mediaLoad` | The full image is decoded or the video first frame is ready |
+| `mediaError` | Loading failed; includes `code: LOAD_FAILED` and `message` |
+| `action` | The sheet has closed after selection; includes `actionId` |
+| `dismiss` | The session ends, with its final current media context |
+| `sourceVisibilityChange` | A source changes visibility; includes `hidden`, `galleryId`, `index`, and `itemId` |
+
+Load events may describe a preloaded adjacent item or arrive before `opened`.
+Use their `itemId`; thumbnails and posters do not count as a successful full
+media load. The viewer shows a retry button after failure. `retryLevixel()`
+returns `{ retried: boolean }`, keeps the existing session, and does not repeat
+a request that is loading or has no eligible failure. `closeLevixel()` resolves
+with `{ closed: true }` after dismissal.
+
 ## Product behavior
 
 - Images start aspect-fitted. Pinch or trackpad zoom, zoomed panning, double-tap zoom, horizontal paging, tap dismissal, and vertical drag dismissal follow the same interaction model as the native viewers.
 - Thumbnail-to-full handoff keeps the preview visible while a synchronized full-resolution layer decodes, then atomically returns to one `<img>` on the next rendering update. Relative zoom and normalized visual center are preserved throughout.
 - Images show no counter, toolbar, or always-visible close button. `counter: true` and `closeButton: true` fail contract validation instead of silently inventing UI.
 - Video starts from its poster, primes the first frame, and shows the matching close, play, and timeline controls after a video tap.
-- `Escape` closes and the left/right arrow keys page while the current image is fitted. Levixel does not modify browser history or a host router.
+- `Escape` dismisses the action sheet first, then the viewer. Left/right arrow keys page while the current image is fitted and the sheet is closed. Levixel does not modify browser history or a host router.
 - The viewer is an accessible modal, traps focus while open, restores the previous focus and inline page styles on close, and respects reduced-motion preferences.
 
 Web defaults `sourceVisibility` to `hidden`, matching the standalone Android/iOS source-handoff semantics. Classic UniApp intentionally remains `visible` to avoid a last-frame source flash in its WebView/Vapor handoff; the Web runtime does not change that platform-specific default.
 
 ## Lifecycle
 
-Only one Web viewer session can exist. Opening again atomically replaces the previous session, restores its source element, and does not emit a duplicate `dismiss` event. Open results, `sourceVisibilityChange`, and `indexChange` expose both the session index and stable `itemId`; use the id when host data can change. Events retain the shared Levixel JSON shape and timestamp semantics.
+Only one Web viewer session can exist. Opening again ends the previous session,
+restores its source, and emits its `dismiss` once. Each opening retains its
+media, actions, and action callbacks. Updating host arrays affects the next
+open. Use `itemId` for business data and `sessionId` to distinguish openings;
+`index` belongs to the opening snapshot, not a later host array.
+
+Action callbacks wait for the sheet's dismissal. Closing or replacing the
+session during that dismissal cancels a still-pending selection callback.
+Repeated `closeLevixel()` calls wait for the same viewer to finish closing.
 
 Backgrounding a page pauses active video without clearing subscriptions or closing the viewer. Resize and `visualViewport` changes re-fit unzoomed media and preserve zoomed viewport state.
 

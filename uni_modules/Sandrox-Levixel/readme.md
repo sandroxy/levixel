@@ -11,6 +11,8 @@ Levixel 以列表中源媒体当前可见的位置、尺寸和圆角为转场起
 - 双指缩放、缩放后平移与双击复位
 - 图片未放大时竖拖关闭，并支持点按关闭和系统返回
 - 缩略图未就绪时直接进入原生加载状态，加载完成后连续交接
+- 图片与视频长按事件、可配置的列表或网格操作抽屉
+- 会话与媒体加载事件、加载失败提示和重试
 - 经典 uni-app 与 uni-app x Vapor 使用同一套公共 JavaScript API
 
 ## 兼容范围
@@ -36,6 +38,7 @@ uni-app x 不支持 VDOM。本 UniApp 交付也不覆盖 nvue、Web、小程序�
 import {
   openLevixel,
   closeLevixel,
+  retryLevixel,
   onLevixelEvent,
   prepareLevixelItem,
   warmupLevixelItem,
@@ -308,28 +311,94 @@ sourceBindings: mountedCells.map(cell => ({
 
 `sourceVisibility` 默认且建议保持 `visible`。经典 uni-app 与 x Vapor 均使用该源图交接策略，避免关闭转场最后阶段出现源图纹理闪烁。只有页面完整处理 `sourceVisibilityChange`，并确认所有目标平台的开关场交接都符合预期时，才应显式传入 `hidden`；否则源位置可能在关闭末帧短暂留空或闪烁。
 
+## 长按与操作抽屉
+
+`openLevixel` 和 `openLevixelFromSelector` 均接受 `actions`、`actionLayout` 和 `actionListIcons`。经典 uni-app 与 uni-app x 使用相同配置：
+
+```js
+await openLevixelFromSelector({
+  items: snapshot,
+  initialItemId: selectedItem.id,
+  sourceBindings: mountedItems.map(item => ({
+    itemId: item.id,
+    selector: `#levixel-source-${item.id}`,
+    objectFit: 'cover',
+    cornerRadius: 6,
+  })),
+  actionLayout: 'list',
+  actions: [
+    { id: 'inspect', label: '查看详情', group: 'tools',
+      onPress: context => showDetails(context.itemId) },
+  ],
+})
+```
+
+`showDetails` 是宿主自己的业务方法。插件负责把抽屉呈现在查看器上方；保存、分享、导航及相关权限申请由接入方实现。
+
+| 按钮字段 | 含义 |
+| --- | --- |
+| `id` | 本次配置内唯一的非空白字符串 |
+| `label` | 非空白文字，最多显示两行 |
+| `icon` | 图片 URI；列表可省略，网格每项必传 |
+| `group` | 可选的非空白分组；省略时归入默认组 |
+| `disabled` | 默认 `false`；禁用项不触发选择或业务回调 |
+| `destructive` | 默认 `false`；危险操作样式，业务确认仍由宿主处理 |
+| `onPress` | 可选回调，接收媒体上下文及 `actionId` |
+
+布局由配置决定，与按钮数量无关：
+
+- `actionLayout` 默认 `'list'`；一个或多个按钮都可以使用列表。列表图标默认隐藏，即使传入也不会加载或显示；显式设置 `actionListIcons: true` 后显示已有图标，缺失项保留对齐空位。
+- `actionLayout: 'grid'` 始终显示图标，每个按钮都必须提供 `icon`，否则打开前报错。单个按钮也可以用网格。图标加载失败时显示中性占位，保留文字和点击能力。
+- 组与组内按钮按首次出现顺序排列。列表按组分隔，网格的每个组对应一条横向滚动行；内容超高时纵向滚动，取消按钮保持可见。
+
+抽屉使用独立浅色配色，跟随系统字号与系统呈现方式；`theme` 控制媒体背景。图片和视频均可长按，视频控制按钮与失败重试按钮不触发长按；移动或多指操作会取消识别。不传 `actions` 或传空数组时只派发 `longPress`，不显示抽屉。
+
+选中按钮后先关闭抽屉，再通知 `action` 事件与 `onPress`，查看器继续保持打开。两处都会收到通知，同一业务操作只在一处执行。取消、点遮罩与系统返回优先关闭抽屉；`closeLevixel()` 关闭整个查看器。需要展示宿主业务弹窗时，可在按钮回调中先 `await closeLevixel()`，再打开业务界面。
+
 ## 事件与直接控制
 
 ```js
-const remove = onLevixelEvent((event) => {
-  // ready | indexChange | sourceVisibilityChange | dismiss
+const removeListener = onLevixelEvent(event => {
   console.log(event.type, event.payload)
 })
 
 await openLevixel({ items, index: 0 })
+// 可由宿主自己的重试按钮调用：
+const { retried } = await retryLevixel()
 await closeLevixel()
-remove()
+// 页面不再需要订阅时调用：
+removeListener()
 ```
 
-打开结果包含会话内 `index` 与稳定 `itemId`；`indexChange` 和 `sourceVisibilityChange` 的 payload 同时包含这两项。宿主列表可能在查看器打开期间变化时，应使用 `itemId` 识别媒体，只把 index 当作本次打开快照内的位置。
+事件结构为 `{ type, payload, time }`，`time` 是 Unix 毫秒时间戳。媒体上下文包含 `sessionId`、`galleryId`、`index`、`itemId` 和 `mediaType`（`image` 或 `video`）。
 
-通常优先使用 `openLevixelFromSelector`，让 SDK 测量当前可见源并生成共享转场所需的 `sourceHints`。只有宿主已经拥有可靠的源图几何时，才需要直接调用 `openLevixel` 并自行传入 `sourceHints`。
+| 事件 | 时机及附加字段 |
+| --- | --- |
+| `ready` | 事件通道就绪，不代表查看器已经打开 |
+| `opened` | 打开转场结束，查看器可交互 |
+| `longPress` | 长按识别成功，在自动打开抽屉之前 |
+| `indexChange` | 当前页变化，同时保留 `currentIndex` |
+| `mediaLoad` | 原图解码完成或视频首帧就绪 |
+| `mediaError` | 媒体加载失败，附加 `code: LOAD_FAILED` 与 `message` |
+| `action` | 选择按钮且抽屉收起后，附加 `actionId` |
+| `dismiss` | 会话结束，包含最后当前媒体的上下文 |
+| `sourceVisibilityChange` | 源图显隐变化，包含 `hidden`、`galleryId`、`index` 和 `itemId` |
+
+原生首次 `indexChange` 可能早于 `opened`。相邻页预加载也可能在打开完成前或其他页面显示期间派发媒体事件，应通过 `itemId` 识别对应媒体，不能假定都是当前页。缩略图或封面就绪不算原图或视频加载成功。
+
+每次打开保留媒体、按钮配置和按钮回调的快照，更新配置在下次打开生效。`sessionId` 标识一次打开；异步业务用 `itemId` 关联数据，`index` 只表示打开时数组内的位置。重新打开会结束旧会话并通知 `dismiss`。关闭或发起新的打开请求时，仍在测量来源或解析本地路径的旧请求会以 `CANCELLED` 结束，避免页面退出后又弹出查看器。
+
+加载失败会显示重试按钮。`retryLevixel()` 返回 `{ retried: boolean }`，仅重试当前可重试的失败媒体，不创建新会话；加载中、没有可重试媒体或查看器已关闭时返回 `false`。`closeLevixel()` 在整个查看器关闭完成后返回 `{ closed: true }`。
+
+通常优先使用 `openLevixelFromSelector`，让 SDK 测量当前可见源。只有宿主已经拥有可靠的源图几何时，才直接调用 `openLevixel` 并传入 `sourceHints`。
 
 ## App 原生插件版
 
 选择 App 原生插件工作流的经典 uni-app Android/iOS 项目，可以从对应 [GitHub Release](https://github.com/sandroxy/levixel/releases) 下载 `levixel-uniapp-legacy-<version>.zip`。
 
-该包不是另一套查看器：它使用同版本的公共 SDK、UniApp 平台运行时和原生核心，只是桥接及打包形式不同。它需要自定义调试基座或离线打包，不属于 DCloud UTS 市场包，也不支持 uni-app x。
+解压后，将 `Sandrox-Levixel/` 放入项目的 `nativeplugins/`，从 `@/nativeplugins/Sandrox-Levixel/js_sdk/index.js` 引入同名公共 API。该包需要包含插件的自定义调试基座或离线包；标准基座不包含此原生插件。
+
+媒体、源绑定、按钮和事件用法与上文相同。该包使用同版本的平台运行时和原生核心，不属于 DCloud UTS 市场包，也不支持 uni-app x。
 
 ## 权限、隐私与许可
 

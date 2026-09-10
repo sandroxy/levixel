@@ -26,5 +26,5 @@ import Levixel
 The package manifest references the release XCFramework by HTTPS URL and pins
 its checksum, which Swift Package Manager verifies before using the binary.
 
-See the [iOS integration guide](https://github.com/sandroxy/levixel#ios) for a
-complete image and video setup example.
+See the [iOS integration guide](https://github.com/sandroxy/levixel/blob/master/native/ios/README.md) for a
+media setup, source binding, action sheets, events, and session control.

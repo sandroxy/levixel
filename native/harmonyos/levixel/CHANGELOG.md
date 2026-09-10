@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.0 - Unreleased
+## 1.4.0 - 2026-09-10
 
 - Adds long-press events and a native action drawer with configurable groups and callbacks.
 - Supports explicit list and grid layouts, optional list icons, and required grid icons.

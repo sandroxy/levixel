@@ -19,14 +19,16 @@ Levixel 是一套强调原生手感的共享转场图片与视频查看器，支
 - 双指缩放、缩放后平移与双击复位
 - 图片未放大时竖拖关闭，并支持点按关闭和系统返回
 - 缩略图、加载态、原图与视频首帧之间的连续交接
+- 图片与视频长按事件，可配置列表或网格操作抽屉
+- 带媒体身份的会话与加载事件、失败提示及手动和程序重试
 - 为 Android、iOS、HarmonyOS、React Native、UniApp 及受支持的现代 Web 浏览器提供正式发行包
 
 ## 支持平台与分发
 
 | 平台 | 推荐渠道 | 接入说明 |
 | --- | --- | --- |
-| Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | 原生 AAR，同时在 GitHub Releases 提供离线镜像 |
-| iOS | [Swift Package](https://github.com/sandroxy/levixel) | 通过校验和验证的二进制 XCFramework |
+| Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | [Android 指南](native/android/README.md)，提供 AAR 离线镜像 |
+| iOS | [Swift Package](https://github.com/sandroxy/levixel) | [iOS 指南](native/ios/README.md)，通过校验和验证的 XCFramework |
 | HarmonyOS | [OHPM](https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel) · `@sandrox/levixel` | 原生 HAR，同时在 GitHub Releases 提供离线镜像 |
 | React Native / Expo | [npm](https://www.npmjs.com/package/@sandrox/levixel) · `@sandrox/levixel` | React Native 组件与随包提供的 Android/iOS 原生运行时 |
 | UniApp | [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) | 经典 uni-app 与 uni-app x Vapor 的 Android/iOS App |
@@ -38,19 +40,7 @@ Levixel 是一套强调原生手感的共享转场图片与视频查看器，支
 
 最低支持 Android API 21。
 
-在依赖仓库中加入 Maven Central 与 JitPack：
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
-```
-
-使用 Maven Central 页面显示的最新稳定版本：
+通过 Maven Central 安装，版本以对应渠道显示的最新稳定版本为准：
 
 ```kotlin
 dependencies {
@@ -58,46 +48,7 @@ dependencies {
 }
 ```
 
-Android 查看器使用由 JitPack 分发的 PhotoView 实现图片缩放和平移，因此项目需要保留 JitPack 仓库。
-
-最小打开方式：
-
-```java
-LevixelMediaItem item = new LevixelMediaItem(
-        "cover",
-        LevixelMediaItem.MediaType.IMAGE,
-        fullImageUrl,
-        thumbnailUrl
-);
-
-List<LevixelMediaItem> items = Collections.singletonList(item);
-String galleryId = "article-gallery";
-LevixelSourceViewRegistry.register(
-        LevixelSharedElementNames.forItem(galleryId, item),
-        sourceImageView
-);
-
-LevixelViewerOverlayView viewer = new LevixelViewerOverlayView(
-        context,
-        items,
-        0,
-        false,
-        galleryId,
-        null
-);
-rootView.addView(viewer);
-```
-
-动态或可复用列表中，每项都应保持唯一、稳定的媒体 `id`，并用同一个
-`galleryId` 注册当前可见的 `ImageView`。cell 重新绑定前先调用
-`LevixelSourceViewRegistry.unregisterView(imageView)`，再以新媒体身份注册。
-查看器会复制打开时的媒体数组作为会话快照；关闭时按稳定 ID 查找最新注册且
-可见的源视图，源已卸载时采用淡出，不会回到同下标的其他 cell。
-圆角源可使用 `register(key, imageView, cornerRadiusPx)` 重载，以物理像素传入与
-可见裁剪一致的统一圆角；当源只剩部分区域位于有效视口内时，转场会保留真实
-交集并取消圆角，避免把列表裁剪边界误画成圆角。
-
-为获得完整的系统栏转场效果，宿主页面应采用 edge-to-edge，并将系统返回事件交给 `viewer.requestClose()`。
+仓库配置、打开查看器、动态列表源绑定、长按操作与事件控制见 [Android 接入说明](native/android/README.md)。
 
 ## iOS
 
@@ -111,29 +62,7 @@ https://github.com/sandroxy/levixel.git
 
 依赖规则推荐选择 **Up to Next Major Version**，并以 [GitHub Releases](https://github.com/sandroxy/levixel/releases) 中显示的最新稳定版本作为最低版本；Xcode 会在同一主版本范围内解析兼容更新。需要完全锁定依赖时选择 **Exact Version**。随后把 `Levixel` 产品链接到 App target。
 
-```swift
-import Levixel
-
-let items: [LevixelMediaItem] = [
-    .imageURL(fullImageURL, thumbnailURL: thumbnailURL, placeholder: imageView.image),
-    .video(url: videoURL, poster: posterURL)
-]
-
-let dataSource = LevixelArrayDataSource(
-    items: items,
-    itemIdentifiers: ["cover", "video"]
-)
-imageView.setupLevixelViewer(
-    dataSource: dataSource,
-    initialIndex: 0,
-    configuration: LevixelViewerConfiguration(theme: .dark),
-    galleryId: "article-gallery"
-)
-```
-
-多项列表中，每个当前可见的源 `UIImageView` 都应使用同一个 `dataSource` 和 `galleryId`，并传入自身对应的 `initialIndex`。稳定 `itemIdentifiers` 用于在前插、删除或重排后找到正确回场源；数据顺序变化时应以最新快照重新配置当前可见 cell。可复用 cell 在重新绑定内容前应调用 `removeLevixelViewerInteraction()`。通常会直接读取 `UIImageView` 自身的裁剪圆角；若可见圆角实际由等尺寸的外层容器裁剪，则为该 cell 的 `LevixelViewerConfiguration.sourceCornerRadius` 提供同一数值。
-
-Swift Package 会验证下载的 XCFramework 与 `Package.swift` 中记录的 checksum 一致。
+媒体数据、源图绑定、长按操作与会话控制见 [iOS 接入说明](native/ios/README.md)。Swift Package 会验证下载文件与包清单中的校验和一致。
 
 ## HarmonyOS
 

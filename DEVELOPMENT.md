@@ -26,9 +26,19 @@ development dependencies, Android SDK, and Chrome. The script checks that Node.j
 provides the module hooks needed by the HarmonyOS tests and stops on any failure.
 
 `./scripts/test-native-ios-source.sh` separately runs iOS regression tests using
-Xcode and an available iPhone simulator. HarmonyOS component compilation requires
-DevEco; its command and the viewer API notes are in
-[the maintainer notes](docs/next-release.md#主仓本地验证).
+Xcode and an available iPhone simulator. `LevixelTestHost` supplies a real
+UIWindowScene to tests and is not part of the distributed framework.
+
+Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
+from `native/harmonyos`:
+
+```sh
+hvigorw assembleHar --mode module -p module=levixel@default -p product=default -p buildMode=debug
+```
+
+Supply `DEVECO_SDK_HOME` when the SDK is not at the tool's default location.
+Development framework and bridge outputs belong under ignored
+`dist/development/`; they are separate from release artifacts.
 
 These are source checks; release metadata and artifact-consumer verification use
 the entries documented below.
@@ -135,11 +145,11 @@ DCLOUD_UNIAPP_X_IOS_SDK_ROOT=/absolute/path/to/UniAppX-iOS \
   ./scripts/verify-uniapp-uts-compiler.sh
 ```
 
-The package command requires a clean worktree for a formal candidate. It builds into temporary storage first and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. Use `--allow-dirty` only for a local pipeline rehearsal; use `--replace` only after deliberately rejecting the previous local candidate, then repeat every artifact-only and device acceptance step.
+The package command requires a clean worktree for a formal candidate. It builds into temporary storage first and refuses to overwrite a different same-version ZIP, checksum sidecar, or Marketplace material. Use `--allow-dirty` only for a local pipeline rehearsal; use `--replace` only after deliberately rejecting the previous local candidate. Run automated acceptance for the replacement bytes and choose additional interaction checks based on the changed behavior, as described in [RELEASING.md](RELEASING.md).
 
 The UTS package builds only the DCloud-independent shared runtimes and embeds the accepted native core artifacts. Compiler verification requires the HBuilderX minimum declared in `uni_modules/Sandrox-Levixel/package.json` or newer. It generates classic/x Kotlin and Swift, then typechecks the x output against the extracted official SDKs; set `HBUILDERX_CONTENTS` when HBuilderX is installed elsewhere. No SDK absolute path is committed.
 
-The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only the classic and uni-app x Vapor Android/iOS targets declared in the plugin metadata are supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported by the UniApp package.** Every release candidate must pass both classic/x Android/iOS device matrices against its recorded SHA-256 before publication.
+The Marketplace ZIP root directly contains `package.json` and `utssdk/`. Install those exact contents under `uni_modules/Sandrox-Levixel/` in separate classic and uni-app x Vapor consumers. Classic may use a matching custom base, cloud package, or offline package. Android/iOS Vapor has no public offline SDK, so x App packaging and device acceptance must use HBuilderX standard run, a matching custom base, or cloud packaging. **Only the classic and uni-app x Vapor Android/iOS targets declared in the plugin metadata are supported; VDOM, nvue, HarmonyOS, mini apps, and Web are not supported by the UniApp package.** Artifact-consumer validation covers both classic/x Android/iOS combinations; manual interaction coverage follows [RELEASING.md](RELEASING.md#immutable-candidate-rule).
 
 The consumer matrix must include a prepend-style chat list, an append-style
 paginated list, a sparse virtualized source set, out-of-order bindings, and
@@ -223,17 +233,22 @@ published packages. Keep them focused on capabilities, installation, API usage,
 and compatibility. A short link to contributor documentation is enough for
 source builds and release procedures.
 
-Keep branch progress, local verification steps, and detailed unreleased API
-drafts in maintainer documentation such as [the next release notes](docs/next-release.md).
-Changelogs may summarize those changes under `Unreleased`. Do not add pending
-release banners or development appendices to public guides, and do not remove
-only the disclaimer while leaving an API unsupported by the published package.
+Each platform guide owns its detailed integration examples. The two landing
+pages summarize capabilities and link to those guides. Keep both languages in
+sync when changing that summary. Packaged guides must be usable without access
+to a development note; package-required license and provenance copies remain.
 
-For the compatible release, integrate reviewed additions into the normal API
-sections and publish the documentation with its matching artifacts. Follow the
+Keep temporary plans, review transcripts, device-session records, and release
+progress outside the tracked documentation. Changelogs may summarize changes
+under `Unreleased` during development. Durable build guidance belongs here;
+publication rules belong in [RELEASING.md](RELEASING.md). Do not create a second
+version-specific API guide or keep a completed draft after integrating it.
+
+Before packaging, check the actual APIs and examples, merge reviewed additions
+into the existing guides, and remove obsolete or duplicate prose. Do not merely
+remove an unpublished disclaimer. Follow the
 [documentation boundary](RELEASING.md#documentation-boundary), including version
-placement and consistency between the Chinese and English landing pages.
-`verify-documentation.sh` checks known wording regressions, links, and metadata;
-passing it does not replace reviewing the audience and accuracy of the prose.
+placement. `verify-documentation.sh` checks known wording regressions, links,
+and metadata; it does not replace reviewing the audience and accuracy of prose.
 
 The release procedure and signing requirements are documented in [RELEASING.md](RELEASING.md).

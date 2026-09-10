@@ -17,7 +17,7 @@ fi
 
 readmes=("$@")
 if [[ ${#readmes[@]} -eq 0 ]]; then
-  readmes=("${plugin_dir}/README.md" "${plugin_dir}/README-EN.md")
+  readmes=("${plugin_dir}/native/ios/README.md")
 fi
 for readme in "${readmes[@]}"; do
   if [[ ! -f "${readme}" ]]; then

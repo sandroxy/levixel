@@ -2,8 +2,6 @@
 
 ## 1.4.0
 
-Unreleased.
-
 - Adds configurable long-press actions, explicit list/grid layouts, optional list icons, grouped scrolling rows, and keyboard access.
 - Aligns the drawer palette and spacing with the native viewers, with animated opening and dismissal that respect reduced-motion preferences. Action callbacks run after the drawer closes.
 - Adds session-aware lifecycle and media-load events, visible retry, and `retryLevixel()`.

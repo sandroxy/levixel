@@ -188,12 +188,19 @@ commit; generating them does not require another manual approval record.
 
 User-facing landing pages and platform guides describe stable capabilities, installation, and compatibility without copying the current Levixel release number into prose. Exact versions belong in `plugin.yaml`, package manifests, changelogs, immutable release notes, artifact filenames, and generated publication material.
 
-Branch progress, local build and verification steps, and pending-release API
-drafts belong in maintainer documents. Public guides must not carry development
-announcements or unreleased API appendices, even with a disclaimer. Changelogs
-may retain an `Unreleased` section; legal notices and provenance retain their
-required attribution. Contributor links and integration requirements such as
-Expo development builds are appropriate in public guides.
+Detailed integration examples belong in the corresponding platform guide;
+landing pages summarize and link to them. Durable source-build and verification
+guidance belongs in DEVELOPMENT.md, and publication procedures belong here.
+Temporary plans, API drafts, review transcripts, personal device records, and
+branch progress do not belong in tracked documentation. Do not preserve them
+as a separate version-specific guide after their useful content has been merged.
+
+Public guides must not carry development announcements or unreleased API
+appendices, even with a disclaimer. Changelogs may retain an `Unreleased` section
+during development. Legal notices and provenance retain their required
+attribution; copies required inside published packages are intentional.
+Contributor links and integration requirements such as Expo development builds
+are appropriate in public guides.
 
 Before creating a tag, run:
 
@@ -214,12 +221,11 @@ entries.
 Post-release documentation corrections are normal commits on the default branch. They must not move an already published tag, replace an accepted release asset, or rebuild a public version. A registry README embedded in an immutable artifact remains the historical copy shipped with that artifact; editable landing pages may link to the current guide.
 
 The root README files and public platform guides must match the published
-packages they install. Keep detailed new API examples in maintainer documentation
-until preparing the compatible release. As part of that release, integrate the
-reviewed content into the normal API sections, update both landing-page languages,
-and ship the guides with their matching artifacts. Removing an unpublished
-disclaimer alone is not a documentation update. Review this boundary manually
-as well as running the wording checks.
+packages they install. When preparing a compatible release, integrate reviewed
+API additions into the normal platform sections, update both landing-page
+languages, remove the temporary draft, and ship the guides with their matching
+artifacts. Removing an unpublished disclaimer alone is not a documentation
+update. Review this boundary manually as well as running the wording checks.
 
 ## Canonical Git Tag
 

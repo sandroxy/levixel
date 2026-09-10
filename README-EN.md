@@ -19,14 +19,16 @@ The interaction direction draws inspiration from the media-centered direct manip
 - Pinch zoom, zoomed panning, and double-tap reset
 - Drag dismissal while the image is not zoomed, plus tap dismissal and system back handling
 - Continuous handoff across thumbnails, loading states, original images, and video frames
+- Image and video long-press events with configurable list or grid action sheets
+- Session and loading events with media identity, visible failure controls, and programmatic retry
 - Published packages for Android, iOS, HarmonyOS, React Native, UniApp, and supported modern Web browsers
 
 ## Platforms and distribution
 
 | Platform | Recommended channel | Integration |
 | --- | --- | --- |
-| Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | Native AAR with an offline mirror on GitHub Releases |
-| iOS | [Swift Package](https://github.com/sandroxy/levixel) | Binary XCFramework protected by checksum verification |
+| Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | [Android guide](native/android/README.md), with an offline AAR mirror |
+| iOS | [Swift Package](https://github.com/sandroxy/levixel) | [iOS guide](native/ios/README.md), with checksum-verified XCFramework |
 | HarmonyOS | [OHPM](https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel) · `@sandrox/levixel` | Native HAR with an offline mirror on GitHub Releases |
 | React Native / Expo | [npm](https://www.npmjs.com/package/@sandrox/levixel) · `@sandrox/levixel` | React Native components with the required Android/iOS native runtimes included |
 | UniApp | [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) | Classic uni-app and uni-app x Vapor Android/iOS Apps |
@@ -38,19 +40,7 @@ See [GitHub Releases](https://github.com/sandroxy/levixel/releases) and [CHANGEL
 
 The minimum supported Android version is API 21.
 
-Make Maven Central and JitPack available to dependency resolution:
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
-```
-
-Use the latest stable version shown by Maven Central:
+Install through Maven Central using the latest stable version shown by that channel:
 
 ```kotlin
 dependencies {
@@ -58,49 +48,7 @@ dependencies {
 }
 ```
 
-The Android viewer uses PhotoView from JitPack for image zooming and panning, so the project must keep JitPack available.
-
-Minimal viewer setup:
-
-```java
-LevixelMediaItem item = new LevixelMediaItem(
-        "cover",
-        LevixelMediaItem.MediaType.IMAGE,
-        fullImageUrl,
-        thumbnailUrl
-);
-
-List<LevixelMediaItem> items = Collections.singletonList(item);
-String galleryId = "article-gallery";
-LevixelSourceViewRegistry.register(
-        LevixelSharedElementNames.forItem(galleryId, item),
-        sourceImageView
-);
-
-LevixelViewerOverlayView viewer = new LevixelViewerOverlayView(
-        context,
-        items,
-        0,
-        false,
-        galleryId,
-        null
-);
-rootView.addView(viewer);
-```
-
-In a dynamic or reusable list, keep every media `id` unique and stable, and
-register each currently visible `ImageView` under the same `galleryId`. Before
-rebinding a cell, call `LevixelSourceViewRegistry.unregisterView(imageView)`,
-then register it for the new media identity. The viewer copies the media array
-it opens with as its session snapshot; dismissal resolves the latest visible
-registered source by stable ID and fades when that source is unmounted instead
-of returning to a different cell at the same index.
-For a rounded source, use the `register(key, imageView, cornerRadiusPx)`
-overload with the uniform visible clipping radius in physical pixels. If only
-part of the source intersects the effective viewport, the transition preserves
-that real intersection and drops the radius instead of rounding a list clip.
-
-For complete system-bar transitions, use an edge-to-edge host and route system back events to `viewer.requestClose()`.
+See the [Android guide](native/android/README.md) for repository setup, opening a viewer, dynamic source binding, long-press actions, and events.
 
 ## iOS
 
@@ -114,29 +62,7 @@ https://github.com/sandroxy/levixel.git
 
 Use **Up to Next Major Version** with the latest stable release shown on [GitHub Releases](https://github.com/sandroxy/levixel/releases) as the lower bound; Xcode will resolve compatible updates within that major version. Use **Exact Version** when the application must pin one release exactly. Then link the `Levixel` product to the app target.
 
-```swift
-import Levixel
-
-let items: [LevixelMediaItem] = [
-    .imageURL(fullImageURL, thumbnailURL: thumbnailURL, placeholder: imageView.image),
-    .video(url: videoURL, poster: posterURL)
-]
-
-let dataSource = LevixelArrayDataSource(
-    items: items,
-    itemIdentifiers: ["cover", "video"]
-)
-imageView.setupLevixelViewer(
-    dataSource: dataSource,
-    initialIndex: 0,
-    configuration: LevixelViewerConfiguration(theme: .dark),
-    galleryId: "article-gallery"
-)
-```
-
-For a multi-item list, configure every currently visible source `UIImageView` with the same `dataSource` and `galleryId`, using that source's own `initialIndex`. Stable `itemIdentifiers` keep return anchors correct across prepends, removals, and reordering; reconfigure visible cells from the latest snapshot when data order changes. Call `removeLevixelViewerInteraction()` before a reusable cell is rebound to different content. Levixel normally reads clipping radius from the `UIImageView`; when an equal-sized outer container owns the visible clipping instead, give that cell's `LevixelViewerConfiguration.sourceCornerRadius` the same value.
-
-The Swift Package verifies the downloaded XCFramework against the checksum recorded in `Package.swift`.
+See the [iOS guide](native/ios/README.md) for media data, source binding, long-press actions, and session control. Swift Package Manager verifies the download against the checksum recorded in the package manifest.
 
 ## HarmonyOS
 

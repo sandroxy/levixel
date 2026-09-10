@@ -25,13 +25,15 @@ supplied by the host application.
 
 ```ts
 import {
+  LevixelAction,
   LevixelController,
   LevixelMediaItem,
   LevixelMediaType,
   LevixelSource,
   LevixelSourceImageFit,
   LevixelSourceViewport,
-  LevixelViewer
+  LevixelViewer,
+  LevixelViewerEvent
 } from '@sandrox/levixel';
 
 @Entry
@@ -50,9 +52,25 @@ struct GalleryPage {
     }
   ];
 
+  private readonly actions: LevixelAction[] = [
+    {
+      id: 'inspect', label: 'View details',
+      onPress: (event: LevixelViewerEvent): void => {
+        console.info(`Selected media: ${event.payload.itemId}`);
+      }
+    }
+  ];
+
+  onBackPress(): boolean {
+    return this.viewer.handleBack();
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      LevixelViewer({ controller: this.viewer, items: this.items }) {
+      LevixelViewer({
+        controller: this.viewer, items: this.items,
+        actions: this.actions, actionLayout: 'list'
+      }) {
         Column() {
           Row() {
             Text('Photos')
@@ -165,35 +183,66 @@ provide `navigationTitle`, pass the window's top safe-area inset through
 ## Actions and viewer events
 
 `LevixelViewer` and `LevixelGallery` accept an `actions: LevixelAction[]` array.
-Each action has a unique, non-blank `id` and `label`, with optional `icon`,
-`group`, `disabled`, `destructive`, and `onPress` fields. Actions and their
-callbacks are snapshotted when the viewer opens.
+Actions and their callbacks are captured when the viewer opens.
 
-Set `actionLayout` explicitly to `'list'` or `'grid'`; the default is `'list'`
-and the number of actions does not change the layout. List icons are optional
-and hidden unless `actionListIcons` is `true`. Grid actions require an `icon`
-URL. Each distinct `group` forms a separate horizontal row in the grid, in
-first-appearance order. Long menus scroll while Cancel remains available.
+| Action field | Meaning |
+| --- | --- |
+| `id` | Unique, non-blank action identifier |
+| `label` | Non-blank text, displayed on up to two lines |
+| `icon` | Image URI; optional for a list, required for a grid |
+| `group` | Optional non-blank group; omitted actions share the default group |
+| `disabled` | Defaults to `false`; prevents selection and callbacks |
+| `destructive` | Defaults to `false`; danger styling, without business confirmation |
+| `onPress` | Optional callback receiving a `LevixelViewerEvent` |
 
-A long press emits `longPress`. When `actions` is non-empty, it also opens a
-system bottom sheet above the viewer. An empty array keeps only the event.
-Selecting an enabled action dismisses the sheet before emitting `action`
-and calling that action's `onPress`. The host implements the business operation.
+`actionLayout` defaults to `'list'`, independent of the action count. List icons
+are hidden unless `actionListIcons` is `true`; missing icons then keep an aligned
+empty space. `'grid'` always displays icons and rejects an action without one.
+A failed icon load uses a neutral placeholder.
 
-Use the component's `onEvent` callback or `controller.onEvent(listener)` to
-receive `LevixelViewerEvent` values. The controller subscription returns a
-function that removes the listener. Event types are `opened`, `indexChange`,
-`dismiss`, `longPress`, `action`, `mediaLoad`, and `mediaError`.
-Each event includes `type`, `time`, and a `payload` identifying the session,
-media item, media type, and index. An action adds `actionId`; a load failure
-adds `code` and `message`.
+Groups and their actions keep first-appearance order. List groups are separated;
+each grid group becomes a horizontally scrollable row. Tall content scrolls
+while Cancel stays available. Labels follow system font scaling.
+
+Images and videos recognize long press, excluding playback controls and retry
+buttons. Movement and multi-touch cancel recognition. A long press emits
+`longPress`; non-empty `actions` also opens a system sheet above the viewer.
+An empty array keeps only the event. Selection dismisses the sheet before
+emitting `action` and calling `onPress`, leaving the viewer open. The host owns
+saving, sharing, navigation, and any permissions required by those operations.
+
+Use the component's `onEvent` or `controller.onEvent(listener)` to receive
+`LevixelViewerEvent` values. The controller subscription returns a function
+that removes the listener. If these handlers and `onPress` are all installed,
+execute each business operation in only one place.
+
+Events include `type`, `time` (Unix milliseconds), and `payload`. Media context
+contains `sessionId`, `galleryId`, `index`, `itemId`, and `mediaType`.
+
+| Event | When it fires |
+| --- | --- |
+| `opened` | The opening transition has finished |
+| `longPress` | Long press is recognized, before any sheet opens |
+| `indexChange` | The page changes; also includes `currentIndex` |
+| `mediaLoad` | The full image is decoded or the video first frame is ready |
+| `mediaError` | Loading failed; includes `code: LOAD_FAILED` and `message` |
+| `action` | The sheet has closed after selection; includes `actionId` |
+| `dismiss` | The session ends, with its final current media context |
+
+Media events can arrive before `opened` or concern an adjacent preloaded page;
+use `itemId` rather than assuming all events describe the current page.
+Thumbnails and posters do not count as a successful full-media load.
+`sessionId` identifies one opening; `index` belongs to its opening snapshot,
+not a later host array. Changed actions and media apply to the next open.
 
 `controller.close()` closes the viewer after dismissing an open action sheet.
 Forward the page's `onBackPress()`
 to `controller.handleBack()`: it dismisses an open sheet first, then the
 viewer, and returns whether it handled the request. `controller.retry()`
-retries the current failed item and returns whether a retry started; the
-viewer also displays a retry button after a media load failure.
+retries the current failed item and returns whether a retry started. It keeps
+the session and does not repeat an active load or retry an ended session.
+The viewer also displays a retry button after a media load failure. Cancel and
+the sheet backdrop leave the viewer open.
 
 Images support pinch zoom, double-tap zoom, and panning within the image
 bounds. Paging and vertical drag dismissal resume at the base zoom scale.
