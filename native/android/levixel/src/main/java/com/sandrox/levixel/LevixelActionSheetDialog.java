@@ -1,6 +1,8 @@
 package com.sandrox.levixel;
 
 import android.content.Context;
+import android.os.Build;
+import android.view.Window;
 import androidx.annotation.Nullable;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -38,6 +40,15 @@ final class LevixelActionSheetDialog extends BottomSheetDialog {
             completions.clear();
             for (Runnable callback : callbacks) callback.run();
         });
+    }
+
+    @Override public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Window window = getWindow();
+        if (window != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Keep the sheet surface visible beneath the transparent navigation bar.
+            window.setNavigationBarContrastEnforced(false);
+        }
     }
 
     @Override public void cancel() {
