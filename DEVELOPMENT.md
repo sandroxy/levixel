@@ -28,6 +28,10 @@ provides the module hooks needed by the HarmonyOS tests and stops on any failure
 `./scripts/test-native-ios-source.sh` separately runs iOS regression tests using
 Xcode and an available iPhone simulator. `LevixelTestHost` supplies a real
 UIWindowScene to tests and is not part of the distributed framework.
+The command reuses `dist/development/ios-source-tests/DerivedData` and replaces
+`dist/development/ios-source-tests/latest.xcresult` on each run. Run this entry
+serially; retain any needed result bundle before starting another run. Failed
+test results remain available at the same path for diagnosis.
 
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:
@@ -37,11 +41,36 @@ hvigorw assembleHar --mode module -p module=levixel@default -p product=default -
 ```
 
 Supply `DEVECO_SDK_HOME` when the SDK is not at the tool's default location.
-Development framework and bridge outputs belong under ignored
-`dist/development/`; they are separate from release artifacts.
+Local source diagnostics belong under ignored `dist/development/`, separate
+from release artifacts. Reuse a fixed output location for each build target
+instead of creating another DerivedData directory for each issue or review.
 
 These are source checks; release metadata and artifact-consumer verification use
 the entries documented below.
+
+### Interactive development and output ownership
+
+Use the separate `integrated-plugins` checkout's existing development entry for
+RN and UniApp integration work; do not create another consumer with its own
+dependencies, Pods and native projects inside this repository. For example:
+
+```sh
+ruby /absolute/path/to/integrated-plugins/development/run.rb \
+  --plugin levixel --target react-native-ios \
+  --source /absolute/path/to/levixel --ios-sdk iphonesimulator --build
+```
+
+That entry prints the persistent consumer location and keeps source development
+separate from candidate acceptance. Other targets and options are listed by its
+`--help`. Keep plugin implementation and source unit tests here; consumer hosts
+remain owned by the test repository.
+
+Retire obsolete local consumers, build directories and diagnostic exports only
+after confirming they are no longer needed. Build caches are regenerable;
+historical test results and temporary host edits are not. Limit cleanup to the
+explicit development paths: do not clear all of `dist/`, release artifacts,
+candidate manifests or acceptance records. Release packaging and its clean-build
+and artifact-reuse rules remain separate from development cache management.
 
 ## Repository layout
 
