@@ -1,6 +1,6 @@
 {
   "name": "@sandrox/levixel",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Shared-transition image and video viewer for HarmonyOS.",
   "main": "Index.ets",
   "author": {

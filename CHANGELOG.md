@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 - 2026-09-14
+
+- Fixes intermittent unresponsive image and video thumbnail taps in React Native Android when image loaders such as expo-image replace their internal image views after asynchronous loading or cache changes.
+- Keeps Android transition sources and thumbnail visibility aligned through image replacement, paging, source recycling, and dismissal, restoring each source's original opacity.
+- Preserves existing integration APIs and supported platforms.
+
 ## 1.4.0 - 2026-09-10
 
 - Adds long-press events and a viewer-owned action drawer for images and videos, with explicit list/grid layouts, optional list icons, groups, and arbitrary business callbacks.

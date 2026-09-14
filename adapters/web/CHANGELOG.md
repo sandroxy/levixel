@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Aligns the package version with the coordinated patch release. Web runtime behavior and APIs are unchanged.
+
 ## 1.4.0
 
 - Adds configurable long-press actions, explicit list/grid layouts, optional list icons, grouped scrolling rows, and keyboard access.

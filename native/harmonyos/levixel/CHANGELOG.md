@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1 - 2026-09-14
+
+- Aligns the package version with the coordinated patch release. HarmonyOS runtime behavior and APIs are unchanged.
+
 ## 1.4.0 - 2026-09-10
 
 - Adds long-press events and a native action drawer with configurable groups and callbacks.
