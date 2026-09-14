@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import com.sandrox.levixel.LevixelAction
@@ -15,7 +14,6 @@ import com.sandrox.levixel.LevixelActionLayout
 import com.sandrox.levixel.LevixelViewerEvent
 import com.sandrox.levixel.LevixelMediaItem
 import com.sandrox.levixel.LevixelSharedElementNames
-import com.sandrox.levixel.LevixelSourceViewRegistry
 import com.sandrox.levixel.LevixelViewerOverlayView
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.Promise
@@ -47,10 +45,9 @@ class LevixelView(context: Context) : ViewGroup(context) {
     val onSourcePress by EventDispatcher()
     val onViewerEvent by EventDispatcher()
 
-    private var sourceImageView: ImageView? = null
-    private var observedSourceImageView: ImageView? = null
-    private var sourceImageLayoutListener: View.OnLayoutChangeListener? = null
-    private var sourceImageAttachListener: View.OnAttachStateChangeListener? = null
+    private val sourceBinding = LevixelSourceBinding(this) { itemId ->
+        onSourcePress(mapOf("itemId" to itemId))
+    }
     private var overlayView: LevixelViewerOverlayView? = null
     private var overlayBackCallback: OnBackPressedCallback? = null
     private var activeRequestId: String? = null
@@ -67,8 +64,8 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     override fun onViewRemoved(child: View) {
-        unregisterSourceImageView()
         super.onViewRemoved(child)
+        sourceBinding.refresh()
         post { refreshBinding() }
     }
 
@@ -85,7 +82,6 @@ class LevixelView(context: Context) : ViewGroup(context) {
         activeRequestId = null
         overlayBackCallback?.remove()
         overlayBackCallback = null
-        unregisterSourceImageView()
         // The decor may be detaching its children, including this controller.
         // Remove a surviving overlay only after that traversal has completed.
         if (overlay != null) {
@@ -95,25 +91,12 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     private fun refreshBinding() {
-        val mediaItems = buildMediaItems()
-        val imageView = findBestImageView(this)
-        if (imageView == null || mediaItems.isEmpty()) {
-            unregisterSourceImageView()
-            return
-        }
-
-        val previous = sourceImageView
-        if (previous != null && previous !== imageView) {
-            clearSourceImageObserver()
-            previous.setOnClickListener(null)
-            LevixelSourceViewRegistry.unregisterView(previous)
-        }
-
-        sourceImageView = imageView
-        imageView.setOnClickListener {
-            buildMediaItems().getOrNull(initialIndex)?.let { item -> onSourcePress(mapOf("itemId" to item.id)) }
-        }
-        registerSourceImageViewWhenReady(imageView, mediaItems)
+        val item = buildMediaItems().getOrNull(initialIndex)
+        sourceBinding.update(
+            item?.let { LevixelSharedElementNames.forItem(scopedGalleryId(), it) },
+            item?.id,
+            sourceCornerRadiusInPixels()
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -213,125 +196,6 @@ class LevixelView(context: Context) : ViewGroup(context) {
             mediaItems.add(mediaItem)
         }
         return mediaItems
-    }
-
-    private fun registerSourceImageViewWhenReady(
-        imageView: ImageView,
-        mediaItems: List<LevixelMediaItem> = buildMediaItems()
-    ) {
-        if (mediaItems.isEmpty()) {
-            if (sourceImageView === imageView) {
-                unregisterSourceImageView()
-            }
-            return
-        }
-        val safeIndex = initialIndex.coerceIn(0, mediaItems.lastIndex)
-        val sourceKey = LevixelSharedElementNames.forItem(scopedGalleryId(), mediaItems[safeIndex])
-        if (isSourceImageViewUsable(imageView)) {
-            clearSourceImageObserver(imageView)
-            LevixelSourceViewRegistry.register(
-                sourceKey,
-                imageView,
-                sourceCornerRadiusInPixels()
-            )
-        } else {
-            observeSourceImageView(imageView)
-        }
-    }
-
-    private fun observeSourceImageView(imageView: ImageView) {
-        if (observedSourceImageView === imageView && sourceImageLayoutListener != null) {
-            return
-        }
-
-        clearSourceImageObserver()
-        observedSourceImageView = imageView
-        val layoutListener = View.OnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            val observed = view as? ImageView ?: return@OnLayoutChangeListener
-            if (sourceImageView !== observed) {
-                clearSourceImageObserver(observed)
-            } else if (isSourceImageViewUsable(observed)) {
-                registerSourceImageViewWhenReady(observed)
-            }
-        }
-        val attachListener = object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(view: View) {
-                val observed = view as? ImageView ?: return
-                if (sourceImageView === observed) {
-                    registerSourceImageViewWhenReady(observed)
-                }
-            }
-
-            override fun onViewDetachedFromWindow(view: View) = Unit
-        }
-        sourceImageLayoutListener = layoutListener
-        sourceImageAttachListener = attachListener
-        imageView.addOnLayoutChangeListener(layoutListener)
-        imageView.addOnAttachStateChangeListener(attachListener)
-        imageView.post {
-            if (sourceImageView === imageView && isSourceImageViewUsable(imageView)) {
-                registerSourceImageViewWhenReady(imageView)
-            }
-        }
-    }
-
-    private fun findBestImageView(root: View): ImageView? {
-        var bestImageView: ImageView? = null
-        var bestScore = Int.MIN_VALUE
-
-        fun visit(candidate: View) {
-            if (candidate is ImageView) {
-                val score = sourceImageViewScore(candidate)
-                if (score > bestScore) {
-                    bestImageView = candidate
-                    bestScore = score
-                }
-            }
-            if (candidate is ViewGroup) {
-                for (index in 0 until candidate.childCount) {
-                    visit(candidate.getChildAt(index))
-                }
-            }
-        }
-
-        visit(root)
-        return bestImageView
-    }
-
-    private fun sourceImageViewScore(imageView: ImageView): Int {
-        var score = 0
-        if (imageView.isAttachedToWindow) score += 16
-        if (imageView.width > 0 && imageView.height > 0) score += 16
-        if (imageView.visibility == View.VISIBLE) score += 16
-        if (imageView.isShown) score += 16
-        if (imageView.drawable != null) score += 8
-        if (imageView === sourceImageView) score += 1
-        return score
-    }
-
-    private fun isSourceImageViewUsable(imageView: ImageView): Boolean {
-        return imageView.isAttachedToWindow && imageView.width > 0 && imageView.height > 0
-    }
-
-    private fun clearSourceImageObserver(imageView: ImageView? = null) {
-        val observed = observedSourceImageView ?: return
-        if (imageView != null && observed !== imageView) {
-            return
-        }
-        sourceImageLayoutListener?.let(observed::removeOnLayoutChangeListener)
-        sourceImageAttachListener?.let(observed::removeOnAttachStateChangeListener)
-        sourceImageLayoutListener = null
-        sourceImageAttachListener = null
-        observedSourceImageView = null
-    }
-
-    private fun unregisterSourceImageView() {
-        clearSourceImageObserver()
-        sourceImageView?.let { imageView ->
-            imageView.setOnClickListener(null)
-            LevixelSourceViewRegistry.unregisterView(imageView)
-        }
-        sourceImageView = null
     }
 
     private fun scopedGalleryId(): String? = galleryId.takeIf(String::isNotBlank)

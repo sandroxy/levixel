@@ -74,8 +74,8 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     @Nullable
     private LevixelViewerPageView dragPageView;
     @Nullable
-    private ImageView hiddenActiveSourceView;
-    private float hiddenActiveSourcePreviousAlpha = 1f;
+    private LevixelSourceViewRegistry.HiddenSource hiddenActiveSource;
+    private String hiddenActiveSourceKey;
     private boolean closing;
     private boolean openingTransitionStarted;
     private long openTransitionWaitStartedAt;
@@ -521,8 +521,11 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                 ? effectivePageState.getGeometry()
                 : defaultOpenGeometryFromSource(sourceState, overlayBounds, pageView, fallbackDrawable);
 
+        hideActiveSourceViewForCurrentIndex();
+        // The media-key lease owns source visibility across loading, paging,
+        // transitions and source replacement; the animator only draws snapshots.
         transitionController.performOpenTransition(
-                sourceView,
+                null,
                 sourceState,
                 targetGeometry,
                 () -> finishOpenTransition(pageView)
@@ -608,7 +611,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         transitionController.performCloseTransition(
                 pageState,
                 targetGeometry,
-                targetView,
+                null,
                 () -> {
                     restoreHiddenActiveSourceView();
                     finishWithoutAnimation();
@@ -847,26 +850,21 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     }
 
     private void hideActiveSourceViewForCurrentIndex() {
-        if (!contentPresented || closing) {
+        if (!openingTransitionStarted || closing || finished) {
             return;
         }
-        ImageView sourceView = sourceViewForIndex(currentIndex);
-        if (hiddenActiveSourceView != sourceView) {
+        String key = LevixelSharedElementNames.forItem(galleryId, items.get(currentIndex));
+        if (!key.equals(hiddenActiveSourceKey)) {
             restoreHiddenActiveSourceView();
-            hiddenActiveSourcePreviousAlpha = sourceView != null ? sourceView.getAlpha() : 1f;
-            hiddenActiveSourceView = sourceView;
-        }
-        if (sourceView != null) {
-            sourceView.setAlpha(0f);
+            hiddenActiveSourceKey = key;
+            hiddenActiveSource = LevixelSourceViewRegistry.hide(key);
         }
     }
 
     private void restoreHiddenActiveSourceView() {
-        if (hiddenActiveSourceView != null) {
-            hiddenActiveSourceView.setAlpha(hiddenActiveSourcePreviousAlpha);
-        }
-        hiddenActiveSourceView = null;
-        hiddenActiveSourcePreviousAlpha = 1f;
+        if (hiddenActiveSource != null) hiddenActiveSource.close();
+        hiddenActiveSource = null;
+        hiddenActiveSourceKey = null;
     }
 
     private void ensureVelocityTracker() {

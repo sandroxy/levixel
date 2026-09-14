@@ -154,6 +154,12 @@ Artifact-consumer coverage must render sources by `itemId`, then prepend,
 append, reorder, and recycle mounted cells before reopening. TypeScript
 component compilation is required in addition to the pure contract test.
 
+After preparing the RN Android host through the development entry above, run
+`./gradlew :sandrox-levixel:testDebugUnitTest` from its `host/android` directory
+for the adapter's source-binding regressions. These cover asynchronous drawable
+arrival, internal image swaps, source identity reuse, and cancelled taps. Android
+core tests separately cover thumbnail hiding through paging and dismissal.
+
 ## UniApp
 
 The public UTS plugin source root is `uni_modules/Sandrox-Levixel`; the DCloud-independent Android/iOS runtimes and the legacy bridges remain under `adapters/uniapp`. `adapters/uniapp/js_sdk/index.js` is the only hand-maintained canonical JavaScript SDK. After changing it, regenerate the checked-in plugin copy and review the resulting diff:
