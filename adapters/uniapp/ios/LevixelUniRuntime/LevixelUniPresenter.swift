@@ -7,7 +7,10 @@ private final class LevixelUniSession {
     let request: LevixelUniOpenRequest
     let dataSource: LevixelArrayDataSource
     let anchorHost: UIView
-    let anchors: [UIImageView?]
+    var anchors: [UIImageView?]
+    var sourceIds: [String?]
+    var sourceRevision = 0
+    weak var viewportView: UIView?
 
     var viewerSession: LevixelViewerSession?
     var lastContext: [String: Any] = [:]
@@ -20,13 +23,16 @@ private final class LevixelUniSession {
         request: LevixelUniOpenRequest,
         dataSource: LevixelArrayDataSource,
         anchorHost: UIView,
-        anchors: [UIImageView?]
+        anchors: [UIImageView?],
+        viewportView: UIView
     ) {
         self.galleryId = galleryId
         self.request = request
         self.dataSource = dataSource
         self.anchorHost = anchorHost
         self.anchors = anchors
+        self.sourceIds = request.sourceIds
+        self.viewportView = viewportView
         currentIndex = request.initialIndex
     }
 
@@ -136,6 +142,81 @@ public final class LevixelUniPresenter: NSObject {
                 completion(self.jsonString(result))
             }
         }
+    }
+
+    @objc(updateSourcesWithJSON:completion:)
+    public func updateSourcesJSON(_ optionsJSON: String, completion: @escaping (String) -> Void) {
+        performOnMain { [weak self] in
+            guard let self else { return }
+            guard let data = optionsJSON.data(using: .utf8),
+                let options = try? JSONSerialization.jsonObject(with: data) else {
+                completion(self.jsonString(self.error(code: "INVALID_JSON", path: "$", message: "Request must be a valid JSON object")))
+                return
+            }
+            self.updateSources(options: options) { completion(self.jsonString($0)) }
+        }
+    }
+
+    @objc(updateSourcesWithOptions:completion:)
+    public func updateSources(options: Any?, completion: @escaping (NSDictionary) -> Void) {
+        precondition(Thread.isMainThread)
+        guard let session = activeSession, let viewportView = session.viewportView,
+            let window = session.anchorHost.window else {
+            completion(ok(data: ["updated": false])); return
+        }
+        do {
+            guard try LevixelUniContract.sourceUpdateGalleryId(options) == session.galleryId else {
+                completion(ok(data: ["updated": false])); return
+            }
+            let update = try LevixelUniContract.parseSourceUpdate(options, itemCount: session.request.items.count)
+            guard update.galleryId == session.galleryId, update.revision > session.sourceRevision else {
+                completion(ok(data: ["updated": false])); return
+            }
+            let previousSourceId = session.sourceIds[session.currentIndex]
+            let sourceViewport = LevixelUniSourceViewport.resolve(rootView: viewportView, window: window)
+            for index in session.request.items.indices {
+                let hint = update.sourceHints[index]
+                let previous = session.anchors[index]
+                if let hint, let previous, update.sourceIds[index] == session.sourceIds[index],
+                    updateAnchor(previous, hint: hint, sourceViewport: sourceViewport, window: window) {
+                    continue
+                }
+                previous?.unregisterLevixelSource()
+                previous?.superview?.removeFromSuperview()
+                session.anchors[index] = nil
+                if let hint, let anchor = makeAnchor(hint: hint,
+                    image: previous?.image ?? imagePipeline.immediateImage(for: session.request.items[index].transitionURL),
+                    host: session.anchorHost, sourceViewport: sourceViewport, window: window) {
+                    anchor.registerLevixelSource(galleryId: session.galleryId, itemIdentifier: session.request.items[index].id)
+                    session.anchors[index] = anchor
+                }
+            }
+            session.sourceIds = update.sourceIds
+            session.sourceRevision = update.revision
+            if session.request.hidesHTMLSource, previousSourceId != session.sourceIds[session.currentIndex] {
+                emitSourceVisibility(hidden: false, index: session.currentIndex, session: session, sourceId: previousSourceId)
+                emitSourceVisibility(hidden: true, index: session.currentIndex, session: session)
+            }
+            startDeferredPreviewLoads(request: session.request, anchors: session.anchors)
+            completion(ok(data: ["updated": true]))
+        } catch let failure as LevixelUniContractError {
+            completion(error(code: failure.code, path: failure.path, message: failure.message))
+        } catch {
+            completion(self.error(code: "INVALID_REQUEST", path: "$", message: "Unable to validate source update"))
+        }
+    }
+
+    private func updateAnchor(_ anchor: UIImageView, hint: LevixelUniSourceHint,
+        sourceViewport: LevixelUniSourceViewport, window: UIWindow) -> Bool {
+        let frame = sourceViewport.frameInWindow(for: hint)
+        guard let clip = sourceViewport.clippingFrameInWindow(for: hint, window: window),
+            LevixelUniSourceGeometry.positiveIntersection(frame, clip) != nil,
+            let clippingView = anchor.superview, let host = clippingView.superview else { return false }
+        clippingView.frame = host.convert(clip, from: nil)
+        anchor.frame = clippingView.convert(frame, from: nil)
+        anchor.contentMode = hint.objectFit.contentMode
+        anchor.layer.cornerRadius = hint.cornerRadius * hint.rectScale
+        return true
     }
 
     @objc(setJSONEventHandler:)
@@ -366,7 +447,8 @@ public final class LevixelUniPresenter: NSObject {
             request: request,
             dataSource: dataSource,
             anchorHost: host,
-            anchors: anchors
+            anchors: anchors,
+            viewportView: viewportView
         )
 
         var configuration = LevixelViewerConfiguration(
@@ -589,12 +671,14 @@ public final class LevixelUniPresenter: NSObject {
         index: Int,
         session: LevixelUniSession
     ) {
-        emit(type: "sourceVisibilityChange", payload: [
-            "hidden": hidden,
-            "index": index,
-            "itemId": session.request.items[index].id,
-            "galleryId": session.galleryId,
-        ])
+        emitSourceVisibility(hidden: hidden, index: index, session: session, sourceId: session.sourceIds[index])
+    }
+
+    private func emitSourceVisibility(hidden: Bool, index: Int, session: LevixelUniSession, sourceId: String?) {
+        var payload: [String: Any] = ["hidden": hidden, "index": index,
+            "itemId": session.request.items[index].id, "galleryId": session.galleryId]
+        if let sourceId { payload["sourceId"] = sourceId }
+        emit(type: "sourceVisibilityChange", payload: payload)
     }
 
     private func emit(type: String, payload: [String: Any]) {

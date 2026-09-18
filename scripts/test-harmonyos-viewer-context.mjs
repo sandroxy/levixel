@@ -82,10 +82,10 @@ loader.deregister();
 const frame = { left: 12, top: 80, width: 160, height: 120 };
 const viewport = { left: 0, top: 60, width: 390, height: 640 };
 
-function registerSource(context, itemId, { viewportId = '', hidden = [] } = {}) {
+function registerSource(context, itemId, { viewportId = '', hidden = [], sourceId = '' } = {}) {
   const registration = context.registerSource(
     itemId, viewportId, 14, LevixelSourceImageFit.COVER,
-    (value) => hidden.push(value),
+    (value) => hidden.push(value), sourceId,
   );
   return { ...registration, hidden };
 }
@@ -185,18 +185,54 @@ test('snapshot identities stay unique across viewers and remounted sources', () 
   assert.equal(new Set([first.snapshotId, second.snapshotId, remounted.snapshotId]).size, 3);
 });
 
-test('recycling may overlap registrations but rejects two visible sources for one item', () => {
+test('multiple sources retain the tapped instance across paging and sibling updates', () => {
   const context = new LevixelViewerContext();
-  const oldSource = mountSource(context, 'media-a');
-  const newSource = registerSource(context, 'media-a');
-  assert.equal(context.resolveSource('media-a').snapshotId, oldSource.snapshotId);
-  context.updateSourceFrame('media-a', newSource.registrationId, frame);
-  context.updateSourceVisibility('media-a', newSource.registrationId, true);
-  assert.throws(() => context.resolveSource('media-a'), /more than one visible mounted source/);
-  context.updateSourceVisibility('media-a', oldSource.registrationId, false);
-  assert.equal(context.resolveSource('media-a').snapshotId, newSource.snapshotId);
-  context.unregisterSource('media-a', oldSource.registrationId);
-  assert.equal(context.resolveSource('media-a').snapshotId, newSource.snapshotId);
+  const cover = mountSource(context, 'media-a', { sourceId: 'cover' });
+  const thumbnail = mountSource(context, 'media-a', { sourceId: 'thumbnail' });
+  const alternate = mountSource(context, 'media-a', { sourceId: 'alternate' });
+  const other = mountSource(context, 'media-b');
+  assert.equal(context.beginSourceSession('media-a', thumbnail.registrationId).snapshotId, thumbnail.snapshotId);
+  context.setHiddenSource('media-a');
+  assert.equal(cover.hidden.at(-1), false);
+  assert.equal(thumbnail.hidden.at(-1), true);
+  assert.equal(alternate.hidden.at(-1), false);
+  context.updateSourceConfiguration('media-a', cover.registrationId, '', 40, LevixelSourceImageFit.CONTAIN);
+  context.updateSourceFrame('media-a', thumbnail.registrationId, { ...frame, top: 100 });
+  context.setHiddenSource('media-b');
+  assert.equal(thumbnail.hidden.at(-1), false);
+  assert.equal(other.hidden.at(-1), true);
+  context.setHiddenSource('media-a');
+  assert.equal(context.resolveSource('media-a').snapshotId, thumbnail.snapshotId);
+  assert.equal(thumbnail.hidden.at(-1), true);
+  context.unregisterSource('media-a', thumbnail.registrationId);
+  assert.equal(context.resolveSource('media-a').snapshotId, cover.snapshotId);
+  assert.equal(thumbnail.hidden.at(-1), false);
+  assert.equal(cover.hidden.at(-1), true);
+  context.unregisterSource('media-a', cover.registrationId);
+  assert.equal(context.resolveSource('media-a').snapshotId, alternate.snapshotId);
+  context.unregisterSource('media-a', alternate.registrationId);
+  assert.equal(context.resolveSource('media-a'), null);
+  context.endSourceSession();
+  assert.equal(other.hidden.at(-1), false);
+});
+
+test('explicit source IDs are scoped to media and missing sources cannot borrow an opening anchor', () => {
+  const controller = new LevixelController();
+  const context = resolveLevixelContext(controller);
+  const cover = mountSource(context, 'media-a', { sourceId: 'cover' });
+  const thumbnail = mountSource(context, 'media-a', { sourceId: 'thumbnail' });
+  mountSource(context, 'media-b', { sourceId: 'thumbnail' });
+  assert.throws(() => mountSource(context, 'media-a', { sourceId: 'cover' }), /unique/);
+  const opened = [];
+  context.registerViewer((id, registrationId) => opened.push(context.beginSourceSession(id, registrationId)), () => {});
+  controller.open('media-a', 'thumbnail');
+  assert.equal(opened.at(-1).snapshotId, thumbnail.snapshotId);
+  controller.open('media-a', 'removed');
+  assert.equal(opened.at(-1), null);
+  // Later return may use a valid peer, in stable registration order.
+  assert.equal(context.resolveSource('media-a').snapshotId, cover.snapshotId);
+  context.updateSourceVisibility('media-a', cover.registrationId, false);
+  assert.equal(context.resolveSource('media-a').snapshotId, thumbnail.snapshotId);
 });
 
 test('stale or mismatched source callbacks cannot modify a replacement cell', () => {
@@ -258,8 +294,8 @@ test('hidden source follows media identity through registration, switching, and 
   context.setHiddenSource('media-a');
   assert.equal(first.hidden.at(-1), true);
   assert.equal(second.hidden.at(-1), false);
-  const replacement = registerSource(context, 'media-a');
-  assert.deepEqual(replacement.hidden, [true]);
+  const replacement = mountSource(context, 'media-a');
+  assert.deepEqual(replacement.hidden, [false]);
   const callbackCount = first.hidden.length;
   context.setHiddenSource('media-a');
   assert.equal(first.hidden.length, callbackCount);
@@ -373,17 +409,38 @@ test('public identifiers, image fit, and corner radius reject invalid values', (
   ), /imageFit must be/);
 });
 
-test('clipped or unmounted sources do not make a visible replacement ambiguous', () => {
+test('a clipped source becoming visible does not steal the selected replacement', () => {
   const context = new LevixelViewerContext();
   const viewportToken = context.registerViewport('messages');
   context.updateViewportFrame('messages', viewportToken, viewport);
   const clipped = mountSource(context, 'media-a', { viewportId: 'messages' });
   context.updateSourceFrame('media-a', clipped.registrationId, { ...frame, top: 700 });
-  mountSource(context, 'media-a', { viewportId: 'removed-viewport' });
+  const unmounted = mountSource(context, 'media-a', { viewportId: 'removed-viewport' });
   const current = mountSource(context, 'media-a', { viewportId: 'messages' });
-  assert.equal(context.resolveSource('media-a').snapshotId, current.snapshotId);
+  assert.equal(context.beginSourceSession('media-a', 0).snapshotId, current.snapshotId);
+  context.setHiddenSource('media-a');
+  assert.deepEqual(clipped.hidden, [false]);
+  assert.deepEqual(unmounted.hidden, [false]);
+  assert.deepEqual(current.hidden, [false, true]);
+
   context.updateSourceFrame('media-a', clipped.registrationId, { ...frame, top: 699.5 });
-  assert.throws(() => context.resolveSource('media-a'), /more than one visible mounted source/);
+  assert.equal(context.resolveSource('media-a').snapshotId, current.snapshotId);
+  assert.deepEqual(clipped.hidden, [false]);
+  assert.deepEqual(current.hidden, [false, true]);
+
+  context.setHiddenSource('');
+  context.setHiddenSource('media-a');
+  assert.equal(context.resolveSource('media-a').snapshotId, current.snapshotId);
+  assert.deepEqual(current.hidden, [false, true, false, true]);
+  assert.deepEqual(clipped.hidden, [false]);
+
+  context.unregisterSource('media-a', current.registrationId);
+  assert.equal(context.resolveSource('media-a').snapshotId, clipped.snapshotId);
+  assert.deepEqual(current.hidden, [false, true, false, true, false]);
+  assert.deepEqual(clipped.hidden, [false, true]);
+  assert.deepEqual(unmounted.hidden, [false]);
+  context.endSourceSession();
+  assert.deepEqual(clipped.hidden, [false, true, false]);
 });
 
 test('any positive viewport intersection is a source; touching an edge is not', () => {

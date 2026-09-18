@@ -8,6 +8,7 @@ Levixel 以列表中源媒体当前可见的位置、尺寸和圆角为转场起
 
 - 图片与视频混合分页浏览
 - 以可见源为锚点的开场与回场共享转场
+- 同一媒体可绑定多个来源，记住实际点击处并在来源不可用时安全回退
 - 双指缩放、缩放后平移与双击复位
 - 图片未放大时竖拖关闭，并支持点按关闭和系统返回
 - 缩略图未就绪时直接进入原生加载状态，加载完成后连续交接
@@ -43,6 +44,7 @@ import {
   prepareLevixelItem,
   warmupLevixelItem,
   openLevixelFromSelector,
+  updateLevixelSources,
 } from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
 ```
 
@@ -265,7 +267,9 @@ items.value.slice(0, 3).forEach(item => preparePreview(item))
 
 调用时的 `items` 是该次全屏查看会话的媒体快照。聊天记录向前插入、瀑布流向后追加或列表重排后，下一次打开传入最新已加载数组即可；Levixel 不会在已经打开的查看器内部代替业务请求下一页。
 
-`sourceBindings` 应包含当前实际挂载的源，不要按点击下标截取固定数量来猜测可视范围。例如已加载 100 项而虚拟列表只挂载 8 个 cell，就传这 8 项的 `{ itemId, selector }`；普通非虚拟列表可传当前已加载并挂载的全部源。SDK 会按 `itemId` 将它们放回正确位置，原生运行时再按源矩形与有效页面视口是否存在正面积交集决定回场：哪怕只露出一小部分也使用共享转场，完全位于视口外或已经卸载才安全淡出。绑定顺序可与 `items` 不同，但每个 `itemId` 必须存在于本次 `items`，每个选择器在自身查询范围内必须唯一且最多命中一个元素。
+`sourceBindings` 应包含当前实际挂载的源，不要按点击下标截取固定数量来猜测可视范围。例如已加载 100 项而虚拟列表只挂载 8 个 cell，就传这 8 项的 `{ itemId, selector }`；普通非虚拟列表可传当前已加载并挂载的全部源。SDK 会按 `itemId` 将它们放回正确位置，原生运行时再按源矩形与有效页面视口是否存在正面积交集决定回场：哪怕只露出一小部分也可使用共享转场，完全位于视口外或已经卸载的源不再作为回场目标；同媒体没有其他可用来源时才淡出。
+
+绑定顺序可与 `items` 不同，但每个 `itemId` 必须存在于本次 `items`，一项媒体可以有多个源绑定；重复 `itemId` 时，每个绑定都必须提供非空且在该媒体内唯一的 `sourceId`，跨组件查询范围也遵守这一身份规则。不同媒体可复用相同的 `sourceId`。每个选择器在自身查询范围内必须唯一且最多命中一个元素。
 
 ```js
 const snapshot = loadedItems.slice()
@@ -310,6 +314,75 @@ sourceBindings: mountedCells.map(cell => ({
 受管预览同时受单文件大小、缓存总字节数、条目数和空闲时间约束；淘汰项会立即删除，上次运行意外遗留的文件会在下次初始化时清理。准备失败或缩略图尚未加载时，查看器仍会按媒体 URL 正常打开。
 
 `sourceVisibility` 默认且建议保持 `visible`。经典 uni-app 与 x Vapor 均使用该源图交接策略，避免关闭转场最后阶段出现源图纹理闪烁。只有页面完整处理 `sourceVisibilityChange`，并确认所有目标平台的开关场交接都符合预期时，才应显式传入 `hidden`；否则源位置可能在关闭末帧短暂留空或闪烁。
+
+## 同一媒体多个来源与更新
+
+经典 uni-app UTS、App 原生插件版和 uni-app x Vapor 的 Android/iOS App
+使用相同的多来源 API。媒体只在 `items` 中保留一项，封面和缩略图各自拥有
+稳定的 `sourceId`，来源容器也应在普通更新中保持稳定。
+
+下面以 Vue 3 Composition API 为例，沿用“媒体数据”中的 `items`。页面已挂载
+`#photo-cover` 和 `#photo-thumbnail`，都显示 `photo-1`，圆角分别为 `16px` 和
+`8px`。点击缩略图时调用 `openThumbnail()`，保留它返回的打开结果：
+
+```js
+import { nextTick } from 'vue'
+import {
+  openLevixelFromSelector,
+  updateLevixelSources,
+} from '@/uni_modules/Sandrox-Levixel/js_sdk/index.js'
+
+const duplicateBindings = [
+  { itemId: 'photo-1', sourceId: 'cover', selector: '#photo-cover', cornerRadius: 16 },
+  { itemId: 'photo-1', sourceId: 'thumbnail', selector: '#photo-thumbnail', cornerRadius: 8 },
+]
+async function openThumbnail() {
+  return openLevixelFromSelector({
+    items: items.slice(),
+    initialItemId: 'photo-1',
+    initialSourceId: 'thumbnail',
+    sourceBindings: duplicateBindings,
+  })
+}
+```
+
+传入的 `initialSourceId` 必须对应打开媒体在 `sourceBindings` 中的一个绑定，
+未声明的 ID 会报错。绑定已声明、但对应视图未挂载或不可用时，开场淡入，
+不会借用另一缩略图的几何。原有不带 `sourceId` 的单来源绑定保持兼容。
+
+来源增删、位置、尺寸或圆角改变后，等待宿主渲染完成，再用打开结果中的
+`galleryId` 更新。例如宿主已从页面状态中移除缩略图、只保留封面，便将这次
+打开的结果传给下列函数：
+
+```js
+async function updateAfterThumbnailRemoval(session) {
+  await nextTick()
+  return updateLevixelSources({
+    galleryId: session.galleryId,
+    sourceBindings: duplicateBindings.filter(binding => binding.sourceId !== 'thumbnail'),
+  })
+}
+```
+
+Vue Options API 使用 `await this.$nextTick()` 等待渲染。更新传入完整的当前
+挂载绑定集合，仅包含打开时媒体快照内的 ID；空数组会移除全部回场锚点，
+但不关闭查看器。顶层 `queryContext` 默认沿用打开时的范围，每项绑定也可以
+单独指定范围。
+
+会话在翻页后仍记住选中来源；内部图片替换、其他来源刷新及绑定重排不会
+替换仍有效的选择。被选来源移除或不可用后，按最初注册顺序选择同媒体的
+可用来源；更新已有绑定不改变该顺序，没有可用来源时关闭淡出。
+
+更新不会改变会话媒体顺序或按钮快照，也不重新打开查看器。
+`{ updated: false }` 表示本次更新未应用：对应的选择器会话已失效，或这次
+异步测量已被较新的更新、关闭或打开请求取代。被较新更新取代时，查看器
+可能仍然打开；不能据此认定会话已经关闭。只在宿主实际渲染变动后更新，
+无需轮询。
+
+选择 `sourceVisibility: 'hidden'` 的宿主应按事件中的
+`itemId + sourceId` 只隐藏被选来源，收到 `hidden: false` 后恢复其原透明度；
+无显式来源身份的旧单来源事件不携带 `sourceId`。不要按 `itemId` 隐藏该媒体的
+所有缩略图。
 
 ## 长按与操作抽屉
 
@@ -382,7 +455,7 @@ removeListener()
 | `mediaError` | 媒体加载失败，附加 `code: LOAD_FAILED` 与 `message` |
 | `action` | 选择按钮且抽屉收起后，附加 `actionId` |
 | `dismiss` | 会话结束，包含最后当前媒体的上下文 |
-| `sourceVisibilityChange` | 源图显隐变化，包含 `hidden`、`galleryId`、`index` 和 `itemId` |
+| `sourceVisibilityChange` | 源图显隐变化，包含 `hidden`、`galleryId`、`index`、`itemId`，显式来源另带 `sourceId` |
 
 原生首次 `indexChange` 可能早于 `opened`。相邻页预加载也可能在打开完成前或其他页面显示期间派发媒体事件，应通过 `itemId` 识别对应媒体，不能假定都是当前页。缩略图或封面就绪不算原图或视频加载成功。
 
@@ -391,6 +464,10 @@ removeListener()
 加载失败会显示重试按钮。`retryLevixel()` 返回 `{ retried: boolean }`，仅重试当前可重试的失败媒体，不创建新会话；加载中、没有可重试媒体或查看器已关闭时返回 `false`。`closeLevixel()` 在整个查看器关闭完成后返回 `{ closed: true }`。
 
 通常优先使用 `openLevixelFromSelector`，让 SDK 测量当前可见源。只有宿主已经拥有可靠的源图几何时，才直接调用 `openLevixel` 并传入 `sourceHints`。
+
+直接打开时，可选的 `sourceIds` 与 `items`、`sourceHints` 按下标一一对应，
+长度与媒体列表相同，每项标识该 hint 对应的已选来源；未命名来源使用 `null`。
+选择器打开会自动填写这些信息，业务无需手工维护。
 
 ## App 原生插件版
 

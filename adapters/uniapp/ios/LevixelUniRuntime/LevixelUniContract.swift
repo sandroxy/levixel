@@ -74,6 +74,7 @@ struct LevixelUniOpenRequest {
     let actionListIcons: Bool
     let items: [LevixelUniItem]
     let sourceHints: [LevixelUniSourceHint?]
+    let sourceIds: [String?]
     let initialIndex: Int
     let theme: LevixelViewerTheme
     let hidesHTMLSource: Bool
@@ -98,6 +99,7 @@ enum LevixelUniContract {
         "index",
         "theme",
         "sourceHints",
+        "sourceIds",
         "sourceVisibility",
         "counter",
         "closeButton",
@@ -191,6 +193,7 @@ enum LevixelUniContract {
             actionListIcons: try optionalBoolean(options["actionListIcons"], fallback: false, path: "$.actionListIcons"),
             items: items,
             sourceHints: try parseSourceHints(options["sourceHints"], itemCount: items.count),
+            sourceIds: try parseSourceIds(options["sourceIds"], itemCount: items.count),
             initialIndex: initialIndex,
             theme: themeValue == "light" ? .light : .dark,
             hidesHTMLSource: sourceVisibility == "hidden"
@@ -219,6 +222,51 @@ enum LevixelUniContract {
             return LevixelAction(id: id, label: label, icon: try optionalURL(icon, path: "\(path).icon"), group: group,
                 disabled: try optionalBoolean(value["disabled"], fallback: false, path: "\(path).disabled"),
                 destructive: try optionalBoolean(value["destructive"], fallback: false, path: "\(path).destructive"))
+        }
+    }
+
+    struct SourceUpdate {
+        let galleryId: String
+        let revision: Int
+        let sourceHints: [LevixelUniSourceHint?]
+        let sourceIds: [String?]
+    }
+
+    static func sourceUpdateGalleryId(_ raw: Any?) throws -> String {
+        let options = try requireObject(raw, path: "$")
+        let galleryId = try requireString(options["galleryId"], path: "$.galleryId")
+        guard !galleryId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw failure("INVALID_VALUE", "$.galleryId", "must not be blank")
+        }
+        return galleryId
+    }
+
+    static func parseSourceUpdate(_ raw: Any?, itemCount: Int) throws -> SourceUpdate {
+        let options = try requireObject(raw, path: "$")
+        try rejectUnknownKeys(options, allowed: ["galleryId", "revision", "sourceHints", "sourceIds"], path: "$")
+        let galleryId = try sourceUpdateGalleryId(options)
+        let revision = try optionalInteger(options["revision"], fallback: 0, path: "$.revision")
+        guard revision > 0 else { throw failure("INVALID_VALUE", "$.revision", "must be a positive integer") }
+        guard options["sourceHints"] is [Any], options["sourceIds"] is [Any] else {
+            throw failure("INVALID_TYPE", "$", "sourceHints and sourceIds must be arrays")
+        }
+        return SourceUpdate(galleryId: galleryId, revision: revision,
+            sourceHints: try parseSourceHints(options["sourceHints"], itemCount: itemCount),
+            sourceIds: try parseSourceIds(options["sourceIds"], itemCount: itemCount))
+    }
+
+    private static func parseSourceIds(_ raw: Any?, itemCount: Int) throws -> [String?] {
+        guard let raw else { return Array(repeating: nil, count: itemCount) }
+        guard let values = raw as? [Any], values.count == itemCount else {
+            throw failure("INVALID_VALUE", "$.sourceIds", "must contain one entry for each media item")
+        }
+        return try values.enumerated().map { index, value in
+            if value is NSNull { return nil }
+            let id = try requireString(value, path: "$.sourceIds[\(index)]")
+            guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw failure("INVALID_VALUE", "$.sourceIds[\(index)]", "must not be blank")
+            }
+            return id
         }
     }
 

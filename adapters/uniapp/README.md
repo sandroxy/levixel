@@ -14,7 +14,11 @@
 
 ## 来源、预览与路径
 
-SDK 按稳定媒体 ID 将稀疏、乱序源绑定转换为与打开快照等长的 `sourceHints`。平台运行时以源矩形与有效页面视口的真实交集判断回场；完全不可见或已卸载的源使用淡出，不回到同下标的其他媒体。
+SDK 区分媒体 ID 与来源实例 ID，将多个稀疏、乱序源绑定按会话选择转换为与打开快照等长的 `sourceHints` 和 `sourceIds`。两组数组按媒体下标一一对应；`sourceIds` 表示各 hint 已选中的来源，未命名来源使用 `null`，不另建一份媒体列表。
+
+`updateLevixelSources` 重新测量渲染后的完整绑定集合，通过共享 runtime 的 `updateSources` 更新原会话的锚点，不修改媒体顺序或按钮快照。UTS 与 legacy 仅转发该请求。SDK 丢弃过期测量，runtime 按 `galleryId` 与递增 `revision` 再次隔离异步更新，避免旧请求修改新会话。
+
+平台运行时以源矩形与有效页面视口的真实交集判断回场。已选来源失效后，可使用同媒体的其他可用来源；没有可用来源才淡出，不回到同下标的其他媒体。
 
 一些 UniApp runtime 会复用 `getImageInfo` 临时路径。远程预览因此保存为各自独立的受管文件：经典分支使用 `uni.saveFile`，x 使用 `uni.getFileSystemManager().saveFile` / `removeSavedFile`。保存失败只保留尺寸，不缓存、传递或清理非自有路径。受管预览按 LRU、单文件与总大小、条目数、空闲时间和下次启动清理管理。
 

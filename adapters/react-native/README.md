@@ -95,6 +95,28 @@ receives both the session index and stable `itemId`; use the id when host data
 can change while the viewer is open. Video items should provide `posterUrl` or
 `thumbnailUrl` for a source-anchored opening transition.
 
+### Multiple sources for one media item
+
+Multiple `Levixel.Source` components may reference the same `itemId`; keep that
+media item only once in `items`. Tapping a cover or a smaller duplicate thumbnail
+opens from that view's image, position, clipping, and radius. Only the selected
+source is hidden; the other thumbnails remain visible.
+
+The session remembers a source for each visited media item. Image changes and
+updates to other sources do not replace a still-valid selection. Paging away
+restores the old source; paging back uses the remembered source while it remains
+mounted, visible, and bound to the same media. Otherwise, the viewer chooses
+another visible source of that media in first-registration order, or fades on
+return when none exists. Updates do not change registration order, and return
+transitions use the source's current geometry.
+
+`ref.open(itemId)` also uses first-registration order when no tap identifies a
+source. Valid media can open without a mounted or loaded thumbnail. If a tapped
+source disappears before presentation, opening has no source transition rather
+than starting from another thumbnail; return transitions may still use another
+valid source of that media. Removing a source does not close the viewer or
+change its media snapshot.
+
 ## Actions and direct control
 
 Use `actions`, `actionLayout`, and `actionListIcons` on `<Levixel>`. A ref can

@@ -6,6 +6,47 @@ public final class LevixelViewerSession {
     private let dataSource: LevixelDataSource
     private let imageLoader: LevixelImageLoading
 
+    /// Presents registered sources without inventing a synthetic image anchor.
+    @discardableResult
+    public static func present(
+        dataSource: LevixelDataSource,
+        initialIndex: Int = 0,
+        configuration: LevixelViewerConfiguration = LevixelViewerConfiguration(),
+        from viewController: UIViewController,
+        galleryId: String,
+        sourceIdentifier: String? = nil,
+        imageLoader: LevixelImageLoading? = nil,
+        completion: (() -> Void)? = nil
+    ) -> LevixelViewerSession? {
+        precondition(Thread.isMainThread)
+        precondition(!galleryId.isEmpty)
+        return present(sourceView: nil, dataSource: dataSource, initialIndex: initialIndex,
+                       configuration: configuration, from: viewController, galleryId: galleryId,
+                       sourceIdentifier: sourceIdentifier, imageLoader: imageLoader, completion: completion)
+    }
+
+    fileprivate static func present(
+        sourceView: UIImageView?, dataSource: LevixelDataSource, initialIndex: Int,
+        configuration: LevixelViewerConfiguration, from viewController: UIViewController,
+        galleryId: String?, sourceIdentifier: String?, imageLoader: LevixelImageLoading?, completion: (() -> Void)?
+    ) -> LevixelViewerSession? {
+        guard dataSource.numberOfItems() > 0 else { return nil }
+        var presenter = viewController
+        while let presented = presenter.presentedViewController { presenter = presented }
+        let loader = imageLoader ?? LevixelImageLoaderFactory.makeDefault()
+        let viewer = LevixelViewerController(sourceView: sourceView, dataSource: dataSource, imageLoader: loader,
+            configuration: configuration, initialIndex: initialIndex, galleryId: galleryId,
+            sourceIdentifier: sourceIdentifier, sourceWindow: presenter.view.window)
+        let session = LevixelViewerSession(viewerController: viewer, dataSource: dataSource, imageLoader: loader)
+        viewer.attachPresentationSession(session)
+        presenter.present(viewer, animated: false) { [weak viewer] in
+            viewer?.presentationDidComplete()
+            completion?()
+        }
+        configuration.onSession?(session)
+        return session
+    }
+
     fileprivate init(
         viewerController: LevixelViewerController,
         dataSource: LevixelDataSource,
@@ -46,7 +87,7 @@ public final class LevixelViewerSession {
 }
 
 extension UIImageView {
-    private enum LevixelAnchorReference {
+    private enum LevixelAnchorReference: Equatable {
         case index(Int)
         case itemIdentifier(String)
     }
@@ -234,19 +275,7 @@ extension UIImageView {
         guard itemCount > 0 else { return nil }
         let safeInitialIndex = min(max(initialIndex, 0), itemCount - 1)
 
-        let resolvedImageLoader = imageLoader ?? LevixelImageLoaderFactory.makeDefault()
-        let viewerController = LevixelViewerController(
-            sourceView: self,
-            dataSource: dataSource,
-            imageLoader: resolvedImageLoader,
-            configuration: configuration,
-            initialIndex: safeInitialIndex,
-            galleryId: galleryId
-        )
-        let rootViewController = viewController ?? topMostHostViewController
-        guard let presenter = rootViewController.map(topMostPresentedController(from:)) else {
-            return nil
-        }
+        guard let presenter = viewController ?? topMostHostViewController else { return nil }
 
         if let galleryId, galleryId.isEmpty == false {
             updateLevixelAnchorRegistration(
@@ -256,18 +285,10 @@ extension UIImageView {
             )
         }
 
-        let session = LevixelViewerSession(
-            viewerController: viewerController,
-            dataSource: dataSource,
-            imageLoader: resolvedImageLoader
-        )
-        viewerController.attachPresentationSession(session)
-        presenter.present(viewerController, animated: false) { [weak viewerController] in
-            viewerController?.presentationDidComplete()
-            completion?()
-        }
-        configuration.onSession?(session)
-        return session
+        return LevixelViewerSession.present(sourceView: self, dataSource: dataSource,
+            initialIndex: safeInitialIndex, configuration: configuration, from: presenter,
+            galleryId: galleryId, sourceIdentifier: LevixelSourceViewRegistry.Selection.nativeIdentifier(self),
+            imageLoader: imageLoader, completion: completion)
     }
 
     private func configureLevixelViewer(
@@ -358,14 +379,6 @@ extension UIImageView {
         )
     }
 
-    private func topMostPresentedController(from rootViewController: UIViewController) -> UIViewController {
-        var controller = rootViewController
-        while let presented = controller.presentedViewController {
-            controller = presented
-        }
-        return controller
-    }
-
     private func clampedIndex(_ index: Int, for dataSource: LevixelDataSource?) -> Int {
         let itemCount = dataSource?.numberOfItems() ?? 0
         guard itemCount > 0 else { return 0 }
@@ -390,7 +403,9 @@ extension UIImageView {
         reference: LevixelAnchorReference?,
         cornerRadius: CGFloat? = nil
     ) {
-        unregisterLevixelSource()
+        if levixelAnchorRegistration?.galleryId != galleryId || levixelAnchorRegistration?.reference != reference {
+            unregisterLevixelSource()
+        }
 
         guard
             let galleryId = galleryId,

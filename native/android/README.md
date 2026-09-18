@@ -68,16 +68,38 @@ stable media ID. Before rebinding a reusable cell, call
 `LevixelSourceViewRegistry.unregisterView(imageView)`, then register the new
 media identity. Unregister sources when the host removes them.
 
-Dismissal resolves the latest visible registered source by stable ID. If that
-source is unmounted or fully clipped, the viewer fades instead of returning to
-another cell at the same index. Items without a mounted thumbnail can still be
-opened and paged through.
-
 For a rounded source, use `register(key, imageView, cornerRadiusPx)` with the
 uniform visible clipping radius in physical pixels. If only part of the source
 intersects its effective viewport, the transition preserves that intersection
 without rounding the list's clipping edge. Hosts that already own reliable
 source geometry may use the constructor overload with `sourceHints`.
+
+### Multiple sources and replaceable images
+
+Multiple source views may share a media key. To open from a specific thumbnail,
+use `registerSource(key, image, radius, container, sourceId)` and pass the same
+`sourceId` as the viewer constructor's `initialSourceId`. Keep each source ID
+stable and unique within its media key.
+
+The container must contain the image, or be the image itself. Update the same
+container's registration when its image changes; passing a null image keeps the
+binding during image-loader replacement. Call `unregisterSource(container)` on
+removal. Transition names identify source instances; use the registry rather
+than constructing names yourself.
+
+A session remembers its selected source for each media item across paging and
+updates. Only the selected container is hidden, and paging away or closing
+restores its original opacity. Return transitions use its current geometry.
+If the selected source is removed, rebound, or fully clipped, the viewer chooses
+another visible source of the same media in first-registration order. Updates
+do not change that order. With no valid source, dismissal fades; it never returns
+to a different media item at the old index.
+
+Without an `initialSourceId`, opening uses first-registration order. If an
+explicitly selected source disappears before presentation, opening has no source
+transition rather than starting from another thumbnail. Return transitions may
+still use another valid source of that media. Items without a mounted thumbnail
+can still be opened and paged through.
 
 ## Long press and actions
 

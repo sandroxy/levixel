@@ -1,6 +1,7 @@
 import {
   closeLevixelNative,
   retryLevixelNative,
+  updateLevixelSourcesNative,
   onLevixelNativeEvent,
   openLevixelNative,
   resolveLevixelNativePaths,
@@ -9,6 +10,7 @@ import {
   __setLevixelNativeTransport,
   closeLevixel as closeLevixelCanonical,
   retryLevixel as retryLevixelCanonical,
+  updateLevixelSources as updateLevixelSourcesCanonical,
   onLevixelEvent as onLevixelEventCanonical,
   openLevixel as openLevixelCanonical,
   openLevixelFromSelector as openLevixelFromSelectorCanonical,
@@ -23,8 +25,10 @@ const OPTIONAL_OPEN_KEYS = [
   'actionListIcons',
   'index',
   'initialItemId',
+  'initialSourceId',
   'theme',
   'sourceHints',
+  'sourceIds',
   'sourceVisibility',
   'counter',
   'closeButton',
@@ -36,7 +40,7 @@ const OPTIONAL_OPEN_KEYS = [
 const OPTIONAL_ACTION_KEYS = ['icon', 'group', 'disabled', 'destructive', 'onPress']
 const OPTIONAL_SOURCE_HINT_KEYS = ['imageSize', 'rectScale', 'cornerRadius']
 const OPTIONAL_SOURCE_STYLE_KEYS = ['objectFit', 'cornerRadius']
-const OPTIONAL_SOURCE_BINDING_KEYS = ['objectFit', 'cornerRadius', 'queryContext']
+const OPTIONAL_SOURCE_BINDING_KEYS = ['sourceId', 'objectFit', 'cornerRadius', 'queryContext']
 const NATIVE_PATH_RESOLUTION_TIMEOUT_MS = 5000
 
 function omitNullOptionalFields(value, optionalKeys) {
@@ -128,6 +132,7 @@ const nativeMethods = {
   open: openLevixelNative,
   close: closeLevixelNative,
   retry: retryLevixelNative,
+  updateSources: updateLevixelSourcesNative,
 }
 
 function decodeNativeJSON(json, kind) {
@@ -211,6 +216,10 @@ function openLevixel(options) {
   return openLevixelCanonical(normalizeOpenOptions(options))
 }
 
+function updateLevixelSources(options) {
+  return updateLevixelSourcesCanonical(normalizeOpenOptions(options))
+}
+
 function retryLevixel() {
   return retryLevixelCanonical()
 }
@@ -242,6 +251,7 @@ const levixel = {
   open: openLevixel,
   close: closeLevixel,
   retry: retryLevixel,
+  updateSources: updateLevixelSources,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,
@@ -251,6 +261,7 @@ const levixel = {
 export {
   closeLevixel,
   retryLevixel,
+  updateLevixelSources,
   onLevixelEvent,
   openLevixel,
   openLevixelFromSelector,

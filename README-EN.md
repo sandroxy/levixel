@@ -16,6 +16,7 @@ The interaction direction draws inspiration from the media-centered direct manip
 
 - Mixed image and video paging
 - Source-anchored shared transitions for both opening and return
+- Multiple sources per media item, remembering the tapped source and falling back to another available source of the same media
 - Pinch zoom, zoomed panning, and double-tap reset
 - Drag dismissal while the image is not zoomed, plus tap dismissal and system back handling
 - Continuous handoff across thumbnails, loading states, original images, and video frames
@@ -89,7 +90,7 @@ The package includes the React Native integration and the required Android/iOS n
 
 ## UniApp
 
-For new projects, install the plugin from the [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394). The UTS plugin supports classic uni-app Vue 2 / Vue 3 App pages and uni-app x Vapor Android/iOS Apps; x VDOM is not supported. Both paths share one public JavaScript API and the same platform runtimes. Dynamic lists bind mounted sources with `initialItemId + sourceBindings`; return transitions use the source rectangle's real intersection with the effective page viewport, sharing the transition while any positive area remains visible and fading safely when none does. `sourceVisibility` remains `visible` by default to prevent a last-frame source flash during WebView/Vapor close handoff.
+For new projects, install the plugin from the [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394). The UTS plugin supports classic uni-app Vue 2 / Vue 3 App pages and uni-app x Vapor Android/iOS Apps; x VDOM is not supported. Both paths share one public JavaScript API and the same platform runtimes. Dynamic lists bind mounted sources with `initialItemId + sourceBindings`; return transitions use the source rectangle's real intersection with the effective page viewport. A partly visible source remains eligible, and dismissal fades safely when the media has no eligible source. `sourceVisibility` remains `visible` by default to prevent a last-frame source flash during WebView/Vapor close handoff.
 
 See the [UniApp guide](uni_modules/Sandrox-Levixel/readme.md) for the complete compatibility boundary, loading-state integration, and examples. Matching GitHub Releases also provide the UTS ZIP and checksum for direct downloads and offline archives.
 

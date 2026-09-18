@@ -16,6 +16,7 @@ Levixel 是一套强调原生手感的共享转场图片与视频查看器，支
 
 - 图片与视频混合分页浏览
 - 以可见源为锚点的开场与回场共享转场
+- 同一媒体可绑定多个来源，记住实际点击处，来源不可用时选择同媒体的其他可用来源
 - 双指缩放、缩放后平移与双击复位
 - 图片未放大时竖拖关闭，并支持点按关闭和系统返回
 - 缩略图、加载态、原图与视频首帧之间的连续交接
@@ -89,7 +90,7 @@ npx expo prebuild
 
 ## UniApp
 
-推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。动态列表可用 `initialItemId + sourceBindings` 绑定当前已挂载源；回场以源矩形和有效页面视口的真实交集为准，部分可见时共享转场，完全不可见时安全淡出。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
+推荐从 [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) 安装。市场 UTS 插件支持经典 uni-app Vue 2 / Vue 3 App 页面，以及 uni-app x Vapor 的 Android/iOS App；x 不支持 VDOM。两条路径使用同一套公共 JavaScript API 与平台运行时。动态列表可用 `initialItemId + sourceBindings` 绑定当前已挂载源；回场以源矩形和有效页面视口的真实交集为准，部分可见的来源仍可用于共享转场，同媒体没有可用来源时安全淡出。`sourceVisibility` 默认保持 `visible`，用于避免 WebView/Vapor 源图在关闭交接末帧闪烁。
 
 完整兼容范围、加载态接入和示例见 [UniApp 使用说明](uni_modules/Sandrox-Levixel/readme.md)。对应版本的 GitHub Release 也提供 UTS ZIP 与校验和，供直接下载和离线归档。
 

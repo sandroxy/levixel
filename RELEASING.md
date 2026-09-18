@@ -275,10 +275,15 @@ The retained PhotoView dependency is hosted by JitPack. Replacing or vendoring i
 ## iOS / Swift Package Manager
 
 1. Build and verify `dist/native-ios/levixel-<version>.xcframework.zip` once.
-2. Update the root `Package.swift` to the release URL and computed checksum.
+2. Update the root `Package.swift` with the URL and checksum from the generated
+   `dist/native-ios/swift-package/Package.swift` for that exact ZIP.
 3. Create the canonical `<version>` tag on the release commit.
 4. Attach the accepted ZIP to the matching GitHub Release without rebuilding.
 5. Resolve the tag in a clean iOS consumer and run the final smoke test.
+
+Until the new archive exists, keep the last valid released root manifest. Do
+not use a placeholder checksum or pair a new release URL with an older archive's
+checksum.
 
 The default binary URL is the GitHub Release asset. Override it only when the permanent binary host changes:
 

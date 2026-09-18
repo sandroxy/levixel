@@ -24,6 +24,7 @@ final class LevixelUniContract {
             "index",
             "theme",
             "sourceHints",
+            "sourceIds",
             "sourceVisibility",
             "counter",
             "closeButton"
@@ -113,6 +114,7 @@ final class LevixelUniContract {
         return new OpenRequest(
                 items,
                 sourceHints,
+                parseSourceIds(options.get("sourceIds"), items.size()),
                 initialIndex,
                 "light".equals(theme),
                 "hidden".equals(sourceVisibility),
@@ -146,6 +148,49 @@ final class LevixelUniContract {
                     optionalBoolean(value.get("destructive"), false, path + ".destructive"), null));
         }
         return LevixelAction.snapshot(actions);
+    }
+
+    static final class SourceUpdateRequest {
+        final String galleryId;
+        final int revision;
+        final List<SourceHint> sourceHints;
+        final List<String> sourceIds;
+        SourceUpdateRequest(String galleryId, int revision, List<SourceHint> hints, List<String> ids) {
+            this.galleryId = galleryId; this.revision = revision; this.sourceHints = hints; this.sourceIds = ids;
+        }
+    }
+
+    static String sourceUpdateGalleryId(Object raw) throws ContractException {
+        String galleryId = requireString(requireObject(raw, "$").get("galleryId"), "$.galleryId");
+        if (galleryId.trim().isEmpty()) throw error("INVALID_VALUE", "$.galleryId", "must not be blank");
+        return galleryId;
+    }
+
+    static SourceUpdateRequest parseSourceUpdate(Object raw, int itemCount) throws ContractException {
+        Map<String, Object> options = requireObject(raw, "$");
+        rejectUnknownKeys(options, keys("galleryId", "revision", "sourceHints", "sourceIds"), "$");
+        String galleryId = sourceUpdateGalleryId(options);
+        int revision = optionalInteger(options.get("revision"), 0, "$.revision");
+        if (revision <= 0) throw error("INVALID_VALUE", "$.revision", "must be a positive integer");
+        if (!(options.get("sourceHints") instanceof List) || !(options.get("sourceIds") instanceof List))
+            throw error("INVALID_TYPE", "$", "sourceHints and sourceIds must be arrays");
+        return new SourceUpdateRequest(galleryId, revision,
+                parseSourceHints(options.get("sourceHints"), itemCount), parseSourceIds(options.get("sourceIds"), itemCount));
+    }
+
+    private static List<String> parseSourceIds(Object raw, int count) throws ContractException {
+        List<String> ids = new ArrayList<>(Collections.nCopies(count, null));
+        if (raw == null) return ids;
+        if (!(raw instanceof List) || ((List<?>) raw).size() != count)
+            throw error("INVALID_VALUE", "$.sourceIds", "must contain one entry for each media item");
+        for (int i = 0; i < count; i++) {
+            Object value = ((List<?>) raw).get(i);
+            if (value == null) continue;
+            String id = requireString(value, "$.sourceIds[" + i + "]");
+            if (id.trim().isEmpty()) throw error("INVALID_VALUE", "$.sourceIds[" + i + "]", "must not be blank");
+            ids.set(i, id);
+        }
+        return ids;
     }
 
     static void validateCloseRequest(@Nullable Object rawOptions) throws ContractException {
@@ -393,6 +438,7 @@ final class LevixelUniContract {
     static final class OpenRequest {
         @NonNull final List<Item> items;
         @NonNull final List<SourceHint> sourceHints;
+        @NonNull final List<String> sourceIds;
         final int initialIndex;
         final boolean lightTheme;
         final boolean hidesHtmlSource;
@@ -403,6 +449,7 @@ final class LevixelUniContract {
         OpenRequest(
                 @NonNull List<Item> items,
                 @NonNull List<SourceHint> sourceHints,
+                @NonNull List<String> sourceIds,
                 int initialIndex,
                 boolean lightTheme,
                 boolean hidesHtmlSource,
@@ -412,6 +459,7 @@ final class LevixelUniContract {
         ) {
             this.items = items;
             this.sourceHints = sourceHints;
+            this.sourceIds = sourceIds;
             this.initialIndex = initialIndex;
             this.lightTheme = lightTheme;
             this.hidesHtmlSource = hidesHtmlSource;

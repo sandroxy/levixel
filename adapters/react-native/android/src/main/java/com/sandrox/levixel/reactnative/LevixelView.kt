@@ -20,33 +20,22 @@ import expo.modules.kotlin.Promise
 
 class LevixelView(context: Context) : ViewGroup(context) {
     var items: List<Map<String, Any?>> = emptyList()
-        set(value) {
-            field = value
-            refreshBinding()
-        }
     var initialIndex: Int = 0
-        set(value) {
-            field = value
-            refreshBinding()
-        }
     var galleryId: String = ""
-        set(value) {
-            field = value
-            refreshBinding()
-        }
+    var sourceId: String = ""
     var sourceCornerRadius: Float = 0f
         set(value) {
             require(value.isFinite() && value >= 0f) {
                 "Levixel sourceCornerRadius must be a non-negative finite number."
             }
             field = value
-            refreshBinding()
         }
     val onSourcePress by EventDispatcher()
     val onViewerEvent by EventDispatcher()
 
+    private var boundSourceId = ""
     private val sourceBinding = LevixelSourceBinding(this) { itemId ->
-        onSourcePress(mapOf("itemId" to itemId))
+        onSourcePress(mapOf("itemId" to itemId, "sourceId" to boundSourceId))
     }
     private var overlayView: LevixelViewerOverlayView? = null
     private var overlayBackCallback: OnBackPressedCallback? = null
@@ -55,25 +44,25 @@ class LevixelView(context: Context) : ViewGroup(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        refreshBinding()
+        sourceBinding.refresh()
     }
 
     override fun onViewAdded(child: View) {
         super.onViewAdded(child)
-        post { refreshBinding() }
+        post { sourceBinding.refresh() }
     }
 
     override fun onViewRemoved(child: View) {
         super.onViewRemoved(child)
         sourceBinding.refresh()
-        post { refreshBinding() }
+        post { sourceBinding.refresh() }
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         for (index in 0 until childCount) {
             getChildAt(index).layout(0, 0, width, height)
         }
-        refreshBinding()
+        sourceBinding.refresh()
     }
 
     override fun onDetachedFromWindow() {
@@ -90,12 +79,16 @@ class LevixelView(context: Context) : ViewGroup(context) {
         super.onDetachedFromWindow()
     }
 
-    private fun refreshBinding() {
+    // Expo calls this after every prop in the transaction has been applied.
+    // Layout/image callbacks refresh this committed binding, never partial props.
+    fun commitSourceBinding() {
         val item = buildMediaItems().getOrNull(initialIndex)
+        boundSourceId = sourceId
         sourceBinding.update(
             item?.let { LevixelSharedElementNames.forItem(scopedGalleryId(), it) },
             item?.id,
-            sourceCornerRadiusInPixels()
+            sourceCornerRadiusInPixels(),
+            boundSourceId.takeIf(String::isNotBlank)
         )
     }
 
@@ -129,6 +122,7 @@ class LevixelView(context: Context) : ViewGroup(context) {
         var backCallback: OnBackPressedCallback? = null
         val overlay = LevixelViewerOverlayView(
             activity, mediaItems, null, index, lightTheme, targetGalleryId, actions, actionLayout, actionListIcons,
+            options["sourceId"] as? String,
             object : LevixelViewerOverlayView.Listener {
                 override fun onOverlayDismissed() {
                     backCallback?.remove()

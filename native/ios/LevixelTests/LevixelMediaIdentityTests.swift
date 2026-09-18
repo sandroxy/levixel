@@ -24,6 +24,8 @@ final class LevixelMediaIdentityTests: XCTestCase {
             context.fill(CGRect(x: 0, y: 0, width: 80, height: 80))
         }
         presenter.view.addSubview(source)
+        source.alpha = 0.6
+        let originalAlpha = source.alpha
         var events: [String] = []
         let closed = expectation(description: "Session closed")
         var configuration = LevixelViewerConfiguration()
@@ -40,6 +42,7 @@ final class LevixelMediaIdentityTests: XCTestCase {
         XCTAssertEqual(events.filter { $0 == "dismiss" }.count, 1)
         XCTAssertNil(session?.sessionId)
         XCTAssertNil(presenter.presentedViewController)
+        XCTAssertEqual(source.alpha, originalAlpha)
     }
 
     func testArrayDataSourcePreservesStableItemIdentifiers() {
@@ -92,6 +95,8 @@ final class LevixelMediaIdentityTests: XCTestCase {
         presenter.view.addSubview(source)
         let galleryId = "test-\(UUID().uuidString)"
         source.registerLevixelSource(galleryId: galleryId, itemIdentifier: "cover", cornerRadius: 18)
+        source.alpha = 0.6
+        let originalAlpha = source.alpha
         let opened = expectation(description: "Viewer opened")
         let closed = expectation(description: "Viewer closed")
         let configuration = LevixelViewerConfiguration(onEvent: { event in
@@ -101,8 +106,10 @@ final class LevixelMediaIdentityTests: XCTestCase {
             configuration: configuration, from: presenter, galleryId: galleryId)
         wait(for: [opened], timeout: 3)
         XCTAssertEqual(source.levixelConfiguredSourceCornerRadius, 18)
+        XCTAssertEqual(source.alpha, 0)
         session?.close(animated: false) { closed.fulfill() }
         wait(for: [closed], timeout: 2)
+        XCTAssertEqual(source.alpha, originalAlpha)
         source.unregisterLevixelSource()
         XCTAssertNil(source.levixelConfiguredSourceCornerRadius)
     }

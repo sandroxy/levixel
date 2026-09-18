@@ -14,6 +14,35 @@ import java.util.List;
 import java.util.Map;
 
 public final class LevixelUniContractTest {
+    @Test public void sourceIdsStayParallelToMediaAndSourceUpdatesAreStrict() throws Exception {
+        Map<String, Object> options = openOptions(imageItem());
+        assertEquals(Arrays.asList((String) null), LevixelUniContract.parseOpenRequest(options).sourceIds);
+        options.put("sourceIds", Arrays.asList("thumbnail"));
+        assertEquals(Arrays.asList("thumbnail"), LevixelUniContract.parseOpenRequest(options).sourceIds);
+        options.put("sourceIds", Arrays.asList(" "));
+        assertContractError("INVALID_VALUE", "$.sourceIds[0]", options);
+        options.put("sourceIds", Arrays.asList("a", "b"));
+        assertContractError("INVALID_VALUE", "$.sourceIds", options);
+        Map<String, Object> update = new HashMap<>();
+        update.put("galleryId", "active-gallery");
+        update.put("revision", 1);
+        update.put("sourceHints", Arrays.asList((Object) null));
+        update.put("sourceIds", Arrays.asList((String) null));
+        LevixelUniContract.SourceUpdateRequest parsed = LevixelUniContract.parseSourceUpdate(update, 1);
+        assertEquals("active-gallery", parsed.galleryId);
+        assertEquals(1, parsed.revision);
+        assertEquals(null, parsed.sourceHints.get(0));
+        for (String key : Arrays.asList("sourceHints", "sourceIds")) {
+            Map<String, Object> invalid = new HashMap<>(update);
+            invalid.put(key, new ArrayList<>());
+            try { LevixelUniContract.parseSourceUpdate(invalid, 1); fail("Accepted mismatched " + key); }
+            catch (LevixelUniContract.ContractException error) { assertEquals("$." + key, error.path); }
+        }
+        update.put("revision", 0);
+        try { LevixelUniContract.parseSourceUpdate(update, 1); fail("Accepted stale revision"); }
+        catch (LevixelUniContract.ContractException error) { assertEquals("$.revision", error.path); }
+    }
+
     @Test public void drawerLayoutAndIconOptionsCrossTheNativeContract() throws Exception {
         Map<String, Object> options = openOptions(imageItem());
         LevixelUniContract.OpenRequest defaults = LevixelUniContract.parseOpenRequest(options);

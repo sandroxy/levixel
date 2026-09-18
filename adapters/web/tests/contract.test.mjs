@@ -185,7 +185,7 @@ test('identified selector bindings reject ambiguous identities and mixed source 
           { itemId: item.id, selector: '#second' },
         ],
       },
-      '$.sourceBindings[1].itemId',
+      '$.sourceBindings[1].sourceId',
     ],
   ]) {
     assert.throws(
@@ -229,4 +229,30 @@ test('drawer layout is explicit and only grid requires icons', () => {
     [{ actionListIcons: null }, '$.actionListIcons'],
   ]) assert.throws(() => normalizeOpenOptions({ items: [item], ...options }), error => error.path === path);
   assert.deepEqual(normalizeOpenOptions({ items: [item], actionLayout: 'grid', actions: [] }).actions, []);
+});
+
+
+test('multiple bindings require explicit identities and select the exact opening source', () => {
+  const bindings = ['cover', 'thumbnail', 'alternate'].map(sourceId => ({ itemId: item.id, sourceId, selector: `#${sourceId}` }));
+  const request = normalizeSelectorOpenOptions({ items: [item], initialSourceId: 'thumbnail', sourceBindings: bindings });
+  assert.equal(request.items.length, 1);
+  assert.equal(request.initialSourceId, 'thumbnail');
+  assert.deepEqual(request.sourceBindings.map(binding => binding.sourceId), ['cover', 'thumbnail', 'alternate']);
+  for (const sourceBindings of [
+    [bindings[0], { ...bindings[1], sourceId: 'cover' }],
+    [bindings[0], { itemId: item.id, selector: '#implicit' }],
+    [{ itemId: item.id, selector: '#implicit' }, bindings[0]],
+  ]) {
+    assert.throws(() => normalizeSelectorOpenOptions({ items: [item], sourceBindings }), error => error.path === '$.sourceBindings[1].sourceId');
+  }
+  assert.throws(() => normalizeSelectorOpenOptions({ items: [item], initialSourceId: 'missing', sourceBindings: bindings }),
+    error => error.path === '$.initialSourceId');
+});
+
+test('serialized source identities remain parallel to media without changing single-source defaults', () => {
+  assert.equal(normalizeOpenOptions({ items: [item] }).sourceIds, undefined);
+  assert.deepEqual(normalizeOpenOptions({ items: [item], sourceIds: ['thumbnail'] }).sourceIds, ['thumbnail']);
+  assert.deepEqual(normalizeOpenOptions({ items: [item], sourceIds: [null] }).sourceIds, [null]);
+  for (const sourceIds of [[], ['a', 'b'], [false], ['  '], null])
+    assert.throws(() => normalizeOpenOptions({ items: [item], sourceIds }), error => error.path.startsWith('$.sourceIds'));
 });

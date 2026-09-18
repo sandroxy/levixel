@@ -7,6 +7,7 @@ let measuredRects = []
 const measuredRectsBySelector = new Map()
 const measuredRectsByQueryContext = new Map()
 const selectorQueryContexts = []
+let nativeSourceUpdate
 let nativeOpenOptions
 let nativeEventCallback
 let activeImageInfoRequests = 0
@@ -73,6 +74,10 @@ const nativePlugin = {
         galleryId: 'test-gallery',
       },
     })
+  },
+  updateSources(options, callback) {
+    nativeSourceUpdate = options
+    callback({ ok: true, data: { updated: true } })
   },
   close(_options, callback) {
     callback({ ok: true, data: { closed: true } })
@@ -484,7 +489,7 @@ for (const [options, pattern] of [
         { itemId: items[0].id, selector: '#other-source' },
       ],
     },
-    /sourceBindings\[1\]\.itemId must be unique/,
+    /sourceBindings\[1\]\.sourceId: duplicate media bindings require distinct explicit sourceId/,
   ],
   [
     {
@@ -561,6 +566,71 @@ nativeEventCallback({
   time: 2,
 })
 assert.equal(receivedEvent, undefined)
+
+// Three views, one media: public API selection, stable update order and cleanup.
+const multiItem = items[0]
+const multiBindings = ['cover', 'thumbnail', 'alternate'].map((sourceId, index) => ({
+  itemId: multiItem.id, sourceId, selector: `#multi-${sourceId}`, cornerRadius: index * 8,
+}))
+for (const [index, binding] of multiBindings.entries())
+  measuredRectsBySelector.set(binding.selector, [{ left: index * 90, top: 20, width: 80, height: 80 }])
+const multiResult = await sdk.openLevixelFromSelector({
+  items: [multiItem], sourceBindings: multiBindings, initialSourceId: 'thumbnail',
+})
+assert.equal(nativeOpenOptions.items.length, 1)
+assert.deepEqual(nativeOpenOptions.sourceIds, ['thumbnail'])
+assert.equal(nativeOpenOptions.sourceHints[0].rect.left, 90)
+assert.deepEqual(await sdk.updateLevixelSources({
+  galleryId: multiResult.galleryId, sourceBindings: multiBindings.toReversed(),
+}), { updated: true })
+assert.deepEqual(nativeSourceUpdate.sourceIds, ['thumbnail'])
+assert.equal(nativeSourceUpdate.sourceHints[0].rect.left, 90)
+await sdk.updateLevixelSources({ galleryId: multiResult.galleryId, sourceBindings: [multiBindings[2], multiBindings[0]] })
+assert.deepEqual(nativeSourceUpdate.sourceIds, ['cover'], 'fallback follows original registration, not latest array order')
+await sdk.updateLevixelSources({ galleryId: multiResult.galleryId, sourceBindings: [] })
+assert.deepEqual(nativeSourceUpdate.sourceHints, [null])
+assert.deepEqual(nativeSourceUpdate.sourceIds, [null])
+assert.equal(nativeSourceUpdate.revision, 3)
+nativeEventCallback({ type: 'dismiss', payload: { galleryId: multiResult.galleryId }, time: 3 })
+assert.deepEqual(await sdk.updateLevixelSources({ galleryId: multiResult.galleryId, sourceBindings: multiBindings }), { updated: false })
+measuredRectsBySelector.set(multiBindings[1].selector, [])
+await sdk.openLevixelFromSelector({ items: [multiItem], sourceBindings: multiBindings, initialSourceId: 'thumbnail' })
+assert.deepEqual(nativeOpenOptions.sourceHints, [null], 'missing exact opening source must fade rather than borrow a peer')
+await sdk.closeLevixel()
+
+// A native callback may arrive after a newer host update has already been requested.
+// The next update must retain the fallback native accepted instead of resurrecting A.
+measuredRectsBySelector.set(multiBindings[1].selector, [{ left: 90, top: 20, width: 80, height: 80 }])
+const raceSdk = await import(`data:text/javascript;base64,${Buffer.from(sdkSource).toString('base64')}#source-update-race`)
+const sourceUpdateRequests = []
+let releaseSourceUpdate
+let didDispatchSourceUpdate
+const sourceUpdateDispatched = new Promise(resolve => { didDispatchSourceUpdate = resolve })
+raceSdk.__setLevixelNativeTransport({
+  subscribe() { return true },
+  invoke(method, options) {
+    if (method === 'open') return { ok: true, data: { galleryId: 'source-race' } }
+    if (method !== 'updateSources') return { ok: true, data: { closed: true } }
+    sourceUpdateRequests.push(options)
+    if (sourceUpdateRequests.length > 1) return { ok: true, data: { updated: true } }
+    didDispatchSourceUpdate()
+    return new Promise(resolve => { releaseSourceUpdate = () => resolve({ ok: true, data: { updated: true } }) })
+  },
+})
+await raceSdk.openLevixelFromSelector({ items: [multiItem], sourceBindings: multiBindings, initialSourceId: 'thumbnail' })
+const removingSource = raceSdk.updateLevixelSources({ galleryId: 'source-race', sourceBindings: [multiBindings[0], multiBindings[2]] })
+await sourceUpdateDispatched
+const restoringSource = raceSdk.updateLevixelSources({ galleryId: 'source-race', sourceBindings: multiBindings })
+releaseSourceUpdate()
+await Promise.all([removingSource, restoringSource])
+assert.deepEqual(sourceUpdateRequests.map(request => request.sourceIds), [['cover'], ['cover']])
+const supersededUpdate = raceSdk.updateLevixelSources({ galleryId: 'source-race', sourceBindings: [] })
+const latestUpdate = raceSdk.updateLevixelSources({ galleryId: 'source-race', sourceBindings: multiBindings })
+assert.deepEqual(await supersededUpdate, { updated: false })
+await latestUpdate
+const updateDuringClose = raceSdk.updateLevixelSources({ galleryId: 'source-race', sourceBindings: [] })
+await raceSdk.closeLevixel()
+assert.deepEqual(await updateDuringClose, { updated: false })
 
 const priorityItems = ['a', 'b', 'c'].map(id => ({
   id: `priority-${id}`,
@@ -1090,6 +1160,9 @@ export function openLevixelNative(optionsJson, callback) {
 }
 export function closeLevixelNative(_optionsJson, callback) {
   callback(JSON.stringify({ ok: true, data: { closed: true } }))
+}
+export function updateLevixelSourcesNative(_optionsJson, callback) {
+  callback(JSON.stringify({ ok: true, data: { updated: true } }))
 }
 export function retryLevixelNative(_optionsJson, callback) {
   callback(JSON.stringify({ ok: true, data: { retried: true } }))

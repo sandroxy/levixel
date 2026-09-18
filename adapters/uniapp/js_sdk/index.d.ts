@@ -59,6 +59,8 @@ export interface LevixelOpenOptions {
   index?: number
   theme?: LevixelTheme
   sourceHints?: Array<LevixelSourceHint | null>
+  /** Selected identities parallel to items/sourceHints; selector opens populate this automatically. */
+  sourceIds?: Array<string | null>
   sourceVisibility?: LevixelSourceVisibility
   counter?: false
   closeButton?: false
@@ -71,7 +73,16 @@ export interface LevixelSelectorSourceStyle {
 
 export interface LevixelSelectorSourceBinding extends LevixelSelectorSourceStyle {
   itemId: string
+  /** Stable identity within this media; required on every duplicate binding. */
+  sourceId?: string
   selector: string
+  queryContext?: unknown
+}
+
+/** After an identified selector open and host rendering, replace all mounted bindings of that session. */
+export interface LevixelSourceUpdateOptions {
+  galleryId: string
+  sourceBindings: LevixelSelectorSourceBinding[]
   queryContext?: unknown
 }
 
@@ -103,6 +114,7 @@ interface LevixelSelectorOpenOptionsBase {
   /** Show provided icons in list layout. Defaults to false; grid always shows icons. */
   actionListIcons?: boolean
   items: LevixelMediaItem[]
+  initialSourceId?: string
   theme?: LevixelTheme
   sourceVisibility?: LevixelSourceVisibility
 }
@@ -147,12 +159,13 @@ export type LevixelEvent =
     }
   | {
       type: 'sourceVisibilityChange'
-      payload: { hidden: boolean, index: number, itemId: string, galleryId: string }
+      payload: { hidden: boolean, index: number, itemId: string, galleryId: string, sourceId?: string }
       time: number
     }
   | { type: 'dismiss', payload: LevixelMediaContext, time: number }
 
 export function openLevixel(options: LevixelOpenOptions): Promise<LevixelOpenResult>
+export function updateLevixelSources(options: LevixelSourceUpdateOptions): Promise<{ updated: boolean }>
 export function retryLevixel(): Promise<LevixelRetryResult>
 export function closeLevixel(): Promise<LevixelCloseResult>
 export function onLevixelEvent(listener: (event: LevixelEvent) => void): () => void
@@ -169,6 +182,7 @@ declare const levixel: {
   open: typeof openLevixel
   close: typeof closeLevixel
   retry: typeof retryLevixel
+  updateSources: typeof updateLevixelSources
   onEvent: typeof onLevixelEvent
   prepareItem: typeof prepareLevixelItem
   warmupItem: typeof warmupLevixelItem

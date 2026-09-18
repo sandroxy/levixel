@@ -127,6 +127,36 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
         });
     }
 
+    public void updateSources(@Nullable Object options, @Nullable LevixelUniResultCallback callback) {
+        runOnMain(() -> {
+            LevixelUniSession session = activeSession;
+            if (session == null) { invoke(callback, ok(mapOf("updated", false))); return; }
+            try {
+                if (!session.galleryId().equals(LevixelUniContract.sourceUpdateGalleryId(options))) {
+                    invoke(callback, ok(mapOf("updated", false))); return;
+                }
+                LevixelUniContract.SourceUpdateRequest update = LevixelUniContract.parseSourceUpdate(options, session.itemCount());
+                String previousSourceId = session.sourceIdAt(session.currentIndex());
+                boolean updated = session.updateSources(update);
+                String nextSourceId = session.sourceIdAt(session.currentIndex());
+                if (updated && session.hidesHtmlSource() && !java.util.Objects.equals(previousSourceId, nextSourceId)) {
+                    emitSourceVisibility(false, session.currentIndex(), session, previousSourceId);
+                    emitSourceVisibility(true, session.currentIndex(), session, nextSourceId);
+                }
+                invoke(callback, ok(mapOf("updated", updated)));
+            } catch (LevixelUniContract.ContractException exception) {
+                invoke(callback, error(exception.code, exception.path, exception.getMessage()));
+            }
+        });
+    }
+
+    public void updateSourcesJson(@NonNull String optionsJson, @Nullable LevixelUniJsonCallback callback) {
+        runOnMain(() -> {
+            try { updateSources(parseJsonObject(optionsJson), result -> invoke(callback, toJson(result))); }
+            catch (JSONException exception) { invoke(callback, errorJson("INVALID_JSON", "$", "Request must be a valid JSON object")); }
+        });
+    }
+
     @Override public void onViewerEvent(@NonNull LevixelUniSession session, @NonNull LevixelViewerEvent event) {
         if (activeSession == session && !"dismiss".equals(event.type)) emit(event.type, event.payload);
     }
@@ -248,8 +278,13 @@ public final class LevixelUniRuntime implements LevixelUniSession.Listener {
             int index,
             @NonNull LevixelUniSession session
     ) {
+        emitSourceVisibility(hidden, index, session, session.sourceIdAt(index));
+    }
+
+    private void emitSourceVisibility(boolean hidden, int index, LevixelUniSession session, @Nullable String sourceId) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("hidden", hidden);
+        if (sourceId != null) payload.put("sourceId", sourceId);
         payload.put("index", index);
         payload.put("itemId", session.itemIdAt(index));
         payload.put("galleryId", session.galleryId());

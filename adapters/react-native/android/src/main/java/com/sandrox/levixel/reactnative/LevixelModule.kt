@@ -23,8 +23,14 @@ class LevixelModule : Module() {
             Prop("galleryId") { view: LevixelView, galleryId: String ->
                 view.galleryId = galleryId
             }
+            Prop("sourceId") { view: LevixelView, sourceId: String ->
+                view.sourceId = sourceId
+            }
             Prop("sourceCornerRadius") { view: LevixelView, sourceCornerRadius: Double ->
                 view.sourceCornerRadius = sourceCornerRadius.toFloat()
+            }
+            OnViewDidUpdateProps { view: LevixelView ->
+                view.commitSourceBinding()
             }
         }
     }

@@ -71,6 +71,8 @@ export interface LevixelOpenOptions {
   index?: number;
   theme?: LevixelTheme;
   sourceHints?: Array<LevixelSourceHint | null>;
+  /** Optional source identities parallel to items, for serialized source hints. */
+  sourceIds?: Array<string | null>;
   /** Web defaults to `hidden`, matching the standalone native viewers. */
   sourceVisibility?: LevixelSourceVisibility;
   counter?: false;
@@ -84,7 +86,14 @@ export interface LevixelSelectorSourceStyle {
 
 export interface LevixelSelectorSourceBinding extends LevixelSelectorSourceStyle {
   itemId: string;
+  /** Stable source identity within this media. Required on every duplicate binding. */
+  sourceId?: string;
   selector: string;
+}
+
+export interface LevixelSourceUpdateOptions {
+  galleryId: string;
+  sourceBindings: LevixelSelectorSourceBinding[];
 }
 
 export interface LevixelPrepareOptions {
@@ -104,6 +113,7 @@ interface LevixelSelectorOpenOptionsBase {
   /** Show provided icons in list layout. Defaults to false; grid always shows icons. */
   actionListIcons?: boolean;
   items: LevixelMediaItem[];
+  initialSourceId?: string;
   theme?: LevixelTheme;
   sourceVisibility?: LevixelSourceVisibility;
 }
@@ -149,7 +159,7 @@ export type LevixelEvent =
     }
   | {
       type: 'sourceVisibilityChange';
-      payload: { hidden: boolean; index: number; itemId: string; galleryId: string };
+      payload: { hidden: boolean; index: number; itemId: string; galleryId: string; sourceId?: string };
       time: number;
     }
   | {
@@ -177,10 +187,12 @@ export interface NormalizedOpenOptions {
   index: number;
   theme: LevixelTheme;
   sourceHints: Array<LevixelSourceHint | null>;
+  sourceIds?: Array<string | null>;
   sourceVisibility: LevixelSourceVisibility;
 }
 
 interface NormalizedSelectorOpenOptionsBase {
+  initialSourceId?: string;
   actions: LevixelAction[];
   actionLayout: LevixelActionLayout;
   actionListIcons: boolean;
@@ -206,6 +218,7 @@ export type NormalizedSelectorOpenOptions =
 
 export interface NormalizedSelectorSourceBinding {
   itemId: string;
+  sourceId?: string;
   itemIndex: number;
   selector: string;
   objectFit: LevixelObjectFit;
@@ -215,6 +228,9 @@ export interface NormalizedSelectorSourceBinding {
 export interface ImageInfo extends LevixelPreparedPreview {}
 
 export interface SourceBinding {
+  sourceId?: string;
+  candidates?: SourceBinding[];
+  preferredSourceId?: string;
   element: HTMLElement | null;
   hint: LevixelSourceHint | null;
   preview?: ImageInfo;

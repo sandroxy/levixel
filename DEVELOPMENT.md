@@ -118,6 +118,14 @@ historical XCFramework independently of newer source.
 
 Android requires the repository Gradle wrapper. iOS requires Xcode command-line tools. HarmonyOS requires DevEco Studio tooling and `ohpm`; custom locations can be supplied through `DEVECO_STUDIO_CONTENTS`, `DEVECO_SDK_HOME`, `HVIGORW`, and `OHPM` where used by the packaging scripts.
 
+Keep Android code compatible with the declared minimum SDK without requiring
+consumer-side core-library desugaring. Use the existing Android Lint checks;
+passing tests on a higher SDK alone does not establish minimum-API compatibility.
+
+Native source-registration changes also affect RN and UniApp, which share the
+cores. Keep source clipping and opacity restoration covered in those adapters,
+including UniApp's transparent iOS source anchors.
+
 HarmonyOS consumer coverage must update the host `items` while a viewer is
 open. The active viewer must retain its immutable opening snapshot, while its
 return transition resolves the latest visible grid source by stable media id
@@ -143,10 +151,12 @@ Build and inspect the immutable npm candidate:
 The tarball embeds the accepted Android AAR and iOS XCFramework. It must be tested as a tarball dependency in Android and iOS consumer hosts before publication.
 Contract verification requires Node.js 22.6 or newer. It exercises request
 validation and action callback ownership across opening snapshots and dismissal;
-TypeScript component compilation and Android/iOS bridge
-integration remain artifact-consumer checks. Packaging also type-checks the
-adapter-facing iOS API against the exact embedded XCFramework on macOS; the same
-API surface is inspected portably when a release asset is verified on Linux.
+TypeScript component compilation and Android/iOS bridge integration remain
+artifact-consumer checks. The iOS lifecycle script checks source call ordering;
+it does not compile or exercise the adapter's container gestures. Packaging also
+type-checks the adapter-facing iOS API against the exact embedded XCFramework
+on macOS; the same API surface is inspected portably when a release asset is
+verified on Linux.
 React Native packaging verifies its temporary candidate before installing it in
 `dist/` and refuses to replace different same-version bytes unless `--replace`
 is explicitly supplied for a rejected, still-untagged local candidate.
@@ -157,8 +167,17 @@ component compilation is required in addition to the pure contract test.
 After preparing the RN Android host through the development entry above, run
 `./gradlew :sandrox-levixel:testDebugUnitTest` from its `host/android` directory
 for the adapter's source-binding regressions. These cover asynchronous drawable
-arrival, internal image swaps, source identity reuse, and cancelled taps. Android
-core tests separately cover thumbnail hiding through paging and dismissal.
+arrival, internal image swaps, source identity reuse, and cancelled taps in
+`LevixelSourceBindingTest`. `LevixelViewTest` also covers prepend/reorder with
+either `items`/`index` update order and media removal: layout or image replacement
+between setters must not change the selected source before the prop batch commits.
+Android core tests separately cover thumbnail hiding through paging and dismissal.
+
+For source-binding changes, use the existing Android and iOS hosts to check
+opening from the tapped thumbnail, keeping the selected source through paging
+and image replacement, and restoring sources on close. Include same-media
+duplicates and source removal or reuse where relevant; source-only checks do
+not establish those interactions.
 
 ## UniApp
 

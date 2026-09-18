@@ -57,6 +57,8 @@ interface ViewerCallbacks {
 interface HiddenSource {
   element: HTMLElement;
   visibility: string;
+  priority: string;
+  sourceId?: string;
   index: number;
 }
 
@@ -72,7 +74,9 @@ export class LevixelWebViewer {
   readonly galleryId: string;
 
   private readonly options: NormalizedOpenOptions;
-  private readonly bindings: SourceBinding[];
+  private bindings: SourceBinding[];
+  private readonly selectedBindings = new Map<number, SourceBinding>();
+  private readonly sourceObserver: MutationObserver;
   private readonly initialPreviews: Array<ImageInfo | undefined>;
   private readonly callbacks: ViewerCallbacks;
   private readonly host: HTMLElement;
@@ -94,6 +98,7 @@ export class LevixelWebViewer {
   private trackOffset = 0;
   private hiddenSource: HiddenSource | undefined;
   private sourceEventIndex: number | undefined;
+  private sourceEventSourceId: string | undefined;
   private actionSheet: ActionSheet | undefined;
   private longPressTimer: number | undefined;
   private suppressClickUntil = 0;
@@ -170,6 +175,9 @@ export class LevixelWebViewer {
     document.body.append(this.host);
     this.documentGuard = new DocumentGuard(this.host);
     this.installListeners();
+    this.sourceObserver = new MutationObserver(() => this.refreshHiddenSource());
+    this.sourceObserver.observe(document.body, { subtree: true, childList: true, attributes: true,
+      attributeFilter: ['style', 'class', 'id', 'hidden'] });
     this.updateViewport(true);
     this.updateActivePages();
   }
@@ -202,8 +210,11 @@ export class LevixelWebViewer {
     this.content.style.opacity = '1';
     this.opened = true;
     if (this.options.sourceVisibility === 'hidden') {
+      // A source may have disappeared during the opening animation. Only now
+      // allow a same-media fallback, keeping opening geometry exact.
+      this.hideSourceElement(this.currentIndex);
       this.sourceEventIndex = this.currentIndex;
-      this.emitSourceVisibility(true, this.currentIndex);
+      this.emitSourceVisibility(true, this.currentIndex, this.resolveBinding(this.currentIndex)?.sourceId);
     }
     this.assertAlive();
     this.root.focus({ preventScroll: true });
@@ -267,13 +278,14 @@ export class LevixelWebViewer {
     if (this.destroyed)
       return;
     this.destroyed = true;
+    this.sourceObserver.disconnect();
     this.cancelAnimations();
     this.clearTapTimer();
     this.removeListeners();
     this.pages.forEach(page => page.destroy());
     this.restoreSourceElement();
     if (this.sourceEventIndex !== undefined) {
-      this.emitSourceVisibility(false, this.sourceEventIndex);
+      this.emitSourceVisibility(false, this.sourceEventIndex, this.sourceEventSourceId);
       this.sourceEventIndex = undefined;
     }
     this.documentGuard.restore();
@@ -653,8 +665,10 @@ export class LevixelWebViewer {
     this.pages.forEach(page => page.updateViewport(size));
     this.track.style.width = `${this.pages.length * size.width}px`;
     this.applyTrackOffset(-this.currentIndex * size.width);
-    if (!initial)
+    if (!initial) {
       this.updateActivePages();
+      this.refreshHiddenSource();
+    }
   }
 
   private updateActivePages(): void {
@@ -765,14 +779,14 @@ export class LevixelWebViewer {
       if (this.options.sourceVisibility === 'hidden') {
         this.restoreSourceElement();
         if (this.sourceEventIndex !== undefined)
-          this.emitSourceVisibility(false, this.sourceEventIndex);
+          this.emitSourceVisibility(false, this.sourceEventIndex, this.sourceEventSourceId);
       }
       this.currentIndex = targetIndex;
       this.updateActivePages();
       if (this.options.sourceVisibility === 'hidden') {
         this.hideSourceElement(targetIndex);
         this.sourceEventIndex = targetIndex;
-        this.emitSourceVisibility(true, targetIndex);
+        this.emitSourceVisibility(true, targetIndex, this.resolveBinding(targetIndex)?.sourceId);
       }
       this.callbacks.emit({
         type: 'indexChange',
@@ -862,15 +876,75 @@ export class LevixelWebViewer {
     this.gesture.lastSample = point;
   }
 
+  get mediaItems(): LevixelMediaItem[] { return this.options.items; }
+
+  updateSources(bindings: SourceBinding[]): void {
+    if (this.closing || this.destroyed) return;
+    bindings.forEach((group, index) => {
+      const previous = this.bindings[index]?.candidates ?? [];
+      const candidates = group.candidates ?? [];
+      const nextById = new Map(candidates.map(candidate => [candidate.sourceId, candidate]));
+      const survivors = previous.flatMap(old => {
+        const next = nextById.get(old.sourceId);
+        return next && next.element === old.element ? [next] : [];
+      });
+      const retained = new Set(survivors);
+      group.candidates = [...survivors, ...candidates.filter(next => !retained.has(next))];
+    });
+    this.bindings = bindings;
+    this.refreshHiddenSource();
+  }
+
+  private resolveBinding(index: number): SourceBinding | undefined {
+    const group = this.bindings[index];
+    if (!group?.candidates) return group;
+    const usable = (binding: SourceBinding): boolean => {
+      const element = binding.element;
+      if (!element || (binding.identitySelector && !element.matches(binding.identitySelector))) return false;
+      const layout = resolveElementSourceLayout(element, this.hiddenSource?.element === element);
+      return !!layout && layout.clippingRect.left < this.viewport.left + this.viewport.width
+        && layout.clippingRect.top < this.viewport.top + this.viewport.height
+        && layout.clippingRect.left + layout.clippingRect.width > this.viewport.left
+        && layout.clippingRect.top + layout.clippingRect.height > this.viewport.top;
+    };
+    const previous = this.selectedBindings.get(index);
+    const selected = group.candidates.find(candidate => candidate.element === previous?.element
+      && candidate.sourceId === previous?.sourceId && usable(candidate));
+    if (selected) { this.selectedBindings.set(index, selected); return selected; }
+    const strictOpening = !this.opened && index === this.options.index && group.preferredSourceId !== undefined;
+    const replacement = group.candidates.find(candidate =>
+      (!strictOpening || candidate.sourceId === group.preferredSourceId) && usable(candidate));
+    if (replacement) this.selectedBindings.set(index, replacement);
+    else this.selectedBindings.delete(index);
+    return replacement;
+  }
+
+  private refreshHiddenSource(): void {
+    if (!this.opened || this.closing || this.destroyed || this.options.sourceVisibility !== 'hidden') return;
+    const previous = this.hiddenSource;
+    const next = this.sourceElement(this.currentIndex);
+    if (previous?.element === next || (!previous && !next)) return;
+    this.restoreSourceElement();
+    const previousEventIndex = this.sourceEventIndex;
+    this.sourceEventIndex = undefined;
+    if (previousEventIndex !== undefined) this.emitSourceVisibility(false, previousEventIndex, this.sourceEventSourceId);
+    if (this.closing || this.destroyed) return;
+    this.hideSourceElement(this.currentIndex);
+    if (this.hiddenSource) {
+      this.sourceEventIndex = this.currentIndex;
+      this.emitSourceVisibility(true, this.currentIndex, this.hiddenSource.sourceId);
+    }
+  }
+
   private transitionSource(index: number): string | undefined {
-    const binding = this.bindings[index];
+    const binding = this.resolveBinding(index);
     return imageInfoFromElement(this.sourceElement(index))?.src
       ?? binding?.preview?.src
       ?? peekImage(transitionURL(this.options.items[index]!))?.src;
   }
 
   private resolveSourceGeometry(index: number): SharedElementGeometry | null {
-    const binding = this.bindings[index];
+    const binding = this.resolveBinding(index);
     const item = this.options.items[index];
     if (!binding || !item)
       return null;
@@ -910,12 +984,19 @@ export class LevixelWebViewer {
     const element = this.sourceElement(index);
     if (!element)
       return;
-    this.hiddenSource = { element, visibility: element.style.visibility, index };
-    element.style.visibility = 'hidden';
+    const sourceId = this.resolveBinding(index)?.sourceId;
+    this.hiddenSource = {
+      element,
+      visibility: element.style.getPropertyValue('visibility'),
+      priority: element.style.getPropertyPriority('visibility'),
+      ...(sourceId !== undefined ? { sourceId } : {}),
+      index,
+    };
+    element.style.setProperty('visibility', 'hidden', 'important');
   }
 
   private sourceElement(index: number): HTMLElement | null {
-    const binding = this.bindings[index];
+    const binding = this.resolveBinding(index);
     const element = binding?.element;
     if (!element?.isConnected)
       return null;
@@ -928,7 +1009,10 @@ export class LevixelWebViewer {
   private restoreSourceElement(): void {
     if (!this.hiddenSource)
       return;
-    this.hiddenSource.element.style.visibility = this.hiddenSource.visibility;
+    if (this.hiddenSource.element.style.visibility === 'hidden') {
+      if (this.hiddenSource.visibility) this.hiddenSource.element.style.setProperty('visibility', this.hiddenSource.visibility, this.hiddenSource.priority);
+      else this.hiddenSource.element.style.removeProperty('visibility');
+    }
     this.hiddenSource = undefined;
   }
 
@@ -1097,10 +1181,12 @@ export class LevixelWebViewer {
     this.liveRegion.textContent = item?.alt || `${item?.type ?? 'media'} ${this.currentIndex + 1}`;
   }
 
-  private emitSourceVisibility(hidden: boolean, index: number): void {
+  private emitSourceVisibility(hidden: boolean, index: number, sourceId?: string): void {
+    if (hidden) this.sourceEventSourceId = sourceId;
     this.callbacks.emit({
       type: 'sourceVisibilityChange',
       payload: {
+        ...(sourceId === undefined ? {} : { sourceId }),
         hidden,
         index,
         itemId: this.options.items[index]!.id,

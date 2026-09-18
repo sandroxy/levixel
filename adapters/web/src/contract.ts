@@ -22,6 +22,7 @@ const OPEN_KEYS = new Set([
   'index',
   'theme',
   'sourceHints',
+  'sourceIds',
   'sourceVisibility',
   'counter',
   'closeButton',
@@ -33,6 +34,7 @@ const SELECTOR_KEYS = new Set([
   'items',
   'index',
   'initialItemId',
+  'initialSourceId',
   'theme',
   'sourceVisibility',
   'sourceSelector',
@@ -60,7 +62,7 @@ const HINT_KEYS = new Set([
 const RECT_KEYS = new Set(['left', 'top', 'width', 'height']);
 const SIZE_KEYS = new Set(['width', 'height']);
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius']);
-const SOURCE_BINDING_KEYS = new Set(['itemId', 'selector', 'objectFit', 'cornerRadius']);
+const SOURCE_BINDING_KEYS = new Set(['itemId', 'sourceId', 'selector', 'objectFit', 'cornerRadius']);
 const ACTION_KEYS = new Set(['id', 'label', 'icon', 'group', 'disabled', 'destructive', 'onPress']);
 
 export class LevixelContractError extends Error {
@@ -310,6 +312,12 @@ function normalizeHints(value: unknown, itemCount: number): Array<LevixelSourceH
   return value.map(normalizeHint);
 }
 
+function normalizeSourceIds(value: unknown, itemCount: number): Array<string | null> {
+  if (!Array.isArray(value) || value.length !== itemCount)
+    contractError('$.sourceIds', '$.sourceIds must contain one entry for each media item');
+  return Array.from(value, (id, index) => id === null ? null : requireNonEmptyString(id, `$.sourceIds[${index}]`));
+}
+
 function rejectUnsupportedBoolean(value: unknown, path: '$.counter' | '$.closeButton'): void {
   if (value === undefined || value === false)
     return;
@@ -379,6 +387,7 @@ export function normalizeOpenOptions(value: LevixelOpenOptions | unknown): Norma
     index: normalizeIndex(record.index, items.length),
     theme: normalizeTheme(record.theme),
     sourceHints: normalizeHints(record.sourceHints, items.length),
+    ...(record.sourceIds === undefined ? {} : { sourceIds: normalizeSourceIds(record.sourceIds, items.length) }),
     sourceVisibility: normalizeSourceVisibility(record.sourceVisibility),
   };
 }
@@ -417,7 +426,8 @@ function normalizeSourceBindings(
     contractError('$.sourceBindings', '$.sourceBindings must be an array');
 
   const itemIndexes = new Map(items.map((item, index) => [item.id, index]));
-  const itemIds = new Set<string>();
+  const identities = new Set<string>();
+  const mediaBindings = new Map<string, boolean>();
   const selectors = new Set<string>();
   return value.map((entry, index) => {
     const path = `$.sourceBindings[${index}]`;
@@ -432,14 +442,14 @@ function normalizeSourceBindings(
         'INVALID_VALUE',
       );
     }
-    if (itemIds.has(itemId)) {
-      contractError(
-        `${path}.itemId`,
-        `${path}.itemId must be unique within $.sourceBindings`,
-        'INVALID_VALUE',
-      );
+    const sourceId = record.sourceId === undefined ? undefined
+      : requireNonEmptyString(record.sourceId, `${path}.sourceId`);
+    const identity = JSON.stringify([itemId, sourceId ?? null]);
+    if (identities.has(identity) || (mediaBindings.has(itemId) && (!mediaBindings.get(itemId) || sourceId === undefined))) {
+      contractError(`${path}.sourceId`, 'Duplicate media bindings require distinct explicit sourceId values', 'INVALID_VALUE');
     }
-    itemIds.add(itemId);
+    identities.add(identity);
+    mediaBindings.set(itemId, sourceId !== undefined);
 
     const selector = requireNonEmptyString(record.selector, `${path}.selector`).trim();
     if (!selector)
@@ -455,6 +465,7 @@ function normalizeSourceBindings(
     return {
       itemId,
       itemIndex,
+      ...(sourceId === undefined ? {} : { sourceId }),
       selector,
       objectFit: objectFit(record.objectFit, `${path}.objectFit`, 'cover'),
       cornerRadius: nonNegativeNumber(record.cornerRadius, `${path}.cornerRadius`, 0),
@@ -495,10 +506,17 @@ export function normalizeSelectorOpenOptions(
     sourceVisibility: normalizeSourceVisibility(record.sourceVisibility),
   };
   const sourceBindings = normalizeSourceBindings(record.sourceBindings, items);
+  const initialSourceId = record.initialSourceId === undefined ? undefined
+    : requireNonEmptyString(record.initialSourceId, '$.initialSourceId');
+  if (initialSourceId !== undefined && !sourceBindings?.some(binding =>
+    binding.itemIndex === normalizedBase.index && binding.sourceId === initialSourceId)) {
+    contractError('$.initialSourceId', '$.initialSourceId must identify a binding of the opening media', 'INVALID_VALUE');
+  }
   if (sourceBindings !== undefined) {
     return {
       ...normalizedBase,
       sourceMode: 'identified',
+      ...(initialSourceId === undefined ? {} : { initialSourceId }),
       sourceBindings,
     };
   }

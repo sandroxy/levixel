@@ -21,6 +21,9 @@ public final class LevixelModule: Module {
             Prop("galleryId") { (view: LevixelView, galleryId: String?) in
                 view.galleryId = galleryId ?? ""
             }
+            Prop("sourceId") { (view: LevixelView, sourceId: String?) in
+                view.sourceId = sourceId ?? ""
+            }
             Prop("sourceCornerRadius") { (view: LevixelView, sourceCornerRadius: Double?) in
                 view.sourceCornerRadius = CGFloat(sourceCornerRadius ?? 0)
             }

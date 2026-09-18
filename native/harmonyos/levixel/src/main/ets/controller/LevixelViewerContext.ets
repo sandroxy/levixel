@@ -9,6 +9,7 @@ import { intersectRects, isUsableRect } from '../model/LevixelTransitionGeometry
 interface LevixelSourceEntry {
   itemId: string;
   registrationId: number;
+  sourceId: string;
   snapshotId: string;
   viewportId: string;
   frameInWindow: RectMetrics | null;
@@ -47,11 +48,13 @@ export class LevixelViewerContext {
   private retryHandler: (() => boolean) | null = null;
   private backHandler: (() => boolean) | null = null;
   private listeners: Set<(event: LevixelViewerEvent) => void> = new Set<(event: LevixelViewerEvent) => void>();
-  private openHandler: ((itemId: string) => void) | null = null;
+  private openHandler: ((itemId: string, registrationId: number) => void) | null = null;
   private prepareHandler: ((itemId: string) => void) | null = null;
   private readonly sources: Map<number, LevixelSourceEntry> = new Map<number, LevixelSourceEntry>();
   private readonly viewports: Map<string, LevixelViewportEntry> = new Map<string, LevixelViewportEntry>();
   private hiddenSourceId: string = '';
+  private hiddenRegistrationId: number = 0;
+  private readonly selectedSources: Map<string, number> = new Map<string, number>();
 
   constructor() {
     LevixelViewerContext.nextContextId += 1;
@@ -78,12 +81,20 @@ export class LevixelViewerContext {
     });
   }
 
-  public open(itemId: string): void {
+  public open(itemId: string, sourceId: string = '', registrationId: number = 0): void {
     this.requireIdentifier(itemId, 'itemId');
     if (this.openHandler === null) {
       throw new Error('LevixelController.open requires a mounted LevixelViewer using the same controller.');
     }
-    this.openHandler(itemId);
+    this.requireOptionalIdentifier(sourceId, 'sourceId');
+    let preferred: number = registrationId;
+    if (sourceId.length > 0) {
+      preferred = -1;
+      this.sources.forEach((source: LevixelSourceEntry) => {
+        if (source.itemId === itemId && source.sourceId === sourceId) preferred = source.registrationId;
+      });
+    }
+    this.openHandler(itemId, preferred);
   }
 
   public prepare(itemId: string): void {
@@ -94,7 +105,7 @@ export class LevixelViewerContext {
   }
 
   public registerViewer(
-    openHandler: (itemId: string) => void,
+    openHandler: (itemId: string, registrationId: number) => void,
     prepareHandler: (itemId: string) => void,
     closeHandler: (() => void) | null = null,
     retryHandler: (() => boolean) | null = null,
@@ -122,7 +133,7 @@ export class LevixelViewerContext {
     this.retryHandler = null;
     this.backHandler = null;
     this.viewerRegistrationId = 0;
-    this.setHiddenSource('');
+    this.endSourceSession();
   }
 
   public registerSource(
@@ -130,9 +141,18 @@ export class LevixelViewerContext {
     viewportId: string,
     cornerRadius: number,
     imageFit: LevixelSourceImageFit,
-    setHidden: (hidden: boolean) => void
+    setHidden: (hidden: boolean) => void,
+    sourceId: string = ''
   ): LevixelSourceRegistration {
     this.requireIdentifier(itemId, 'itemId');
+    this.requireOptionalIdentifier(sourceId, 'sourceId');
+    if (sourceId.length > 0) {
+      this.sources.forEach((source: LevixelSourceEntry) => {
+        if (source.itemId === itemId && source.sourceId === sourceId) {
+          throw new Error('Levixel sourceId must be unique within one media item.');
+        }
+      });
+    }
     this.requireOptionalIdentifier(viewportId, 'viewportId');
     this.requireCornerRadius(cornerRadius);
     this.requireImageFit(imageFit);
@@ -141,6 +161,7 @@ export class LevixelViewerContext {
     this.sources.set(registrationId, {
       itemId: itemId,
       registrationId: registrationId,
+      sourceId: sourceId,
       snapshotId: snapshotId,
       viewportId: viewportId,
       frameInWindow: null,
@@ -149,7 +170,7 @@ export class LevixelViewerContext {
       imageFit: imageFit,
       setHidden: setHidden
     });
-    setHidden(this.hiddenSourceId === itemId);
+    setHidden(false);
     return {
       registrationId: registrationId,
       snapshotId: snapshotId
@@ -162,6 +183,7 @@ export class LevixelViewerContext {
       return;
     }
     source.frameInWindow = cloneRect(frameInWindow);
+    this.refreshHiddenSource();
   }
 
   public updateSourceConfiguration(
@@ -179,6 +201,7 @@ export class LevixelViewerContext {
       source.viewportId = viewportId;
       source.cornerRadius = cornerRadius;
       source.imageFit = imageFit;
+      this.refreshHiddenSource();
     }
   }
 
@@ -190,6 +213,7 @@ export class LevixelViewerContext {
     const source: LevixelSourceEntry | null = this.registeredSource(itemId, registrationId);
     if (source !== null) {
       source.visible = visible;
+      this.refreshHiddenSource();
     }
   }
 
@@ -200,25 +224,41 @@ export class LevixelViewerContext {
     }
     source.setHidden(false);
     this.sources.delete(registrationId);
+    if (this.hiddenRegistrationId === registrationId) this.hiddenRegistrationId = 0;
+    this.refreshHiddenSource();
   }
 
-  public resolveSource(itemId: string): LevixelResolvedSource | null {
-    const matches: LevixelSourceEntry[] = [];
-    this.sources.forEach((candidate: LevixelSourceEntry) => {
-      if (candidate.itemId === itemId && this.isResolvableSource(candidate)) {
-        matches.push(candidate);
+  public beginSourceSession(itemId: string, registrationId: number): LevixelResolvedSource | null {
+    this.endSourceSession();
+    if (registrationId !== 0) this.selectedSources.set(itemId, registrationId);
+    return this.resolveSource(itemId, registrationId === 0);
+  }
+
+  public endSourceSession(): void {
+    this.setHiddenSource('');
+    this.selectedSources.clear();
+  }
+
+  private selectedSource(itemId: string, allowFallback: boolean = true): LevixelSourceEntry | null {
+    const selected: number | undefined = this.selectedSources.get(itemId);
+    if (selected !== undefined) {
+      const source: LevixelSourceEntry | null = this.registeredSource(itemId, selected);
+      if (source !== null && this.isResolvableSource(source)) return source;
+    }
+    if (!allowFallback) return null;
+    let replacement: LevixelSourceEntry | null = null;
+    this.sources.forEach((source: LevixelSourceEntry) => {
+      if (replacement === null && source.itemId === itemId && this.isResolvableSource(source)) {
+        replacement = source;
+        this.selectedSources.set(itemId, source.registrationId);
       }
     });
-    if (matches.length === 0) {
-      return null;
-    }
-    if (matches.length > 1) {
-      throw new Error(`LevixelSource itemId "${itemId}" has more than one visible mounted source.`);
-    }
-    const source: LevixelSourceEntry = matches[0];
-    if (source.frameInWindow === null) {
-      return null;
-    }
+    return replacement;
+  }
+
+  public resolveSource(itemId: string, allowFallback: boolean = true): LevixelResolvedSource | null {
+    const source: LevixelSourceEntry | null = this.selectedSource(itemId, allowFallback);
+    if (source === null || source.frameInWindow === null) return null;
 
     let viewportInWindow: RectMetrics | null = null;
     if (source.viewportId.length > 0) {
@@ -239,13 +279,19 @@ export class LevixelViewerContext {
   }
 
   public setHiddenSource(itemId: string): void {
-    if (this.hiddenSourceId === itemId) {
-      return;
-    }
     this.hiddenSourceId = itemId;
-    this.sources.forEach((source: LevixelSourceEntry) => {
-      source.setHidden(source.itemId === itemId);
-    });
+    this.refreshHiddenSource();
+  }
+
+  private refreshHiddenSource(): void {
+    const source: LevixelSourceEntry | null = this.hiddenSourceId.length > 0
+      ? this.selectedSource(this.hiddenSourceId) : null;
+    const next: number = source !== null ? source.registrationId : 0;
+    if (this.hiddenRegistrationId === next) return;
+    const previous: LevixelSourceEntry | undefined = this.sources.get(this.hiddenRegistrationId);
+    this.hiddenRegistrationId = next;
+    if (previous !== undefined) previous.setHidden(false);
+    if (source !== null) source.setHidden(true);
   }
 
   public registerViewport(viewportId: string): number {
@@ -267,12 +313,14 @@ export class LevixelViewerContext {
       return;
     }
     viewport.frameInWindow = cloneRect(frameInWindow);
+    this.refreshHiddenSource();
   }
 
   public unregisterViewport(viewportId: string, registrationId: number): void {
     const viewport: LevixelViewportEntry | undefined = this.viewports.get(viewportId);
     if (viewport !== undefined && viewport.registrationId === registrationId) {
       this.viewports.delete(viewportId);
+      this.refreshHiddenSource();
     }
   }
 

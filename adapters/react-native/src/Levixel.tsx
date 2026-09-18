@@ -7,6 +7,7 @@ import type { LevixelAction, LevixelActionLayout, LevixelEvent, LevixelProps, Le
 
 interface NativeOpenOptions {
   requestId: string;
+  sourceId?: string;
   galleryId: string;
   items: NativeLevixelMediaItem[];
   index: number;
@@ -23,16 +24,17 @@ interface NativeController {
 interface NativeSourceProps extends ViewProps {
   ref?: React.Ref<NativeController>;
   galleryId?: string;
+  sourceId?: string;
   index?: number;
   items?: NativeLevixelMediaItem[];
   sourceCornerRadius?: number;
-  onSourcePress?: (event: NativeSyntheticEvent<{ itemId: string }>) => void;
+  onSourcePress?: (event: NativeSyntheticEvent<{ itemId: string; sourceId: string }>) => void;
   onViewerEvent?: (event: NativeSyntheticEvent<LevixelEvent & { requestId: string }>) => void;
 }
 interface ContextValue {
   galleryId: string;
   items: NativeLevixelMediaItem[];
-  open(itemId: string): Promise<void>;
+  open(itemId: string, sourceId?: string): Promise<void>;
 }
 const LevixelContext = React.createContext<ContextValue | null>(null);
 const NativeSource = requireNativeView<NativeSourceProps>('Levixel');
@@ -51,7 +53,7 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
   const normalizedActions = actionOptions.actions;
   const resolvedGalleryId = galleryId?.trim() || generatedGalleryId;
   if (theme !== 'dark' && theme !== 'light') throw new TypeError('[Levixel] theme must be dark or light.');
-  const open = React.useCallback(async (itemId: string) => {
+  const open = React.useCallback(async (itemId: string, sourceId?: string) => {
     const index = resolveSourceIndex(normalizedItems, { itemId });
     if (native.current === null) throw new Error('[Levixel] Levixel is not mounted.');
     const requestId = uniqueId();
@@ -59,6 +61,7 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
     try {
       await native.current.open({
         requestId, galleryId: resolvedGalleryId, index, theme,
+        ...(sourceId === undefined ? {} : { sourceId }),
         items: normalizedItems.map(item => ({ ...item })),
         actions: normalizedActions.map(({ onPress: _callback, ...action }) => action),
         actionLayout: actionOptions.actionLayout,
@@ -67,7 +70,7 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
     } catch (error) { sessions.end(requestId); throw error; }
   }, [normalizedItems, normalizedActions, actionOptions, resolvedGalleryId, sessions, theme]);
   React.useImperativeHandle(ref, () => ({
-    open,
+    open(itemId: string) { return open(itemId); },
     async close() { await native.current?.close(); },
     async retry() { return await native.current?.retry() ?? false; },
   }), [open]);
@@ -90,16 +93,18 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
 });
 
 function LevixelSource(props: LevixelSourceProps) {
+  const [sourceId] = React.useState(uniqueId);
   const context = React.useContext(LevixelContext);
   if (context === null) throw new Error('[Levixel] Levixel.Source must be rendered inside Levixel.');
   const { children, style } = props;
   const index = resolveSourceIndex(context.items, props);
   const sourceCornerRadius = resolveSourceCornerRadius(StyleSheet.flatten(style) as Readonly<Record<string, unknown>> | undefined);
   return (
-    <NativeSource collapsable={false} galleryId={context.galleryId} index={index}
+    <NativeSource collapsable={false} galleryId={context.galleryId} sourceId={sourceId} index={index}
       items={context.items} sourceCornerRadius={sourceCornerRadius} style={style}
       onSourcePress={({ nativeEvent }) => {
-        void context.open(nativeEvent.itemId).catch(error => console.warn('[Levixel] Could not open viewer.', error));
+        if (nativeEvent.sourceId !== sourceId || nativeEvent.itemId !== context.items[index].id) return;
+        void context.open(nativeEvent.itemId, sourceId).catch(error => console.warn('[Levixel] Could not open viewer.', error));
       }}>
       {React.Children.only(children)}
     </NativeSource>

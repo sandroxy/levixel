@@ -156,14 +156,29 @@ Wrap a scrolling or virtualized source collection in
 Viewport IDs must be unique within their controller.
 The registered viewport defines the real clipping boundary: any positive-area
 intersection remains a valid return target, while a fully clipped or unmounted
-source produces a safe fade. Sources that are not inside a clipping container
-may omit both the viewport and `viewportId`.
+source is ineligible. Dismissal fades when the media has no eligible source.
+Sources that are not inside a clipping container may omit both the viewport
+and `viewportId`.
 
 Every media item requires a stable, unique `id`, a full-resolution `sourceUrl`,
 a `thumbnailUrl`, a display `title`, and finite positive `aspectWidth` and
 `aspectHeight` values. For video items, use `LevixelMediaType.VIDEO`; the
-thumbnail is also the playback poster. Rendering more than one visible source
-for the same item is ambiguous and fails explicitly.
+thumbnail is also the playback poster.
+
+Several mounted `LevixelSource` views may reference the same item without
+duplicating `items`. Taps carry their own instance identity. Keep those
+components stable through ordinary updates. Optionally give each view a stable
+`sourceId`, unique within that media/controller, and call
+`controller.open(itemId, sourceId)` to select it from another control. If that
+explicit source is unavailable, opening fades instead of using another view's
+geometry.
+
+The session remembers each selected source through paging and ordinary updates.
+If it becomes unavailable, another eligible source of the same media is chosen
+in first-registration order; updating an existing source does not change that
+order or replace a still-valid selection. Only the selected source is hidden,
+and it is shown again when paging away or closing. With no eligible source,
+dismissal fades.
 
 The host may replace `items` after prepending history, appending a page, or
 reordering its data. Keep every media `id` stable and unique. An open viewer

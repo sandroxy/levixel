@@ -1,6 +1,7 @@
 import {
   CloseLevixelNative,
   RetryLevixelNative,
+  UpdateLevixelSourcesNative,
   LevixelNativeCallback,
   OnLevixelNativeEvent,
   OpenLevixelNative,
@@ -81,6 +82,13 @@ export const retryLevixelNative: RetryLevixelNative = function (
     optionsJson,
     new RuntimeResultCallback(callback)
   )
+}
+
+export const updateLevixelSourcesNative: UpdateLevixelSourcesNative = function (
+  optionsJson: string,
+  callback: LevixelNativeCallback
+): void {
+  LevixelUniRuntime.getShared().updateSourcesJson(optionsJson, new RuntimeResultCallback(callback))
 }
 
 export const onLevixelNativeEvent: OnLevixelNativeEvent = function (

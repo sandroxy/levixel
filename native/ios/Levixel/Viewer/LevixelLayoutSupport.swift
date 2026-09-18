@@ -106,7 +106,7 @@ extension UIView {
 
         var ancestor = superview
         while let current = ancestor {
-            if current.isHidden || current.alpha <= 0.01 {
+            if current.isHidden || (current.alpha <= 0.01 && !LevixelSourceViewRegistry.shared.isHiddenByViewer(current)) {
                 return false
             }
             ancestor = current.superview

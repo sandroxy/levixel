@@ -23,13 +23,15 @@ import {
   openLevixelFromSelector,
   prepareLevixelItem,
   retryLevixel,
+  updateLevixelSources,
   type LevixelMediaItem,
   warmupLevixelItem,
 } from '@sandrox/levixel-web';
 ```
 
 For a list that can paginate, reorder, or virtualize, bind only the currently
-mounted source elements by stable media ID:
+mounted source elements by stable media ID. This example uses one source per
+media item:
 
 ```ts
 const items: LevixelMediaItem[] = [
@@ -47,7 +49,7 @@ const items: LevixelMediaItem[] = [
 const mountedSources = () =>
   [...document.querySelectorAll<HTMLElement>('[data-levixel-item-id]')];
 
-const sourceBindings = () => mountedSources().map(source => ({
+const getSourceBindings = () => mountedSources().map(source => ({
   itemId: source.dataset.levixelItemId!,
   selector: `#${source.id}`,
   objectFit: 'cover' as const,
@@ -60,10 +62,9 @@ const bindLevixelSource = (source: HTMLElement) =>
     void openLevixelFromSelector({
       items,
       initialItemId: itemId,
-      sourceBindings: sourceBindings(),
+      sourceBindings: getSourceBindings(),
     });
   });
-
 ```
 
 Call `bindLevixelSource` from the list cell's mount hook and call its returned
@@ -72,13 +73,13 @@ their own activation handler without retaining detached elements.
 
 Every bound selector must identify at most one element. Bindings may be sparse
 and in any order; `itemId` maps each mounted source to the current `items`
-snapshot. Unknown or repeated ids, repeated selectors, and mixing
-`sourceBindings` with `sourceSelector`/`sourceStyles` are rejected instead of
-being guessed. In the example, every mounted source therefore needs its own
-non-empty DOM `id`. A source that unmounts before return simply uses a fade for
-that item. If a virtual list reuses the same DOM node for another media ID,
-Levixel rejects that stale return target and fades instead of transitioning to
-the recycled cell.
+snapshot. Unknown media IDs, duplicate source identities, repeated selectors,
+and mixing `sourceBindings` with `sourceSelector`/`sourceStyles` are rejected
+instead of being guessed. In the example, every mounted source therefore needs
+its own non-empty DOM `id`. A removed source, or a DOM node rebound to another
+media ID, is no longer a return target. The viewer uses another eligible source
+of the same media, or fades when none remains; it never returns to the recycled
+cell's new media.
 
 `onLevixelSourceActivate` preserves ordinary click activation for mouse, keyboard, and assistive input. On touch devices it recognizes a primary, movement-bounded tap from Pointer Events, so a source remains immediately responsive after vertical drag dismissal even when the browser suppresses the follow-up compatibility `click`. Scrolling or a cancelled pointer does not activate the source.
 
@@ -105,7 +106,70 @@ One viewer session pages through the loaded `items` captured by that open call.
 Appending or prepending host data is supported on the next open; Levixel does
 not fetch another host page from inside an already open viewer.
 
-`openLevixel` accepts already measured `sourceHints` for hosts that own their DOM geometry. `prepareLevixelItem` preloads the transition preview (thumbnail or poster, falling back to the image URL), while `warmupLevixelItem` first reuses dimensions from an already loaded source element and otherwise preloads the same preview. Neither function runs automatically merely because the host renders a thumbnail list.
+`openLevixel` accepts already measured `sourceHints` for hosts that own their
+DOM geometry. Its optional `sourceIds` array identifies the source represented
+by each hint, with one entry per media item and `null` for unnamed sources.
+Selector-based opening fills this information automatically.
+
+`prepareLevixelItem` preloads the transition preview (thumbnail or poster, falling back to the image URL), while `warmupLevixelItem` first reuses dimensions from an already loaded source element and otherwise preloads the same preview. Neither function runs automatically merely because the host renders a thumbnail list.
+
+### Multiple sources and live updates
+
+Keep the media once in `items`. When several bindings reference that media,
+each needs a distinct non-empty `sourceId`; different media may reuse the same
+source ID. Keep those identities and source containers stable through ordinary
+updates. A single-source binding may still omit `sourceId`.
+
+The example below uses `items` from above and two mounted elements,
+`#coast-cover` and `#coast-thumbnail`, both carrying
+`data-levixel-item-id="coast"`. Their visible clipping radii must match the
+bindings. When opening from the thumbnail's activation handler:
+
+```ts
+const duplicateBindings = [
+  { itemId: 'coast', sourceId: 'cover', selector: '#coast-cover', cornerRadius: 16 },
+  { itemId: 'coast', sourceId: 'thumbnail', selector: '#coast-thumbnail', cornerRadius: 8 },
+];
+const session = await openLevixelFromSelector({
+  items,
+  initialItemId: 'coast',
+  initialSourceId: 'thumbnail',
+  sourceBindings: duplicateBindings,
+});
+```
+
+`initialSourceId`, when supplied, must name a binding for the opening media;
+an unknown ID is an error. If that binding exists but its element is unmounted
+or ineligible, opening has no source transition rather than borrowing another
+thumbnail's geometry.
+
+Existing bindings are measured live. Call `updateLevixelSources` after the host
+changes the mounted binding collection, selectors, `objectFit`, or declared
+`cornerRadius`. For example, after the host removes the thumbnail and commits
+that DOM change, pass the complete remaining collection:
+
+```ts
+await updateLevixelSources({
+  galleryId: session.galleryId,
+  sourceBindings: duplicateBindings.filter(binding => binding.sourceId !== 'thumbnail'),
+});
+```
+
+Updates replace the binding collection, not the viewer's media or actions.
+Include only media IDs in the opening snapshot; `[]` removes all anchors
+without closing. `{ updated: false }` means the update was not applied because
+the named viewer is no longer active or is closing.
+
+The session remembers its selected source across paging. Replacing image
+children, refreshing a sibling, or reordering bindings does not replace a
+still-valid selection. When it becomes unavailable, including being fully
+clipped, the viewer uses another eligible source of the same media in
+first-registration order, or fades on return when none remains. Updates to an
+existing binding do not change that order.
+
+With the default `sourceVisibility: hidden`, only the selected source is hidden;
+paging away or closing restores its original inline visibility.
+`sourceVisibilityChange` includes `sourceId` for explicitly identified sources.
 
 ## Long press and actions
 
@@ -115,7 +179,7 @@ Both opening functions accept `actions`, `actionLayout`, and `actionListIcons`:
 await openLevixelFromSelector({
   items,
   initialItemId: 'coast',
-  sourceBindings: sourceBindings(),
+  sourceBindings: getSourceBindings(),
   actionLayout: 'list',
   actions: [
     { id: 'inspect', label: 'View details', group: 'tools',
@@ -187,7 +251,7 @@ Media context contains `sessionId`, `galleryId`, `index`, `itemId`, and
 | `mediaError` | Loading failed; includes `code: LOAD_FAILED` and `message` |
 | `action` | The sheet has closed after selection; includes `actionId` |
 | `dismiss` | The session ends, with its final current media context |
-| `sourceVisibilityChange` | A source changes visibility; includes `hidden`, `galleryId`, `index`, and `itemId` |
+| `sourceVisibilityChange` | A source changes visibility; includes `hidden`, `galleryId`, `index`, `itemId`, and optional `sourceId` |
 
 Load events may describe a preloaded adjacent item or arrive before `opened`.
 Use their `itemId`; thumbnails and posters do not count as a successful full

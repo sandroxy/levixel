@@ -147,6 +147,37 @@ class LevixelSourceBindingTest {
         assertTrue(pressed.isEmpty())
     }
 
+    @Test fun changingSourceInstanceCancelsAnAlreadyQueuedClick() {
+        binding.update("gallery/media", "media", 8f, "first-instance")
+        touch(MotionEvent.ACTION_DOWN)
+        touch(MotionEvent.ACTION_UP)
+        binding.update("gallery/media", "media", 8f, "second-instance")
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(pressed.isEmpty())
+        tap()
+        assertEquals(listOf("media"), pressed)
+    }
+
+    @Test fun unregisteringOneSourceDoesNotRemoveItsSibling() {
+        val other = FrameLayout(activity.get())
+        root.addView(other, FrameLayout.LayoutParams(100, 100))
+        val otherImage = ImageView(activity.get()).apply { setImageDrawable(ColorDrawable(Color.RED)) }
+        other.addView(otherImage, FrameLayout.LayoutParams(100, 100))
+        other.layout(0, 0, 100, 100)
+        otherImage.layout(0, 0, 100, 100)
+        val otherPressed = mutableListOf<String>()
+        val otherBinding = LevixelSourceBinding(other, otherPressed::add)
+        otherBinding.update("gallery/media", "media", 4f, "sibling")
+        tap()
+        other.performClick()
+        assertEquals(listOf("media"), pressed)
+        assertEquals(listOf("media"), otherPressed)
+        root.removeView(source)
+        assertSame(otherImage, LevixelSourceViewRegistry.find("gallery/media"))
+        other.performClick()
+        assertEquals(listOf("media", "media"), otherPressed)
+    }
+
     @Test fun hiddenSourceDoesNotSupplyStaleGeometry() {
         source.visibility = View.GONE
         draw()

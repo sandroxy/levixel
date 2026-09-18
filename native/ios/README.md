@@ -47,7 +47,7 @@ Use unique, non-empty `itemIdentifiers`, one per item, for dynamic lists. The
 viewer captures its opening data. After a prepend, removal, or reorder, configure
 the currently visible cells from the latest snapshot. An open viewer retains
 its media order, while dismissal resolves the current source by stable ID.
-Unavailable sources fade instead of returning to another cell at the same index.
+It never returns to a different media item at the old index.
 
 Call `removeLevixelViewerInteraction()` before a reusable cell is rebound.
 The viewer normally reads the `UIImageView` clipping radius. If an equal-sized
@@ -55,6 +55,42 @@ outer container owns the visible radius, pass that same value in the cell's
 `LevixelViewerConfiguration.sourceCornerRadius`. A partly visible source uses
 its real viewport intersection; a fully clipped or detached source is not a
 shared-transition target.
+
+### Multiple sources for one media item
+
+Several registered image views can represent the same media ID. A tap installed
+by `setupLevixelViewer`, or a call to `imageView.presentLevixelViewer(...)`, opens
+from that image view. The session remembers its selected source for each media
+item across paging and source updates. Only the selected source is hidden;
+paging away or closing restores its original opacity.
+
+Return transitions use the selected source's current geometry. If it is removed,
+rebound, or fully clipped, the viewer chooses another visible source of the same
+media in first-registration order, or fades when none remains. Updating a source
+does not change that order or replace a still-valid selection.
+
+### Advanced: stable source containers
+
+For image loaders that replace child image views, retain a
+`LevixelSourceRegistration(view:sourceIdentifier:imageViewProvider:)` for the
+stable container. Register its gallery ID, item ID, and radius. The provider
+receives the container and returns its currently displayed child `UIImageView`
+(or the container itself if it is an image view). It may return nil while the
+loader replaces the image without discarding the container's binding. Do not
+capture a strong reference to the container in this closure.
+
+Update the same registration when the media binding changes and call
+`unregister()` on removal. Source identifiers must be stable and unique within
+a gallery/media binding. Perform all registration operations on the main thread.
+Only the selected container is hidden, with its original opacity restored when
+paging away or closing.
+
+Use `LevixelViewerSession.present(dataSource:from:galleryId:sourceIdentifier:)`
+to present registered sources without an image-view receiver. Omitting
+`sourceIdentifier` selects the first valid source in registration order, or opens
+without a source transition when none exists. If an explicitly selected source
+disappears before presentation, opening does not start from another thumbnail;
+return transitions may still use another valid source of that media.
 
 ## Long press and actions
 

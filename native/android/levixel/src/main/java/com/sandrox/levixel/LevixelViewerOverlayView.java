@@ -22,7 +22,9 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class LevixelViewerOverlayView extends FrameLayout implements LevixelViewerPageView.Listener {
@@ -76,6 +78,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     @Nullable
     private LevixelSourceViewRegistry.HiddenSource hiddenActiveSource;
     private String hiddenActiveSourceKey;
+    private final Map<String, LevixelSourceViewRegistry.Selection> sourceSelections = new HashMap<>();
     private boolean closing;
     private boolean openingTransitionStarted;
     private long openTransitionWaitStartedAt;
@@ -141,6 +144,17 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             @Nullable String galleryId, @NonNull List<LevixelAction> actions,
             @NonNull LevixelActionLayout actionLayout, boolean actionListIcons, @Nullable Listener listener
     ) {
+        this(context, sourceItems, sourceHints, startIndex, lightTheme, galleryId,
+                actions, actionLayout, actionListIcons, null, listener);
+    }
+
+    public LevixelViewerOverlayView(
+            @NonNull Context context, @NonNull List<LevixelMediaItem> sourceItems,
+            @Nullable List<LevixelSourceHint> sourceHints, int startIndex, boolean lightTheme,
+            @Nullable String galleryId, @NonNull List<LevixelAction> actions,
+            @NonNull LevixelActionLayout actionLayout, boolean actionListIcons,
+            @Nullable String initialSourceId, @Nullable Listener listener
+    ) {
         super(context);
         this.actions = LevixelAction.snapshot(actions, actionLayout);
         this.actionLayout = actionLayout;
@@ -150,6 +164,8 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         this.currentIndex = Math.max(0, Math.min(startIndex, items.size() - 1));
         this.lightTheme = lightTheme;
         this.galleryId = galleryId;
+        String initialKey = LevixelSharedElementNames.forItem(galleryId, items.get(currentIndex));
+        sourceSelections.put(initialKey, new LevixelSourceViewRegistry.Selection(initialKey, initialSourceId, this));
         this.listener = listener;
         ViewConfiguration viewConfiguration = ViewConfiguration.get(context);
         touchSlop = viewConfiguration.getScaledTouchSlop();
@@ -192,6 +208,15 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             snapshot.add(item);
         }
         return snapshot;
+    }
+
+    /** Replaces viewport source snapshots without replacing this viewer's media or session. Call on the UI thread. */
+    public boolean updateSourceHints(@NonNull List<LevixelSourceHint> hints) {
+        if (hints.size() != items.size()) throw new IllegalArgumentException("Source hints must match the session media count");
+        if (closing || finished) return false;
+        sourceHints.clear();
+        sourceHints.addAll(hints);
+        return true;
     }
 
     public void requestClose() {
@@ -492,10 +517,8 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
             return;
         }
         openingTransitionStarted = true;
-        LevixelMediaItem item = items.get(currentIndex);
         LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
-        String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
-        ImageView sourceView = LevixelSourceViewRegistry.find(anchorKey);
+        ImageView sourceView = sourceViewForIndex(currentIndex);
         float sourceCornerRadius = LevixelSourceViewRegistry.cornerRadiusForView(sourceView);
         LevixelSharedElementState sourceState = LevixelLayoutSupport.captureImageViewState(
                 sourceView,
@@ -522,7 +545,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                 : defaultOpenGeometryFromSource(sourceState, overlayBounds, pageView, fallbackDrawable);
 
         hideActiveSourceViewForCurrentIndex();
-        // The media-key lease owns source visibility across loading, paging,
+        // The selected-source lease owns visibility across loading, paging,
         // transitions and source replacement; the animator only draws snapshots.
         transitionController.performOpenTransition(
                 null,
@@ -540,6 +563,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         transitionController.completeOpenTransition(() -> {
             if (closing || finished) return;
             contentPresented = true;
+            selectionForIndex(currentIndex).allowFallback();
             pagerAdapter.setActiveIndex(currentIndex);
             syncPagerGesturePolicy();
             hideActiveSourceViewForCurrentIndex();
@@ -584,10 +608,8 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         LevixelSharedElementState pageState = pageView.sharedElementState();
         pageView.setMediaHidden(true);
 
-        LevixelMediaItem item = items.get(currentIndex);
         LevixelSourceHint sourceHint = sourceHintForIndex(currentIndex);
-        String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
-        ImageView targetView = LevixelSourceViewRegistry.findVisible(anchorKey);
+        ImageView targetView = sourceViewForIndex(currentIndex);
         float targetCornerRadius = LevixelSourceViewRegistry.cornerRadiusForView(targetView);
         LevixelSharedElementState targetState = LevixelLayoutSupport.captureImageViewState(
                 targetView,
@@ -835,9 +857,17 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         if (index < 0 || index >= items.size()) {
             return null;
         }
-        LevixelMediaItem item = items.get(index);
-        String anchorKey = LevixelSharedElementNames.forItem(galleryId, item);
-        return LevixelSourceViewRegistry.find(anchorKey);
+        return selectionForIndex(index).image();
+    }
+
+    private LevixelSourceViewRegistry.Selection selectionForIndex(int index) {
+        String key = LevixelSharedElementNames.forItem(galleryId, items.get(index));
+        LevixelSourceViewRegistry.Selection selection = sourceSelections.get(key);
+        if (selection == null) {
+            selection = new LevixelSourceViewRegistry.Selection(key, null, this);
+            sourceSelections.put(key, selection);
+        }
+        return selection;
     }
 
     private void applySourcePlaceholderIfNeeded(@NonNull LevixelViewerPageView pageView, int index) {
@@ -857,7 +887,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         if (!key.equals(hiddenActiveSourceKey)) {
             restoreHiddenActiveSourceView();
             hiddenActiveSourceKey = key;
-            hiddenActiveSource = LevixelSourceViewRegistry.hide(key);
+            hiddenActiveSource = LevixelSourceViewRegistry.hide(selectionForIndex(currentIndex));
         }
     }
 
@@ -928,6 +958,7 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
         }
         videoControlGestureActive = false;
         restoreHiddenActiveSourceView();
+        sourceSelections.clear();
         removeCallbacks(openTransitionReadyWatcher);
         if (pagerAdapter != null) {
             pagerAdapter.releaseAll();

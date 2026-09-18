@@ -6,6 +6,9 @@ final class LevixelViewerController: UIViewController {
     private var actionSheet: LevixelActionSheetController?
     private var isClosingActionsForDismissal = false
     private weak var initialSourceView: UIImageView?
+    private let initialSourceIdentifier: String?
+    private weak var sourceWindow: UIWindow?
+    private var sourceSelections: [Int: LevixelSourceViewRegistry.Selection] = [:]
     private let imageLoader: LevixelImageLoading
     private let galleryId: String?
     private let initialIndex: Int
@@ -44,8 +47,8 @@ final class LevixelViewerController: UIViewController {
     private var dragStartPoint = CGPoint.zero
     private var dragTargetView: UIView?
     private weak var dragPageView: LevixelViewerPageView?
-    private weak var hiddenActiveSourceView: UIImageView?
-    private var hiddenActiveSourcePreviousAlpha: CGFloat = 1
+    private var hiddenActiveSource: LevixelSourceViewRegistry.HiddenSource?
+    private var hiddenActiveIndex: Int?
 
     private lazy var panGestureRecognizer: UIPanGestureRecognizer = {
         let recognizer = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -79,15 +82,19 @@ final class LevixelViewerController: UIViewController {
     }
 
     init(
-        sourceView: UIImageView,
+        sourceView: UIImageView?,
         dataSource: LevixelDataSource?,
         imageLoader: LevixelImageLoading,
         configuration: LevixelViewerConfiguration = LevixelViewerConfiguration(),
         initialIndex: Int = 0,
-        galleryId: String? = nil
+        galleryId: String? = nil,
+        sourceIdentifier: String? = nil,
+        sourceWindow: UIWindow? = nil
     ) {
         configuration.validateActionPresentation()
         self.initialSourceView = sourceView
+        self.initialSourceIdentifier = sourceIdentifier ?? sourceView.map(LevixelSourceViewRegistry.Selection.nativeIdentifier)
+        self.sourceWindow = sourceWindow ?? sourceView?.window
         self.dataSource = dataSource.map { LevixelArrayDataSource(snapshotting: $0) }
         self.imageLoader = imageLoader
         self.configuration = configuration
@@ -335,15 +342,18 @@ final class LevixelViewerController: UIViewController {
         let pageView = currentPageView
         refreshNavigationItems()
         setNavigationBarHidden(shouldHideNavigationBarForCurrentPage, animated: false)
+        let source = anchorView(for: initialIndex)
+        hideActiveSourceViewForCurrentIndex()
         transitionCoordinatorRef?.performOpenTransition(
-            from: initialSourceView,
-            sourceCornerRadius: sourceCornerRadius(for: initialSourceView, at: initialIndex),
+            from: source,
+            sourceCornerRadius: sourceCornerRadius(for: source, at: initialIndex),
             to: pageView,
             backgroundView: backgroundView,
             contentView: contentView
         ) { [weak self] in
             guard let self = self, !self.pendingDismissal, !self.hasNotifiedDismissal else { return }
             self.hasCompletedOpenTransition = true
+            self.sourceSelection(for: self.initialIndex).allowFallback()
             self.completeOpenTransitionPreviewHandoffForVisiblePages()
             self.setVideoRevealAllowedForVisiblePages(true)
             self.pageView(at: self.currentIndex)?.setActive(true)
@@ -395,7 +405,7 @@ final class LevixelViewerController: UIViewController {
         performOpenTransition()
     }
 
-    private func performDismissTransition(anchorOverride: UIImageView? = nil) {
+    private func performDismissTransition() {
         guard pendingDismissal == false else { return }
         pendingDismissal = true
         videoControlsInteractionActive = false
@@ -403,7 +413,7 @@ final class LevixelViewerController: UIViewController {
         let pageView = currentPageView
         pageView?.prepareForReturnAnimation()
 
-        let anchorView = anchorOverride ?? anchorView(for: currentIndex)
+        let anchorView = anchorView(for: currentIndex)
         transitionCoordinatorRef?.performCloseTransition(
             from: pageView,
             to: anchorView,
@@ -432,29 +442,22 @@ final class LevixelViewerController: UIViewController {
     }
 
     func anchorView(for index: Int) -> UIImageView? {
-        if let galleryId = galleryId {
-            if let identifiedDataSource = dataSource as? LevixelIdentifiedDataSource,
-               let itemIdentifier = identifiedDataSource.itemIdentifier(at: index),
-               itemIdentifier.isEmpty == false {
-                // A stable identity is authoritative. If its source no longer exists,
-                // fade out instead of falling back to a cell that may now represent
-                // different media after list mutation or reuse.
-                return LevixelSourceViewRegistry.shared.sourceView(
-                    for: galleryId,
-                    itemIdentifier: itemIdentifier
-                )
-            }
-            if let sourceView = LevixelSourceViewRegistry.shared.sourceView(
-                for: galleryId,
-                index: index
-            ) {
-                return sourceView
-            }
+        sourceSelection(for: index).imageView
+    }
+
+    private func sourceSelection(for index: Int) -> LevixelSourceViewRegistry.Selection {
+        if let selection = sourceSelections[index] { return selection }
+        let itemId = (dataSource as? LevixelIdentifiedDataSource)?.itemIdentifier(at: index).flatMap { $0.isEmpty ? nil : $0 }
+        let key: LevixelSourceViewRegistry.AnchorKey? = galleryId.map { _ in
+            itemId.map(LevixelSourceViewRegistry.AnchorKey.itemIdentifier) ?? .index(index)
         }
-        if index == initialIndex {
-            return initialSourceView
-        }
-        return nil
+        // Stable media identities never fall back to an index or a recycled initial view.
+        let fallback = (galleryId == nil || itemId == nil) && index == initialIndex ? initialSourceView : nil
+        let selection = LevixelSourceViewRegistry.shared.selection(galleryId: galleryId, key: key,
+            window: sourceWindow, sourceIdentifier: index == initialIndex ? initialSourceIdentifier : nil,
+            fallbackView: fallback)
+        sourceSelections[index] = selection
+        return selection
     }
 
     private func sourceCornerRadius(for sourceView: UIImageView?, at index: Int) -> CGFloat? {
@@ -463,7 +466,7 @@ final class LevixelViewerController: UIViewController {
            configuration.sourceCornerRadius != nil {
             return configuration.sourceCornerRadius
         }
-        return sourceView?.levixelConfiguredSourceCornerRadius
+        return sourceSelection(for: index).cornerRadius
     }
 
     private func clampedIndex(_ index: Int) -> Int {
@@ -479,19 +482,17 @@ final class LevixelViewerController: UIViewController {
 
     private func hideActiveSourceViewForCurrentIndex() {
         guard hasPerformedOpenTransition, pendingDismissal == false else { return }
-        let sourceView = anchorView(for: currentIndex)
-        if hiddenActiveSourceView !== sourceView {
+        if hiddenActiveIndex != currentIndex {
             restoreHiddenActiveSourceView()
-            hiddenActiveSourcePreviousAlpha = sourceView?.alpha ?? 1
-            hiddenActiveSourceView = sourceView
+            hiddenActiveIndex = currentIndex
+            hiddenActiveSource = LevixelSourceViewRegistry.shared.hide(sourceSelection(for: currentIndex))
         }
-        sourceView?.alpha = 0
     }
 
     private func restoreHiddenActiveSourceView() {
-        hiddenActiveSourceView?.alpha = hiddenActiveSourcePreviousAlpha
-        hiddenActiveSourceView = nil
-        hiddenActiveSourcePreviousAlpha = 1
+        hiddenActiveSource?.close()
+        hiddenActiveSource = nil
+        hiddenActiveIndex = nil
     }
 
     private func scrollToIndex(_ index: Int, animated: Bool) {

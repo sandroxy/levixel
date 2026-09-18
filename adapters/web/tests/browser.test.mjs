@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright-core';
 import { verifyActions } from './actions.test.mjs';
+import { verifySources } from './sources.test.mjs';
 
 const adapterRoot = resolve(join(fileURLToPath(new URL('.', import.meta.url)), '..'));
 const packageDistRoot = resolve(process.env.LEVIXEL_WEB_DIST_ROOT ?? join(adapterRoot, 'dist'));
@@ -432,6 +433,7 @@ try {
   await verifyAtomicImageHandoff(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyKeyboardFocusRestore(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   await verifyActions(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
+  await verifySources(browser, `http://127.0.0.1:${address.port}/tests/fixture.html`);
   assert.deepEqual(pageErrors, []);
 }
 finally {

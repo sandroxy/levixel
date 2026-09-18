@@ -190,6 +190,130 @@ public final class LevixelViewerLifecycleTest {
         assertEquals(1f, nextSource.getAlpha(), 0f);
     }
 
+    @Test public void clickedSourceRemainsSelectedAcrossPagingAndSiblingRegistration() {
+        overlay.dismissImmediately();
+        LevixelMediaItem first = new LevixelMediaItem("image", LevixelMediaItem.MediaType.IMAGE,
+                "file:///levixel-test.jpg", "file:///levixel-test.jpg");
+        LevixelMediaItem next = new LevixelMediaItem("next", LevixelMediaItem.MediaType.IMAGE,
+                "file:///levixel-next.jpg", "file:///levixel-next.jpg");
+        overlay = new LevixelViewerOverlayView(activityController.get(), java.util.Arrays.asList(first, next),
+                null, 0, false, "gallery", Collections.emptyList(), LevixelActionLayout.LIST, false, "clicked", null);
+        container.addView(overlay);
+        FrameLayout sibling = registerSource();
+        FrameLayout clicked = new FrameLayout(activityController.get());
+        root.addView(clicked, 0, new FrameLayout.LayoutParams(100, 100));
+        clicked.layout(100, 0, 200, 100);
+        clicked.setAlpha(0.8f);
+        LevixelSourceViewRegistry.registerSource(sourceKey(), sourceImage(clicked), 12f, clicked, "clicked");
+        startOpening();
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        assertEquals(0f, clicked.getAlpha(), 0f);
+        assertEquals(0.6f, sibling.getAlpha(), 0f);
+        ViewPager2 pager = ReflectionHelpers.getField(overlay, "viewPager");
+        pager.setCurrentItem(1, false);
+        assertEquals(0.8f, clicked.getAlpha(), 0f);
+        LevixelSourceViewRegistry.registerSource(sourceKey(), (ImageView) sibling.getChildAt(0), 0f, sibling);
+        pager.setCurrentItem(0, false);
+        assertEquals(0f, clicked.getAlpha(), 0f);
+        assertEquals(0.6f, sibling.getAlpha(), 0f);
+        overlay.requestClose();
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        assertEquals(0.8f, clicked.getAlpha(), 0f);
+        assertEquals(0.6f, sibling.getAlpha(), 0f);
+    }
+
+    @Test public void viewerKeepsItsSnapshotAndRestoresSourcesForEveryDemoOperation() {
+        overlay.dismissImmediately();
+        for (int clicked = 0; clicked < 3; clicked++) {
+            for (String operation : new String[] {"none", "prepend", "reorder", "replace-images", "refresh-cover", "remove-thumbnail", "remove-sources"}) {
+                String context = "source=" + clicked + ", " + operation;
+                List<LevixelMediaItem> hostItems = new ArrayList<>();
+                hostItems.add(new LevixelMediaItem("image", LevixelMediaItem.MediaType.IMAGE, "file:///levixel-test.jpg", "file:///levixel-test.jpg"));
+                hostItems.add(new LevixelMediaItem("next", LevixelMediaItem.MediaType.IMAGE, "file:///levixel-next.jpg", "file:///levixel-next.jpg"));
+                List<FrameLayout> sources = new ArrayList<>();
+                float[] alphas = {0.8f, 0.6f, 1f};
+                for (int i = 0; i < 3; i++) {
+                    FrameLayout view = new FrameLayout(activityController.get());
+                    root.addView(view, 0, new FrameLayout.LayoutParams(100, 100));
+                    view.layout(i * 120, 0, i * 120 + 100, 100);
+                    view.setAlpha(alphas[i]);
+                    sources.add(view);
+                    LevixelSourceViewRegistry.registerSource(sourceKey(), sourceImage(view), i * 8f, view, "source-" + i);
+                }
+                List<LevixelViewerEvent> recorded = new ArrayList<>();
+                overlay = new LevixelViewerOverlayView(activityController.get(), hostItems, null, 0, false,
+                        "gallery", Collections.emptyList(), LevixelActionLayout.LIST, false, "source-" + clicked,
+                        new LevixelViewerOverlayView.Listener() {
+                            @Override public void onOverlayDismissed() { }
+                            @Override public void onOverlayIndexChange(int index) { }
+                            @Override public void onViewerEvent(LevixelViewerEvent event) { recorded.add(event); }
+                        });
+                container.addView(overlay);
+                try {
+                    startOpening();
+                    Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+                    assertViewerSourceAlphas(context, sources, alphas, clicked);
+                    int expected = clicked;
+                    if ("prepend".equals(operation)) hostItems.add(0, new LevixelMediaItem("history", LevixelMediaItem.MediaType.IMAGE, "file:///history.jpg", "file:///history.jpg"));
+                    if ("reorder".equals(operation)) Collections.reverse(hostItems);
+                    if ("replace-images".equals(operation)) {
+                        for (int i = 0; i < 3; i++) {
+                            FrameLayout view = sources.get(i);
+                            view.removeAllViews();
+                            LevixelSourceViewRegistry.registerSource(sourceKey(), sourceImage(view), i * 8f, view, "source-" + i);
+                        }
+                    }
+                    if ("refresh-cover".equals(operation)) LevixelSourceViewRegistry.registerSource(sourceKey(), (ImageView) sources.get(0).getChildAt(0), 24f, sources.get(0), "source-0");
+                    if ("remove-thumbnail".equals(operation)) {
+                        LevixelSourceViewRegistry.unregisterSource(sources.get(1));
+                        root.removeView(sources.get(1));
+                        if (clicked == 1) expected = 0;
+                    }
+                    if ("remove-sources".equals(operation)) {
+                        for (FrameLayout source : sources) {
+                            LevixelSourceViewRegistry.unregisterSource(source);
+                            root.removeView(source);
+                        }
+                        expected = -1;
+                    }
+                    assertViewerSourceAlphas(context, sources, alphas, expected);
+                    ViewPager2 pager = ReflectionHelpers.getField(overlay, "viewPager");
+                    assertEquals(context, 2, pager.getAdapter().getItemCount());
+                    pager.setCurrentItem(1, false);
+                    assertViewerSourceAlphas(context + " after paging away", sources, alphas, -1);
+                    pager.setCurrentItem(0, false);
+                    assertViewerSourceAlphas(context + " after paging back", sources, alphas, expected);
+                    overlay.requestClose();
+                    Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+                    assertViewerSourceAlphas(context + " after closing", sources, alphas, -1);
+                    List<String> pageIds = new ArrayList<>();
+                    int opened = 0, dismissed = 0;
+                    for (LevixelViewerEvent event : recorded) {
+                        if ("indexChange".equals(event.type)) pageIds.add((String) event.payload.get("itemId"));
+                        if ("opened".equals(event.type)) opened++;
+                        if ("dismiss".equals(event.type)) dismissed++;
+                    }
+                    assertEquals(context, java.util.Arrays.asList("image", "next", "image"), pageIds);
+                    assertEquals(context, 1, opened);
+                    assertEquals(context, 1, dismissed);
+                    assertNull(context, overlay.getParent());
+                } finally {
+                    overlay.dismissImmediately();
+                    for (FrameLayout source : sources) {
+                        LevixelSourceViewRegistry.unregisterSource(source);
+                        root.removeView(source);
+                    }
+                }
+            }
+        }
+    }
+
+    private void assertViewerSourceAlphas(String context, List<FrameLayout> sources, float[] original, int hidden) {
+        for (int i = 0; i < sources.size(); i++) {
+            assertEquals(context + ", opacity " + i, i == hidden ? 0f : original[i], sources.get(i).getAlpha(), 0f);
+        }
+    }
+
     private FrameLayout registerSource() {
         FrameLayout source = new FrameLayout(activityController.get());
         root.addView(source, 0, new FrameLayout.LayoutParams(100, 100));

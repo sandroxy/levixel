@@ -18,4 +18,12 @@ func verifyLevixelAdapterAPI() {
     _ = session?.sessionId
     session?.close(animated: false, completion: {})
     sourceView.unregisterLevixelSource()
+    let source = LevixelSourceRegistration(view: sourceView, sourceIdentifier: "probe-source",
+        imageViewProvider: { $0 as? UIImageView })
+    source.register(galleryId: "probe", itemIdentifier: "probe", cornerRadius: 12)
+    let registeredSession = LevixelViewerSession.present(
+        dataSource: LevixelArrayDataSource(items: items, itemIdentifiers: ["probe"]),
+        from: UIViewController(), galleryId: "probe", sourceIdentifier: source.sourceIdentifier)
+    registeredSession?.close(animated: false)
+    source.unregister()
 }

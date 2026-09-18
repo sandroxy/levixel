@@ -43,6 +43,8 @@ final class LevixelUniSession {
     @Nullable private LevixelUniViewerWindow viewerWindow;
     private String sessionId = UUID.randomUUID().toString();
     private int currentIndex;
+    private int sourceRevision;
+    private List<String> sourceIds;
     private boolean opened;
     private boolean finished;
 
@@ -58,6 +60,7 @@ final class LevixelUniSession {
         this.listener = listener;
         nativeItems = request.nativeItems();
         currentIndex = request.initialIndex;
+        sourceIds = new ArrayList<>(request.sourceIds);
     }
 
     void start() {
@@ -121,6 +124,20 @@ final class LevixelUniSession {
 
     boolean hidesHtmlSource() {
         return request.hidesHtmlSource;
+    }
+
+    @Nullable String sourceIdAt(int index) { return sourceIds.get(index); }
+
+    boolean updateSources(LevixelUniContract.SourceUpdateRequest update) {
+        if (finished || overlayView == null || update.revision <= sourceRevision || !galleryId.equals(update.galleryId)) return false;
+        List<LevixelSourceHint> hints = LevixelUniSourceHints.map(update.sourceHints,
+                LevixelLayoutSupport.viewBoundsOnScreen(viewportView),
+                LevixelUniViewport.visibleFrameInWindow(viewportView),
+                activity.getResources().getDisplayMetrics().density);
+        if (!overlayView.updateSourceHints(hints)) return false;
+        sourceIds = new ArrayList<>(update.sourceIds);
+        sourceRevision = update.revision;
+        return true;
     }
 
     private void openOverlay() {

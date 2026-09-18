@@ -13,9 +13,11 @@ internal class LevixelSourceBinding(
 ) : View.OnAttachStateChangeListener, ViewTreeObserver.OnPreDrawListener {
     private var sourceKey: String? = null
     private var itemId: String? = null
+    private var sourceId: String? = null
     private var cornerRadius = 0f
     private var registeredImage: ImageView? = null
     private var registeredKey: String? = null
+    private var registeredSourceId: String? = null
     private var registeredCornerRadius = 0f
     private var observer: ViewTreeObserver? = null
 
@@ -33,14 +35,15 @@ internal class LevixelSourceBinding(
         source.addOnAttachStateChangeListener(this)
     }
 
-    fun update(key: String?, id: String?, radius: Float) {
-        if (key != sourceKey || id != itemId) {
+    fun update(key: String?, id: String?, radius: Float, instanceId: String? = null) {
+        if (key != sourceKey || id != itemId || instanceId != sourceId) {
             // A recycled cell must not deliver the previous item's in-flight tap.
             source.cancelPendingInputEvents()
             source.isPressed = false
         }
         sourceKey = key
         itemId = id
+        sourceId = instanceId
         cornerRadius = radius
         refresh()
     }
@@ -59,11 +62,12 @@ internal class LevixelSourceBinding(
             observer = source.viewTreeObserver.also { it.addOnPreDrawListener(this) }
         }
         val image = findDisplayedImage()
-        if (image !== registeredImage || key != registeredKey || cornerRadius != registeredCornerRadius) {
+        if (image !== registeredImage || key != registeredKey || sourceId != registeredSourceId || cornerRadius != registeredCornerRadius) {
             // Update the stable owner atomically, even between drawable loads.
-            LevixelSourceViewRegistry.registerSource(key, image, cornerRadius, source)
+            LevixelSourceViewRegistry.registerSource(key, image, cornerRadius, source, sourceId)
             registeredImage = image
             registeredKey = key
+            registeredSourceId = sourceId
             registeredCornerRadius = cornerRadius
         }
     }
@@ -92,6 +96,7 @@ internal class LevixelSourceBinding(
         if (registeredKey != null) LevixelSourceViewRegistry.unregisterSource(source)
         registeredImage = null
         registeredKey = null
+        registeredSourceId = null
     }
 
     private fun findDisplayedImage(): ImageView? {

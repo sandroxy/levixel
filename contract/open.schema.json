@@ -32,6 +32,14 @@
         ]
       }
     },
+    "sourceIds": {
+      "type": "array",
+      "description": "Optional source identities parallel to items/sourceHints. Runtime validators require the same length as items. A null entry has no explicit identity.",
+      "items": { "anyOf": [
+        { "type": "string", "minLength": 1, "pattern": "\\S" },
+        { "type": "null" }
+      ] }
+    },
     "sourceVisibility": {
       "enum": ["hidden", "visible"]
     },

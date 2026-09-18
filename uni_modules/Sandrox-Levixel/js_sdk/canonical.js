@@ -21,6 +21,7 @@ const ITEM_KEYS = new Set([
 const SOURCE_STYLE_KEYS = new Set(['objectFit', 'cornerRadius'])
 const SOURCE_BINDING_KEYS = new Set([
   'itemId',
+  'sourceId',
   'selector',
   'objectFit',
   'cornerRadius',
@@ -35,6 +36,7 @@ const SELECTOR_OPEN_KEYS = new Set([
   'items',
   'index',
   'initialItemId',
+  'initialSourceId',
   'theme',
   'sourceVisibility',
   'sourceSelector',
@@ -50,6 +52,7 @@ let injectedNativeTransport
 let eventChannelStarted = false
 const eventListeners = new Set()
 const actionsByGallery = new Map()
+const selectorSessions = new Map()
 const earlyActions = new Map()
 const dismissedDuringOpen = new Set()
 let pendingActionRegistrations = 0
@@ -1101,8 +1104,8 @@ function measureSources(selector, itemCount, queryContext) {
   })
 }
 
-function measureSourceBindings(sourceBindings, itemCount) {
-  const rects = Array(itemCount).fill(null)
+function measureSourceBindings(sourceBindings) {
+  const rects = Array(sourceBindings.length).fill(null)
   if (sourceBindings.length === 0)
     return Promise.resolve(rects)
 
@@ -1157,7 +1160,7 @@ function measureSourceBindings(sourceBindings, itemCount) {
               fail(new Error(`${path} must match at most one element`))
               return
             }
-            rects[binding.itemIndex] = values.length === 1 ? normalizeRect(values[0]) : null
+            rects[bindingIndex] = values.length === 1 ? normalizeRect(values[0]) : null
           })
       }
       catch (_) {
@@ -1217,7 +1220,8 @@ function normalizeSourceBindings(rawBindings, items, defaultQueryContext) {
     throw new Error('$.sourceBindings must be an array')
 
   const itemIndexes = new Map(items.map((item, index) => [item.id, index]))
-  const itemIds = new Set()
+  const identities = new Set()
+  const mediaBindings = new Map()
   const selectorsByContext = new Map()
   return rawBindings.map((value, index) => {
     const path = `$.sourceBindings[${index}]`
@@ -1229,9 +1233,13 @@ function normalizeSourceBindings(rawBindings, items, defaultQueryContext) {
     const itemIndex = itemIndexes.get(itemId)
     if (itemIndex === undefined)
       throw new Error(`${path}.itemId must reference an item in $.items`)
-    if (itemIds.has(itemId))
-      throw new Error(`${path}.itemId must be unique within $.sourceBindings`)
-    itemIds.add(itemId)
+    const sourceId = value.sourceId === undefined ? undefined
+      : requireNonEmptyString(value.sourceId, `${path}.sourceId`)
+    const identity = JSON.stringify([itemId, sourceId ?? null])
+    if (identities.has(identity) || (mediaBindings.has(itemId) && (!mediaBindings.get(itemId) || sourceId === undefined)))
+      throw new Error(`${path}.sourceId: duplicate media bindings require distinct explicit sourceId values`)
+    identities.add(identity)
+    mediaBindings.set(itemId, sourceId !== undefined)
 
     const rawSelector = requireNonEmptyString(value.selector, `${path}.selector`)
     const selector = rawSelector.trim()
@@ -1262,6 +1270,7 @@ function normalizeSourceBindings(rawBindings, items, defaultQueryContext) {
     return {
       itemId,
       itemIndex,
+      sourceId,
       selector,
       objectFit,
       cornerRadius,
@@ -1309,6 +1318,7 @@ function startEventChannel() {
         : undefined
       if (event && event.type === 'dismiss') {
         actionsByGallery.delete(galleryId)
+        selectorSessions.delete(galleryId)
         if (pendingActionRegistrations > 0) dismissedDuringOpen.add(galleryId)
       }
       if (event?.type === 'action' && !actionsByGallery.has(galleryId) && pendingActionRegistrations > 0) {
@@ -1389,7 +1399,7 @@ export async function openLevixel(options) {
   return openWithActions(options, actionOptions, ++openRequestGeneration)
 }
 
-async function openWithActions(options, actionOptions, generation) {
+async function openWithActions(options, actionOptions, generation, registerSources) {
   assertCurrentOpen(generation)
   const actions = actionOptions.actions ?? []
   const request = options?.actions === undefined ? options : {
@@ -1400,7 +1410,10 @@ async function openWithActions(options, actionOptions, generation) {
     startEventChannel()
     const result = await invokeNative('open', request, generation)
     if (result?.galleryId) {
-      if (!dismissedDuringOpen.has(result.galleryId) && actions.length) actionsByGallery.set(result.galleryId, actions)
+      if (!dismissedDuringOpen.has(result.galleryId) && generation === openRequestGeneration) {
+        registerSources?.(result.galleryId)
+        if (actions.length) actionsByGallery.set(result.galleryId, actions)
+      }
       const queued = earlyActions.get(result.galleryId) ?? []
       earlyActions.delete(result.galleryId)
       for (const context of queued) {
@@ -1421,6 +1434,7 @@ export function retryLevixel() {
 
 export function closeLevixel() {
   openRequestGeneration += 1
+  selectorSessions.clear()
   return invokeNative('close', {})
 }
 
@@ -1498,15 +1512,14 @@ export async function openLevixelFromSelector(options) {
 
   const queryContext = normalizeQueryContext(options.queryContext, '$.queryContext')
   const sourceBindings = normalizeSourceBindings(options.sourceBindings, items, queryContext)
-  const sourceStyles = sourceBindings === undefined
+  const initialSourceId = options.initialSourceId === undefined ? undefined
+    : requireNonEmptyString(options.initialSourceId, '$.initialSourceId')
+  if (initialSourceId !== undefined && !sourceBindings?.some(binding =>
+    binding.itemIndex === index && binding.sourceId === initialSourceId))
+    throw new Error('$.initialSourceId must identify a binding of the opening media')
+  let sourceStyles = sourceBindings === undefined
     ? normalizeSourceStyles(options.sourceStyles, items.length)
     : Array.from({ length: items.length }, () => ({ objectFit: 'cover', cornerRadius: 0 }))
-  sourceBindings?.forEach((binding) => {
-    sourceStyles[binding.itemIndex] = {
-      objectFit: binding.objectFit,
-      cornerRadius: binding.cornerRadius,
-    }
-  })
   const generation = ++openRequestGeneration
   const rectScale = readSourceRectScale()
   const previewURLs = items.map(transitionURL)
@@ -1515,14 +1528,19 @@ export async function openLevixelFromSelector(options) {
     ? ensureStableImageInfo(selectedPreviewURL, true)
     : Promise.resolve(undefined)
 
-  const [rects, initialInfo] = await Promise.all([
+  const [measuredRects, initialInfo] = await Promise.all([
     sourceBindings === undefined
       ? measureSources(sourceSelector, items.length, queryContext)
-      : measureSourceBindings(sourceBindings, items.length),
+      : measureSourceBindings(sourceBindings),
     selectedPreviewURL
       ? withTimeout(selectedPreviewPromise, INITIAL_PREVIEW_TIMEOUT_MS)
       : Promise.resolve(undefined),
   ])
+  const selected = new Map()
+  const measured = sourceBindings === undefined ? null
+    : selectMeasuredSources(sourceBindings, measuredRects, items, selected, index, initialSourceId)
+  const rects = measured ? measured.rects : measuredRects
+  if (measured) sourceStyles = measured.styles
   const previewInfos = previewURLs.map(url => url ? getCachedImageInfo(url) : undefined)
   if (initialInfo && selectedPreviewURL)
     previewInfos[index] = initialInfo
@@ -1548,20 +1566,119 @@ export async function openLevixelFromSelector(options) {
     return hint
   })
 
-  return openWithActions({
+  const result = await openWithActions({
     items: resolvedItems,
     ...actionOptions,
     index,
     theme,
     sourceHints,
+    ...(measured?.sourceIds.some(id => id !== null) ? { sourceIds: measured.sourceIds } : {}),
     sourceVisibility,
-  }, actionOptions, generation)
+  }, actionOptions, generation, (galleryId) => {
+    if (sourceBindings !== undefined) {
+      selectorSessions.set(galleryId, {
+        items, bindings: sourceBindings, selected, generation, revision: 0, previewInfos, queryContext,
+      })
+    }
+  })
+  return result
+}
+
+// Selection belongs to a viewer session, not to media ordering or the most recent measurement.
+function selectMeasuredSources(bindings, measuredRects, items, selected, initialIndex = -1, initialSourceId) {
+  const rects = items.map(() => null)
+  const sourceIds = items.map(() => null)
+  const styles = items.map(() => ({ objectFit: 'cover', cornerRadius: 0 }))
+  const viewport = uni.getSystemInfoSync()
+  const visible = rect => rect && rect.left + rect.width > 0 && rect.top + rect.height > 0
+    && (!(viewport.windowWidth > 0) || rect.left < viewport.windowWidth)
+    && (!(viewport.windowHeight > 0) || rect.top < viewport.windowHeight)
+  const candidatesByItem = new Map()
+  bindings.forEach((binding, index) => {
+    const rect = measuredRects[index]
+    if (!visible(rect)) return
+    const candidates = candidatesByItem.get(binding.itemId) ?? []
+    candidates.push({ binding, rect })
+    candidatesByItem.set(binding.itemId, candidates)
+  })
+  items.forEach((item, index) => {
+    const previous = selected.get(item.id)
+    const matches = candidatesByItem.get(item.id) ?? []
+    const strictOpening = index === initialIndex && initialSourceId !== undefined
+    const choice = strictOpening
+      ? matches.find(entry => entry.binding.sourceId === initialSourceId)
+      : matches.find(entry => previous && sameSourceBinding(entry.binding, previous)) ?? matches[0]
+    if (!choice) { selected.delete(item.id); return }
+    selected.set(item.id, choice.binding)
+    rects[index] = choice.rect
+    sourceIds[index] = choice.binding.sourceId ?? null
+    styles[index] = { objectFit: choice.binding.objectFit, cornerRadius: choice.binding.cornerRadius }
+  })
+  return { rects, sourceIds, styles }
+}
+
+function sameSourceBinding(first, second) {
+  return first.itemId === second.itemId && first.sourceId === second.sourceId
+    && first.selector === second.selector && first.queryContext === second.queryContext
+}
+
+export async function updateLevixelSources(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('$ must be an object')
+  rejectUnknownKeys(options, new Set(['galleryId', 'sourceBindings', 'queryContext']), '$')
+  const galleryId = requireNonEmptyString(options.galleryId, '$.galleryId')
+  if (!Array.isArray(options.sourceBindings)) throw new Error('$.sourceBindings must be an array')
+  const session = selectorSessions.get(galleryId)
+  if (!session || session.generation !== openRequestGeneration) return { updated: false }
+  const queryContext = options.queryContext === undefined ? session.queryContext
+    : normalizeQueryContext(options.queryContext, '$.queryContext')
+  const next = normalizeSourceBindings(options.sourceBindings, session.items, queryContext)
+  const revision = ++session.revision
+  const previousUpdate = session.pendingUpdate ?? Promise.resolve()
+  // Apply updates in order. A newer measurement must see the last source that
+  // native actually accepted, even when its callback arrived after a new request.
+  const update = previousUpdate.catch(() => {}).then(async () => {
+    if (selectorSessions.get(galleryId) !== session || session.generation !== openRequestGeneration
+      || revision !== session.revision) return { updated: false }
+    const identity = binding => JSON.stringify([binding.itemId, binding.sourceId ?? null])
+    const nextByIdentity = new Map(next.map(binding => [identity(binding), binding]))
+    const survivors = session.bindings.flatMap(previous => {
+      const binding = nextByIdentity.get(identity(previous))
+      return binding && sameSourceBinding(binding, previous) ? [binding] : []
+    })
+    const retained = new Set(survivors)
+    const bindings = [...survivors, ...next.filter(binding => !retained.has(binding))]
+    const rects = await measureSourceBindings(bindings)
+    if (selectorSessions.get(galleryId) !== session || session.generation !== openRequestGeneration
+      || revision !== session.revision) return { updated: false }
+    const selected = new Map(session.selected)
+    const measured = selectMeasuredSources(bindings, rects, session.items, selected)
+    const rectScale = readSourceRectScale()
+    const sourceHints = measured.rects.map((rect, index) => {
+      if (!rect) return null
+      const item = session.items[index]
+      const info = session.previewInfos[index]
+      const imageSize = info && info.width > 0 && info.height > 0
+        ? { width: info.width, height: info.height }
+        : (item.width > 0 && item.height > 0 ? { width: item.width, height: item.height } : undefined)
+      return { rect, ...measured.styles[index], coordinateSpace: 'viewport', rectScale,
+        ...(imageSize ? { imageSize } : {}) }
+    })
+    const result = await invokeNative('updateSources', { galleryId, revision, sourceHints, sourceIds: measured.sourceIds })
+    if (result.updated && selectorSessions.get(galleryId) === session && session.generation === openRequestGeneration) {
+      session.bindings = bindings
+      session.selected = selected
+    }
+    return result
+  })
+  session.pendingUpdate = update
+  return update
 }
 
 export default {
   open: openLevixel,
   close: closeLevixel,
   retry: retryLevixel,
+  updateSources: updateLevixelSources,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,

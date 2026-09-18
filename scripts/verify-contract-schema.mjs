@@ -29,4 +29,7 @@ assert.deepEqual(schema.$defs.action.required, ['id', 'label'])
 assert.equal(schema.$defs.action.additionalProperties, false)
 assert.equal('onPress' in schema.$defs.action.properties, false, 'Callbacks must not cross the native JSON bridge')
 
+assert.equal(schema.properties.sourceIds.type, 'array')
+assert.deepEqual(schema.properties.sourceIds.items.anyOf.map(entry => entry.type), ['string', 'null'])
+
 console.log(`Verified contract schema boundary: ${schemaPath}`)

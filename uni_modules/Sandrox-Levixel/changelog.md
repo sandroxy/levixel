@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0
+
+- 新增同一媒体多个来源：`sourceBindings` 支持 `sourceId`，`initialSourceId` 指定实际点击来源，媒体列表无需重复。
+- 新增 `updateLevixelSources`，宿主渲染后重新测量来源，保持当前会话与已选来源，移除后按稳定顺序选择同媒体来源，无可用来源则淡出。
+- 经典 UTS、App 原生插件版与 uni-app x Vapor 的 Android/iOS App 均支持上述能力；显隐事件携带可选 `sourceId`，过期的异步来源更新不会覆盖较新结果或影响另一会话。
+- 保持既有单来源用法、`sourceVisibility: visible` 默认值及平台兼容范围。
+
 ## 1.4.1
 
 - 与各平台统一版本，同步更新 Android 内核；UniApp 接口及平台兼容范围不变。

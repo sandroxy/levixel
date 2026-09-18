@@ -20,3 +20,5 @@ export type ResolveLevixelNativePaths = (
 ) => void
 
 export type RetryLevixelNative = CloseLevixelNative
+
+export type UpdateLevixelSourcesNative = CloseLevixelNative

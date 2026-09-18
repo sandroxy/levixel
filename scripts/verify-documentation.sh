@@ -113,7 +113,7 @@ for public_api in \
   fi
 done
 
-for dynamic_api in initialItemId sourceBindings queryContext; do
+for dynamic_api in initialItemId initialSourceId sourceId sourceBindings queryContext updateLevixelSources; do
   if ! grep -Fq "${dynamic_api}" "${marketplace_readme}"; then
     echo "UniApp user documentation is missing dynamic-list API ${dynamic_api}." >&2
     exit 1
@@ -129,7 +129,7 @@ for source_style_marker in borderRadius "overflow: 'hidden'"; do
     exit 1
   fi
 done
-for dynamic_api in initialItemId sourceBindings; do
+for dynamic_api in initialItemId initialSourceId sourceId sourceBindings updateLevixelSources; do
   if ! grep -Fq "${dynamic_api}" "${plugin_dir}/adapters/web/README.md"; then
     echo "Web documentation is missing dynamic-list API ${dynamic_api}." >&2
     exit 1

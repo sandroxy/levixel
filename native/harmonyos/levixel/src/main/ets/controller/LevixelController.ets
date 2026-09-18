@@ -19,8 +19,8 @@ export class LevixelController {
     return resolveLevixelContext(this).onEvent(listener);
   }
 
-  public open(itemId: string): void {
-    resolveLevixelContext(this).open(itemId);
+  public open(itemId: string, sourceId: string = ''): void {
+    resolveLevixelContext(this).open(itemId, sourceId);
   }
 }
 

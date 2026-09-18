@@ -6,6 +6,7 @@ import { LevixelSourceImageFit, RectMetrics } from '../model/LevixelModels';
 export struct LevixelSource {
   controller: LevixelController | null = null;
   @Prop @Watch('handleItemIdChanged') itemId: string = '';
+  @Prop @Watch('handleItemIdChanged') sourceId: string = '';
   @Prop @Watch('handleConfigurationChanged') viewportId: string = '';
   @Prop @Watch('handleConfigurationChanged') cornerRadius: number = 0;
   @Prop @Watch('handleConfigurationChanged') imageFit: LevixelSourceImageFit = LevixelSourceImageFit.COVER;
@@ -74,7 +75,7 @@ export struct LevixelSource {
         this.getViewerContext().updateSourceVisibility(this.itemId, this.registrationId, true);
       }
       this.getViewerContext().prepare(this.itemId);
-      this.getViewerContext().open(this.itemId);
+      this.getViewerContext().open(this.itemId, '', this.registrationId);
     })
     .onAreaChange((_oldArea, newArea) => {
       if (!this.mounted) {
@@ -138,7 +139,8 @@ export struct LevixelSource {
       this.imageFit,
       (hidden: boolean): void => {
         this.hidden = hidden;
-      }
+      },
+      this.sourceId
     );
     this.registeredItemId = this.itemId;
     this.registrationId = registration.registrationId;

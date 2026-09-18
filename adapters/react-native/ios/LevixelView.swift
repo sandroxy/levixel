@@ -6,6 +6,7 @@ final class LevixelView: ExpoView {
     var items: [[String: Any]] = []
     var initialIndex = 0
     var galleryId = ""
+    var sourceId = ""
     var sourceCornerRadius: CGFloat = 0 {
         didSet {
             precondition(
@@ -16,29 +17,26 @@ final class LevixelView: ExpoView {
     }
     let onSourcePress = EventDispatcher()
     let onViewerEvent = EventDispatcher()
-    private static let sources = NSHashTable<LevixelView>.weakObjects()
     private var sourceTap: UITapGestureRecognizer?
     private var viewerSession: LevixelViewerSession?
     private var pendingOpen: Promise?
     private var openSequence = 0
-    private let fallbackImageView = UIImageView()
-
-    private weak var configuredImageView: UIImageView?
+    private var sourceBinding: LevixelSourceRegistration?
+    private var boundItemId: String?
+    private var boundGalleryId: String?
 
     deinit {
         pendingOpen?.reject("OPEN_CANCELLED", "Levixel was unmounted.")
         viewerSession?.close(animated: false)
-        clearConfiguredImageView()
+        clearSourceBinding()
     }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window == nil {
             closeImmediately()
-            Self.sources.remove(self)
-            clearConfiguredImageView()
+            clearSourceBinding()
         } else {
-            Self.sources.add(self)
             configureSourceView()
         }
     }
@@ -50,8 +48,8 @@ final class LevixelView: ExpoView {
     }
 
     override func removeReactSubview(_ subview: UIView!) {
-        clearConfiguredImageView()
         super.removeReactSubview(subview)
+        configureSourceView()
     }
     #endif
 
@@ -62,45 +60,51 @@ final class LevixelView: ExpoView {
     }
 
     override func unmountChildComponentView(_ childComponentView: UIView, index: Int) {
-        clearConfiguredImageView()
         super.unmountChildComponentView(childComponentView, index: index)
+        // The Source container is still alive. Its provider resolves a remaining
+        // or replacement image on demand, including a temporary empty child tree.
+        configureSourceView()
     }
 
     override func prepareForRecycle() {
         closeImmediately()
-        clearConfiguredImageView()
+        clearSourceBinding()
         super.prepareForRecycle()
     }
     #endif
 
     func configureSourceView() {
-        guard window != nil, let imageView = findImageView() else {
-            clearConfiguredImageView()
-            return
-        }
         let media = buildMediaItems()
-        guard media.items.isEmpty == false else {
-            clearConfiguredImageView()
+        guard window != nil, !sourceId.isEmpty, !galleryId.isEmpty,
+              media.itemIdentifiers.indices.contains(initialIndex) else {
+            clearSourceBinding()
             return
         }
-
-        if configuredImageView !== imageView {
-            clearConfiguredImageView()
-            configuredImageView = imageView
+        let itemId = media.itemIdentifiers[initialIndex]
+        if sourceBinding?.sourceIdentifier != sourceId { clearSourceBinding() }
+        if sourceBinding == nil {
+            sourceBinding = LevixelSourceRegistration(view: self, sourceIdentifier: sourceId,
+                imageViewProvider: { Self.findDisplayedImage(in: $0) })
             let recognizer = UITapGestureRecognizer(target: self, action: #selector(sourcePressed))
-            imageView.addGestureRecognizer(recognizer)
-            imageView.isUserInteractionEnabled = true
+            addGestureRecognizer(recognizer)
             sourceTap = recognizer
         }
-        let safeIndex = min(max(0, initialIndex), media.items.count - 1)
-        imageView.registerLevixelSource(galleryId: galleryId,
-            itemIdentifier: media.itemIdentifiers[safeIndex], cornerRadius: sourceCornerRadius)
+        if boundItemId != itemId || boundGalleryId != galleryId {
+            // Rebinding during a touch must not activate the replacement media.
+            sourceTap?.isEnabled = false
+            sourceTap?.isEnabled = true
+        }
+        boundItemId = itemId
+        boundGalleryId = galleryId
+        sourceBinding?.register(galleryId: galleryId, itemIdentifier: itemId, cornerRadius: sourceCornerRadius)
     }
 
     @objc private func sourcePressed() {
         let media = buildMediaItems()
-        guard media.itemIdentifiers.indices.contains(initialIndex) else { return }
-        onSourcePress(["itemId": media.itemIdentifiers[initialIndex]])
+        guard window != nil, media.itemIdentifiers.indices.contains(initialIndex),
+              sourceBinding?.sourceIdentifier == sourceId, boundGalleryId == galleryId,
+              boundItemId == media.itemIdentifiers[initialIndex] else { return }
+        onSourcePress(["itemId": media.itemIdentifiers[initialIndex], "sourceId": sourceId])
     }
 
     func open(options: [String: Any], promise: Promise) {
@@ -157,18 +161,15 @@ final class LevixelView: ExpoView {
         }
         let present: () -> Void = { [weak self] in
             guard let self, sequence == self.openSequence, self.window != nil else { return }
-            let source = Self.sources.allObjects.first {
-                $0.galleryId == targetGalleryId && $0.items.indices.contains($0.initialIndex)
-                    && $0.items[$0.initialIndex]["id"] as? String == media.itemIdentifiers[index]
-                    && $0.configuredImageView?.window != nil
+            guard let presenter = self.window?.rootViewController else {
+                self.pendingOpen = nil
+                promise.reject("OPEN_FAILED", "No presenter is available.")
+                return
             }
-            var resolvedConfiguration = configuration
-            resolvedConfiguration.sourceCornerRadius = source?.sourceCornerRadius
-            let imageView = source?.configuredImageView ?? self.fallbackImageView
-            self.viewerSession = imageView.presentLevixelViewer(
+            self.viewerSession = LevixelViewerSession.present(
                 dataSource: LevixelArrayDataSource(items: media.items, itemIdentifiers: media.itemIdentifiers),
-                initialIndex: index, configuration: resolvedConfiguration,
-                from: self.window?.rootViewController, galleryId: targetGalleryId)
+                initialIndex: index, configuration: configuration,
+                from: presenter, galleryId: targetGalleryId, sourceIdentifier: options["sourceId"] as? String)
             self.pendingOpen = nil
             if self.viewerSession == nil { promise.reject("OPEN_FAILED", "No presenter is available.") }
             else { promise.resolve() }
@@ -237,11 +238,13 @@ final class LevixelView: ExpoView {
         return (mediaItems, itemIdentifiers)
     }
 
-    private func clearConfiguredImageView() {
-        if let sourceTap { configuredImageView?.removeGestureRecognizer(sourceTap) }
+    private func clearSourceBinding() {
+        if let sourceTap { removeGestureRecognizer(sourceTap) }
         sourceTap = nil
-        configuredImageView?.unregisterLevixelSource()
-        configuredImageView = nil
+        sourceBinding?.unregister()
+        sourceBinding = nil
+        boundItemId = nil
+        boundGalleryId = nil
     }
 
     private func makeURL(_ value: String) -> URL? {
@@ -251,32 +254,26 @@ final class LevixelView: ExpoView {
         return value.isEmpty ? nil : URL(fileURLWithPath: value)
     }
 
-    private func findImageView() -> UIImageView? {
-        var bestImageView: UIImageView?
-        var bestScore = Int.min
-
-        func visit(_ view: UIView) {
-            if let imageView = view as? UIImageView {
-                let score = imageViewScore(imageView)
-                if score > bestScore {
-                    bestImageView = imageView
-                    bestScore = score
+    private static func findDisplayedImage(in source: UIView) -> UIImageView? {
+        var best: UIImageView?
+        var bestAlpha: CGFloat = -1
+        var bestArea: CGFloat = -1
+        func visit(_ view: UIView, parentAlpha: CGFloat) {
+            let alpha = parentAlpha * view.alpha
+            guard !view.isHidden, alpha > 0.001 else { return }
+            if let image = view as? UIImageView, image.window != nil, image.image != nil,
+               image.bounds.width > 0, image.bounds.height > 0 {
+                let area = image.bounds.width * image.bounds.height
+                if alpha > bestAlpha || (alpha == bestAlpha && area > bestArea) {
+                    best = image
+                    bestAlpha = alpha
+                    bestArea = area
                 }
             }
-            view.subviews.forEach(visit)
+            view.subviews.reversed().forEach { visit($0, parentAlpha: alpha) }
         }
-
-        subviews.forEach(visit)
-        return bestImageView
-    }
-
-    private func imageViewScore(_ imageView: UIImageView) -> Int {
-        var score = 0
-        if imageView.window != nil { score += 16 }
-        if imageView.bounds.width > 0, imageView.bounds.height > 0 { score += 16 }
-        if !imageView.isHidden, imageView.alpha > 0.001 { score += 16 }
-        if imageView.image != nil { score += 8 }
-        if imageView === configuredImageView { score += 1 }
-        return score
+        // Ignore the viewer-owned container alpha, while respecting loader-layer visibility.
+        source.subviews.reversed().forEach { visit($0, parentAlpha: 1) }
+        return best
     }
 }

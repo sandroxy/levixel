@@ -5,7 +5,6 @@ import {
   normalizeSelectorOpenOptions,
   sanitizeSingleItem,
 } from './contract.js';
-import { isUsableRect } from './geometry.js';
 import {
   imageInfoFromElement,
   loadImage,
@@ -27,6 +26,7 @@ import type {
   LevixelPreparedPreview,
   LevixelSelectorOpenOptions,
   LevixelSelectorSourceStyle,
+  LevixelSourceUpdateOptions,
   NormalizedOpenOptions,
   NormalizedSelectorOpenOptions,
   SourceBinding,
@@ -54,6 +54,7 @@ export type {
   LevixelSize,
   LevixelSourceHint,
   LevixelSourceVisibility,
+  LevixelSourceUpdateOptions,
   LevixelTheme,
 } from './types.js';
 export { LevixelContractError } from './contract.js';
@@ -70,7 +71,10 @@ let sessionGeneration = 0;
 export async function openLevixel(options: LevixelOpenOptions): Promise<LevixelOpenResult> {
   requireBrowser();
   const normalized = normalizeOpenOptions(options);
-  const bindings = normalized.sourceHints.map(hint => ({ element: null, hint }));
+  const bindings = normalized.sourceHints.map((hint, index): SourceBinding => {
+    const sourceId = normalized.sourceIds?.[index];
+    return { element: null, hint, ...(sourceId != null ? { sourceId } : {}) };
+  });
   return await openNormalized(normalized, bindings);
 }
 
@@ -161,6 +165,22 @@ export async function openLevixelFromSelector(
   return await openNormalized(openOptions, bindings);
 }
 
+/** Replace mounted bindings after host rendering; media and the viewer session stay unchanged. */
+export async function updateLevixelSources(options: LevixelSourceUpdateOptions): Promise<{ updated: boolean }> {
+  requireBrowser();
+  if (!options || typeof options !== 'object' || Array.isArray(options)
+    || Object.keys(options).some(key => key !== 'galleryId' && key !== 'sourceBindings')
+    || typeof options.galleryId !== 'string' || !options.galleryId.trim()
+    || !Array.isArray(options.sourceBindings)) {
+    throw new LevixelContractError('INVALID_REQUEST', '$', 'Expected galleryId and sourceBindings');
+  }
+  const viewer = activeViewer;
+  if (!viewer || viewer.galleryId !== options.galleryId || viewer.isClosing()) return { updated: false };
+  const normalized = normalizeSelectorOpenOptions({ items: viewer.mediaItems, sourceBindings: options.sourceBindings });
+  viewer.updateSources(bindingsFromSelector(normalized));
+  return { updated: true };
+}
+
 async function openNormalized(
   options: NormalizedOpenOptions,
   bindings: SourceBinding[],
@@ -218,7 +238,7 @@ async function resolveInitialPreviews(
 
 function bindingsFromSelector(options: NormalizedSelectorOpenOptions): SourceBinding[] {
   if (options.sourceMode === 'identified') {
-    const bindings = options.items.map((): SourceBinding => ({ element: null, hint: null }));
+    const bindings = options.items.map((): SourceBinding => ({ element: null, hint: null, candidates: [] }));
     const boundElements = new Set<HTMLElement>();
     options.sourceBindings.forEach((sourceBinding, bindingIndex) => {
       const path = `$.sourceBindings[${bindingIndex}].selector`;
@@ -232,12 +252,23 @@ function bindingsFromSelector(options: NormalizedSelectorOpenOptions): SourceBin
       }
       if (element)
         boundElements.add(element);
-      bindings[sourceBinding.itemIndex] = bindingFromElement(
+      const candidate = bindingFromElement(
         options.items[sourceBinding.itemIndex]!,
         element,
         sourceBinding,
         sourceBinding.selector,
       );
+      if (sourceBinding.sourceId !== undefined)
+        candidate.sourceId = sourceBinding.sourceId;
+      bindings[sourceBinding.itemIndex]!.candidates!.push(candidate);
+    });
+    bindings.forEach((binding, index) => {
+      if (index === options.index && options.initialSourceId !== undefined)
+        binding.preferredSourceId = options.initialSourceId;
+      const initial = binding.preferredSourceId === undefined ? binding.candidates![0]
+        : binding.candidates!.find(candidate => candidate.sourceId === binding.preferredSourceId);
+      if (initial?.preview)
+        binding.preview = initial.preview;
     });
     return bindings;
   }
@@ -293,7 +324,7 @@ function bindingFromElement(
   identitySelector?: string,
 ): SourceBinding {
   if (!element)
-    return { element: null, hint: null };
+    return { element: null, hint: null, ...(identitySelector ? { identitySelector } : {}) };
   const rect = element.getBoundingClientRect();
   const normalizedRect = {
     left: rect.left,
@@ -301,8 +332,6 @@ function bindingFromElement(
     width: rect.width,
     height: rect.height,
   };
-  if (!isUsableRect(normalizedRect))
-    return { element, hint: null };
   const preview = imageInfoFromElement(element);
   const transition = transitionURL(item);
   if (preview && transition)
@@ -355,6 +384,7 @@ const levixel = {
   open: openLevixel,
   close: closeLevixel,
   retry: retryLevixel,
+  updateSources: updateLevixelSources,
   onEvent: onLevixelEvent,
   prepareItem: prepareLevixelItem,
   warmupItem: warmupLevixelItem,

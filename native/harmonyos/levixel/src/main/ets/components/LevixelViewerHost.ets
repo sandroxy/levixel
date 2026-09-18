@@ -130,8 +130,8 @@ export struct LevixelViewerHost {
   aboutToAppear(): void {
     this.snapshotItems();
     this.viewerRegistrationId = this.getViewerContext().registerViewer(
-      (itemId: string): void => {
-        this.openViewer(itemId);
+      (itemId: string, registrationId: number): void => {
+        this.openViewer(itemId, registrationId);
       },
       (itemId: string): void => {
         this.prepareTransitionResource(itemId);
@@ -385,7 +385,7 @@ export struct LevixelViewerHost {
     .opacity(this.snapshotOpacity)
   }
 
-  private openViewer(itemId: string): void {
+  private openViewer(itemId: string, registrationId: number = 0): void {
     if (this.disposed || this.viewerOpen || this.transitionActive) {
       return;
     }
@@ -398,7 +398,7 @@ export struct LevixelViewerHost {
     const actions: LevixelAction[] = snapshotLevixelActions(this.actions, this.actionLayout);
     if (typeof this.actionListIcons !== 'boolean') throw new Error('Levixel actionListIcons must be boolean.');
     if (this.theme !== 'dark' && this.theme !== 'light') throw new Error('Levixel theme must be dark or light.');
-    const source: LevixelResolvedSource | null = this.getViewerContext().resolveSource(itemId);
+    const source: LevixelResolvedSource | null = this.getViewerContext().beginSourceSession(itemId, registrationId);
     const token: number = this.beginTransition();
     const item: LevixelMediaItem = sessionItems[index];
     this.sessionId = this.getViewerContext().createSessionId();
@@ -597,7 +597,7 @@ export struct LevixelViewerHost {
     this.sessionItems = [];
     this.transitionActive = false;
     this.closing = false;
-    this.getViewerContext().setHiddenSource('');
+    this.getViewerContext().endSourceSession();
     this.hiddenViewerMediaId = '';
     this.backgroundOpacity = 0;
     this.snapshotRadius = 0;

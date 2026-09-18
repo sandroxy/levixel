@@ -47,6 +47,9 @@ required_declarations=(
   'public struct LevixelViewerEvent'
   'public func retry() -> Swift.Bool'
   'public var onEvent:'
+  'public class LevixelSourceRegistration'
+  'sourceIdentifier: Swift.String, imageViewProvider:'
+  'public static func present(dataSource:'
 )
 
 for declaration in "${required_declarations[@]}"; do

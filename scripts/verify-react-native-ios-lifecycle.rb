@@ -60,15 +60,16 @@ unmount_body = extract_body.call(
 expect_in_order.call(
   "Fabric unmount",
   unmount_body,
-  "clearConfiguredImageView()",
-  "super.unmountChildComponentView(childComponentView, index: index)"
+  "super.unmountChildComponentView(childComponentView, index: index)",
+  "configureSourceView()"
 )
+abort("Child unmount must preserve the stable Source registration") if unmount_body.include?("clearSourceBinding()")
 
 recycle_body = extract_body.call("override func prepareForRecycle()")
 expect_in_order.call(
   "Fabric recycle",
   recycle_body,
-  "clearConfiguredImageView()",
+  "clearSourceBinding()",
   "super.prepareForRecycle()"
 )
 

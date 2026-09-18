@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0 - 2026-09-14
+
+- Supports several `LevixelSource` instances for one media ID, exact tapped-source opening, remembered selection and stable fallback when that source disappears.
+- Adds optional `sourceId` and `controller.open(itemId, sourceId)`. Hiding affects only the selected instance; existing sources and controller calls remain supported.
+
 ## 1.4.1 - 2026-09-14
 
 - Aligns the package version with the coordinated patch release. HarmonyOS runtime behavior and APIs are unchanged.

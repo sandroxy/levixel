@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+
+- Supports several identified sources for one media item, exact tapped-source opening, session-retained selection, stable fallback and source-specific visibility events.
+- Adds `updateLevixelSources` for host binding/style updates, live source eligibility and restoration of the original inline visibility. Existing single-source and positional APIs remain supported.
+
 ## 1.4.1
 
 - Aligns the package version with the coordinated patch release. Web runtime behavior and APIs are unchanged.

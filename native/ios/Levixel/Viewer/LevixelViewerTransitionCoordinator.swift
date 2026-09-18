@@ -30,7 +30,6 @@ private final class LevixelTransitionSnapshotView: UIView {
 
 final class LevixelViewerTransitionCoordinator {
     private weak var containerView: UIView?
-    private weak var hiddenAnchorView: UIView?
     private weak var hiddenPageView: LevixelViewerPageView?
     private var activeSnapshotView: UIView?
 
@@ -99,8 +98,6 @@ final class LevixelViewerTransitionCoordinator {
         containerView.addSubview(snapshotView)
         activeSnapshotView = snapshotView
 
-        hiddenAnchorView = sourceView
-        sourceView.alpha = 0
         pageView?.setMediaHidden(true)
         hiddenPageView = pageView
 
@@ -193,8 +190,6 @@ final class LevixelViewerTransitionCoordinator {
            let anchorState = anchorView.levixelSharedElementState(
                cornerRadius: anchorCornerRadius
            ) {
-            hiddenAnchorView = anchorView
-            anchorView.alpha = 0
             targetGeometry = anchorState.geometry
         }
 
@@ -318,8 +313,6 @@ final class LevixelViewerTransitionCoordinator {
     }
 
     private func restoreHiddenViews() {
-        hiddenAnchorView?.alpha = 1
-        hiddenAnchorView = nil
         hiddenPageView?.setMediaHidden(false)
         hiddenPageView = nil
     }
