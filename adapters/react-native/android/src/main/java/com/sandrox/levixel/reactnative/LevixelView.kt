@@ -3,12 +3,14 @@ package com.sandrox.levixel.reactnative
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import com.facebook.react.uimanager.BackgroundStyleApplicator
 import com.sandrox.levixel.LevixelAction
 import com.sandrox.levixel.LevixelActionLayout
 import com.sandrox.levixel.LevixelViewerEvent
@@ -16,13 +18,14 @@ import com.sandrox.levixel.LevixelMediaItem
 import com.sandrox.levixel.LevixelSharedElementNames
 import com.sandrox.levixel.LevixelViewerOverlayView
 import expo.modules.kotlin.viewevent.EventDispatcher
-import expo.modules.kotlin.Promise
+import kotlinx.coroutines.CompletableDeferred
 
 class LevixelView(context: Context) : ViewGroup(context) {
     var items: List<Map<String, Any?>> = emptyList()
     var initialIndex: Int = 0
     var galleryId: String = ""
     var sourceId: String = ""
+    var isController: Boolean = false
     var sourceCornerRadius: Float = 0f
         set(value) {
             require(value.isFinite() && value >= 0f) {
@@ -32,7 +35,9 @@ class LevixelView(context: Context) : ViewGroup(context) {
         }
     val onSourcePress by EventDispatcher()
     val onViewerEvent by EventDispatcher()
+    val onControllerReady by EventDispatcher()
 
+    private var controllerReady = false
     private var boundSourceId = ""
     private val sourceBinding = LevixelSourceBinding(this) { itemId ->
         onSourcePress(mapOf("itemId" to itemId, "sourceId" to boundSourceId))
@@ -40,11 +45,12 @@ class LevixelView(context: Context) : ViewGroup(context) {
     private var overlayView: LevixelViewerOverlayView? = null
     private var overlayBackCallback: OnBackPressedCallback? = null
     private var activeRequestId: String? = null
-    private val closePromises = mutableMapOf<String, MutableList<Promise>>()
+    private val closeCompletions = mutableMapOf<String, CompletableDeferred<Unit>>()
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         sourceBinding.refresh()
+        notifyControllerReady()
     }
 
     override fun onViewAdded(child: View) {
@@ -58,6 +64,13 @@ class LevixelView(context: Context) : ViewGroup(context) {
         post { sourceBinding.refresh() }
     }
 
+    override fun dispatchDraw(canvas: Canvas) {
+        // RN applies borderRadius to the background; clip image children too,
+        // using the same drawing path as ExpoView and ReactViewGroup.
+        if (clipToPadding) BackgroundStyleApplicator.clipToPaddingBox(this, canvas)
+        super.dispatchDraw(canvas)
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         for (index in 0 until childCount) {
             getChildAt(index).layout(0, 0, width, height)
@@ -66,6 +79,7 @@ class LevixelView(context: Context) : ViewGroup(context) {
     }
 
     override fun onDetachedFromWindow() {
+        controllerReady = false
         val overlay = overlayView
         overlayView = null
         activeRequestId = null
@@ -90,6 +104,14 @@ class LevixelView(context: Context) : ViewGroup(context) {
             sourceCornerRadiusInPixels(),
             boundSourceId.takeIf(String::isNotBlank)
         )
+        notifyControllerReady()
+    }
+
+    private fun notifyControllerReady() {
+        if (isController && isAttachedToWindow && !controllerReady) {
+            controllerReady = true
+            onControllerReady(emptyMap())
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -132,8 +154,7 @@ class LevixelView(context: Context) : ViewGroup(context) {
                         activeRequestId = null
                         overlayBackCallback = null
                     }
-                    val completed = closePromises.remove(requestId).orEmpty()
-                    completed.forEach { it.resolve(null) }
+                    closeCompletions.remove(requestId)?.complete(Unit)
                 }
                 override fun onOverlayIndexChange(index: Int) = Unit
                 override fun onViewerEvent(event: LevixelViewerEvent) {
@@ -152,12 +173,15 @@ class LevixelView(context: Context) : ViewGroup(context) {
         }
     }
 
-    fun close(promise: Promise) {
+    suspend fun close() {
         val overlay = overlayView
         val requestId = activeRequestId
-        if (overlay == null || requestId == null) { promise.resolve(null); return }
-        closePromises.getOrPut(requestId) { mutableListOf() }.add(promise)
+        if (overlay == null || requestId == null) return
+        val completion = closeCompletions.getOrPut(requestId) { CompletableDeferred() }
         overlay.requestClose()
+        // Concurrent callers share this session's completion, including detach
+        // or replacement. Returning the JS promise must wait for actual dismissal.
+        completion.await()
     }
     fun retry(): Boolean = overlayView?.retry() ?: false
 

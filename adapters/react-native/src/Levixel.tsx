@@ -1,6 +1,6 @@
 import { requireNativeView } from 'expo';
 import * as React from 'react';
-import { StyleSheet, type NativeSyntheticEvent, type ViewProps } from 'react-native';
+import { Platform, StyleSheet, type NativeSyntheticEvent, type ViewProps } from 'react-native';
 import { normalizeActionOptions, normalizeMediaItems, resolveSourceCornerRadius, resolveSourceIndex } from './contract';
 import { LevixelSessions } from './session';
 import type { LevixelAction, LevixelActionLayout, LevixelEvent, LevixelProps, LevixelRef, LevixelSourceProps, LevixelTheme, NativeLevixelMediaItem } from './types';
@@ -28,6 +28,8 @@ interface NativeSourceProps extends ViewProps {
   index?: number;
   items?: NativeLevixelMediaItem[];
   sourceCornerRadius?: number;
+  isController?: boolean;
+  onControllerReady?: () => void;
   onSourcePress?: (event: NativeSyntheticEvent<{ itemId: string; sourceId: string }>) => void;
   onViewerEvent?: (event: NativeSyntheticEvent<LevixelEvent & { requestId: string }>) => void;
 }
@@ -47,6 +49,24 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
   const [generatedGalleryId] = React.useState(uniqueId);
   const [sessions] = React.useState(() => new LevixelSessions());
   const native = React.useRef<NativeController>(null);
+  const [mount] = React.useState(() => ({
+    ready: Platform.OS !== 'android',
+    waiting: new Set<(view: NativeController | null) => void>(),
+  }));
+  const setNative = React.useCallback((view: NativeController | null) => {
+    native.current = view;
+    if (view === null) {
+      mount.ready = Platform.OS !== 'android';
+      for (const resolve of mount.waiting) resolve(null);
+      mount.waiting.clear();
+    }
+  }, [mount]);
+  const controller = React.useCallback(async () => {
+    if (native.current === null || mount.ready) return native.current;
+    // A JS ref can precede the native mount. Wait for the actual attachment,
+    // not a timer or a future host UI update; unmount releases pending calls.
+    return new Promise<NativeController | null>(resolve => mount.waiting.add(resolve));
+  }, [mount]);
   const normalizedItems = React.useMemo(() => normalizeMediaItems(items), [items]);
   const actionOptions = React.useMemo(() => normalizeActionOptions(actions, actionLayout, actionListIcons),
     [actions, actionLayout, actionListIcons]);
@@ -55,11 +75,12 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
   if (theme !== 'dark' && theme !== 'light') throw new TypeError('[Levixel] theme must be dark or light.');
   const open = React.useCallback(async (itemId: string, sourceId?: string) => {
     const index = resolveSourceIndex(normalizedItems, { itemId });
-    if (native.current === null) throw new Error('[Levixel] Levixel is not mounted.');
+    const view = await controller();
+    if (view === null || native.current !== view) throw new Error('[Levixel] Levixel is not mounted.');
     const requestId = uniqueId();
     sessions.begin(requestId, normalizedActions);
     try {
-      await native.current.open({
+      await view.open({
         requestId, galleryId: resolvedGalleryId, index, theme,
         ...(sourceId === undefined ? {} : { sourceId }),
         items: normalizedItems.map(item => ({ ...item })),
@@ -68,18 +89,33 @@ const LevixelProvider = React.forwardRef<LevixelRef, LevixelProps>(function Levi
         actionListIcons: actionOptions.actionListIcons,
       });
     } catch (error) { sessions.end(requestId); throw error; }
-  }, [normalizedItems, normalizedActions, actionOptions, resolvedGalleryId, sessions, theme]);
+  }, [normalizedItems, normalizedActions, actionOptions, resolvedGalleryId, sessions, theme, controller]);
   React.useImperativeHandle(ref, () => ({
     open(itemId: string) { return open(itemId); },
-    async close() { await native.current?.close(); },
-    async retry() { return await native.current?.retry() ?? false; },
-  }), [open]);
+    async close() {
+      const view = await controller();
+      if (native.current === view) await view?.close();
+    },
+    async retry() {
+      const view = await controller();
+      return native.current === view ? await view?.retry() ?? false : false;
+    },
+  }), [open, controller]);
   const value = React.useMemo(() => ({ galleryId: resolvedGalleryId, items: normalizedItems, open }),
     [resolvedGalleryId, normalizedItems, open]);
   return (
     <LevixelContext.Provider value={value}>
-      <NativeSource ref={native} collapsable={false} pointerEvents="none" accessible={false}
+      <NativeSource ref={setNative} collapsable={false} pointerEvents="none" accessible={false}
         style={{ width: 0, height: 0, position: 'absolute' }}
+        {...(Platform.OS === 'android' ? {
+          isController: true,
+          onControllerReady: () => {
+            if (native.current === null) return;
+            mount.ready = true;
+            for (const resolve of mount.waiting) resolve(native.current);
+            mount.waiting.clear();
+          },
+        } : {})}
         onViewerEvent={({ nativeEvent }) => {
           const { requestId, ...event } = nativeEvent;
           sessions.dispatch(requestId, event as LevixelEvent, event => {

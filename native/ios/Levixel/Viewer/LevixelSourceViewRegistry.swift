@@ -254,12 +254,15 @@ final class LevixelSourceViewRegistry {
         // Release before acquiring, so a recycled container never saves another owner's zero alpha.
         for (source, target) in targets where source.view !== target { releaseHiddenView(source) }
         for (source, target) in targets {
-            guard let target, source.view !== target else { continue }
-            let id = ObjectIdentifier(target)
-            let hidden = hiddenViews[id].flatMap { $0.view === target ? $0 : nil } ?? HiddenView(target)
-            hidden.owners += 1
-            hiddenViews[id] = hidden
-            source.view = target
+            guard let target else { continue }
+            if source.view !== target {
+                let id = ObjectIdentifier(target)
+                let hidden = hiddenViews[id].flatMap { $0.view === target ? $0 : nil } ?? HiddenView(target)
+                hidden.owners += 1
+                hiddenViews[id] = hidden
+                source.view = target
+            }
+            // Host style updates can reapply alpha while this lease still owns the source.
             target.alpha = 0
         }
     }

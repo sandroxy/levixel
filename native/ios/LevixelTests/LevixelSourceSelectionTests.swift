@@ -106,6 +106,30 @@ final class LevixelSourceSelectionTests: XCTestCase {
         XCTAssertEqual(source.view.alpha, source.originalAlpha)
     }
 
+    func testReregisteringHiddenSourceReassertsAlphaWithoutAddingOwners() {
+        let fixture = Fixture()
+        defer { fixture.close() }
+        let source = fixture.source("selected", alpha: 0.8)
+        let selection = fixture.selection("selected")
+        let first = LevixelSourceViewRegistry.shared.hide(selection)
+        let second = LevixelSourceViewRegistry.shared.hide(selection)
+        defer { first.close(); second.close() }
+
+        // RN may reapply the source's style when its corner radius changes.
+        for radius in [CGFloat(16), 24, 16] {
+            source.view.alpha = source.originalAlpha
+            source.registration.register(galleryId: fixture.galleryId, itemIdentifier: "media", cornerRadius: radius)
+            XCTAssertEqual(source.view.alpha, 0)
+            XCTAssertTrue(selection.imageView === source.image)
+            XCTAssertEqual(selection.cornerRadius, radius)
+        }
+
+        first.close()
+        XCTAssertEqual(source.view.alpha, 0)
+        second.close()
+        XCTAssertEqual(source.view.alpha, source.originalAlpha)
+    }
+
     func testProgrammaticSelectionRejectsClippedAndHostHiddenSources() {
         let fixture = Fixture()
         defer { fixture.close() }
