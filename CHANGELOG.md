@@ -1,11 +1,12 @@
 # Changelog
 
-## 1.5.0 - 2026-09-14
+## 1.5.0 - 2026-09-20
 
 - Supports multiple source views for the same media across native Android/iOS, React Native, HarmonyOS, Web, classic UniApp (UTS/legacy), and UniApp x Vapor, without duplicating media entries. Opening uses the tapped thumbnail's image, position, clipping, and radius; other thumbnails remain visible.
 - Remembers the selected source across paging, image replacement, and updates to other thumbnails. If that source becomes unavailable, return transitions use another visible source of the same media, or fade when none remains.
 - Restores thumbnails to their original opacity after cell reuse, interrupted opening, and dismissal.
 - Adds native source-registration and presentation APIs for containers whose image loaders replace child image views. React Native component, ref, and event APIs remain unchanged.
+- Keeps React Native Android source clipping aligned with transition corners and dispatches viewer commands after native mounting in both architectures, preventing delayed opening in the old architecture.
 - Adds `sourceId` and `initialSourceId` to Web/UniApp selector bindings, plus session-scoped `updateLevixelSources` for mounted-source and geometry updates without reopening. UniApp shares the implementation across both bridges and rejects stale asynchronous updates.
 - Adds optional HarmonyOS source IDs and exact-source controller opening; existing single-source integrations and platform minimums remain supported.
 

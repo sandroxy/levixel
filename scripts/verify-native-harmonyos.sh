@@ -67,7 +67,7 @@ ruby -e '
     "src/main/ets/controller/LevixelController.d.ets" => [
       "export declare class LevixelController",
       "constructor();",
-      "open(itemId: string): void;",
+      "open(itemId: string, sourceId?: string): void;",
       "close(): void;",
       "retry(): boolean;",
       "handleBack(): boolean;",
@@ -112,6 +112,7 @@ ruby -e '
       "export declare struct LevixelSource",
       "controller: LevixelController | null;",
       "itemId: string;",
+      "sourceId: string;",
       "viewportId: string;",
       "cornerRadius: number;",
       "imageFit: LevixelSourceImageFit;",
