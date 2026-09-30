@@ -93,7 +93,34 @@ if [[ "${platform}" == android ]]; then
 else
   : "${LEVIXEL_FLUTTER_DEVICE:?Set LEVIXEL_FLUTTER_DEVICE to an available iOS simulator ID}"
 fi
-flutter test integration_test/viewer_test.dart -d "${LEVIXEL_FLUTTER_DEVICE}" --reporter expanded
+ruby -rtimeout - "${LEVIXEL_FLUTTER_TEST_TIMEOUT:-600}" flutter test integration_test/viewer_test.dart \
+  -d "${LEVIXEL_FLUTTER_DEVICE}" --reporter expanded --verbose <<'RUBY' 2>&1 | tee "${work_dir}/native-test.log"
+limit = Integer(ARGV.shift, 10)
+abort 'LEVIXEL_FLUTTER_TEST_TIMEOUT must be positive' unless limit.positive?
+
+def signal_group(pid, signal)
+  Process.kill(signal, -pid)
+rescue Errno::ESRCH
+  # The command may have exited while its timeout was being delivered.
+end
+
+pid = Process.spawn(*ARGV, pgroup: true)
+begin
+  _, status = Timeout.timeout(limit) { Process.wait2(pid) }
+  exit(status.exitstatus || 1)
+rescue Timeout::Error
+  warn "Flutter source test command exceeded #{limit} seconds."
+  signal_group(pid, 'TERM')
+  begin
+    Timeout.timeout(10) { Process.wait(pid) }
+  rescue Timeout::Error
+    signal_group(pid, 'KILL')
+    Process.wait(pid)
+  rescue Errno::ECHILD
+  end
+  exit 124
+end
+RUBY
 if [[ "${platform}" == android ]]; then
   ./android/gradlew -p android :sandrox_levixel:lintDebug --no-daemon --console=plain
 fi

@@ -48,6 +48,9 @@ integration and are not distributed or used as artifact acceptance hosts.
 Do not run the same target concurrently. See the
 [Flutter adapter API](adapters/flutter/README.md) for controller and source
 semantics.
+Native test commands retain detailed output in `native-test.log` in their target
+directory. `LEVIXEL_FLUTTER_TEST_TIMEOUT` overrides the default 600-second limit
+for building, launching, and running the Flutter integration test command.
 
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:

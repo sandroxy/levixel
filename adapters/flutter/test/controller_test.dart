@@ -179,8 +179,8 @@ void main() {
     final controller =
         LevixelController(galleryId: 'gallery', items: [media('first')]);
     final preparation = Completer<void>();
-    tester.binding.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
       calls.add(call);
       if (call.method == 'prepare') {
         await preparation.future;

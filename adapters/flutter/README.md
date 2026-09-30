@@ -97,6 +97,9 @@ opening snapshot and receive the native event's media identity.
 `action`, and `dismiss`. Each event exposes its timestamp, session ID, gallery ID,
 item ID, index, and native payload. Subscribe before opening to receive initial
 events, and cancel host subscriptions when they are no longer needed.
+The initial `indexChange` precedes `opened`. Media loading and preloading can
+emit events before opening finishes or for an adjacent item; use `itemId` to
+identify their media. A thumbnail preview alone does not emit `mediaLoad`.
 `controller.retry()` requests the native viewer's current retry operation and
 reports whether it was accepted.
 

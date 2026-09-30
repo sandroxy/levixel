@@ -49,7 +49,7 @@ jobs:
           path: .toolchains/flutter
           persist-credentials: false
       - name: Cache Flutter SDK artifacts
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .toolchains/flutter/bin/cache
           key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
@@ -87,7 +87,7 @@ jobs:
           path: .toolchains/flutter
           persist-credentials: false
       - name: Cache Flutter SDK artifacts
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .toolchains/flutter/bin/cache
           key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
@@ -139,6 +139,7 @@ jobs:
           path: |
             ${{ runner.temp }}/levixel-emulator.log
             ${{ runner.temp }}/levixel-logcat.txt
+            dist/development/flutter-source-tests/android/native-test.log
             dist/development/flutter-source-tests/android/host/build/**/reports/
           retention-days: 7
 
@@ -163,7 +164,7 @@ jobs:
           path: .toolchains/flutter
           persist-credentials: false
       - name: Cache Flutter SDK artifacts
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .toolchains/flutter/bin/cache
           key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
@@ -177,3 +178,9 @@ jobs:
           xcrun simctl bootstatus "${device}" -b
       - name: Check iOS bridge and thumbnail lifecycle
         run: ./scripts/test-flutter-source.sh "${{ matrix.target }}"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: flutter-${{ matrix.target }}-diagnostics
+          path: dist/development/flutter-source-tests/${{ matrix.target }}/native-test.log
+          retention-days: 7

@@ -57,7 +57,14 @@ void main() {
         events.where((event) => event.type == LevixelEventType.dismiss).length,
         1,
       );
-      expect(events.first.type, LevixelEventType.indexChange);
+      final initialIndex = events.indexWhere(
+        (event) => event.type == LevixelEventType.indexChange,
+      );
+      final initialOpen = events.indexWhere(
+        (event) => event.type == LevixelEventType.opened,
+      );
+      expect(initialIndex, greaterThanOrEqualTo(0));
+      expect(initialIndex, lessThan(initialOpen));
 
       await tester.runAsync(() async {
         final opened = host.controller.events.firstWhere(
