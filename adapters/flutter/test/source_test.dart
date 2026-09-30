@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,9 +32,7 @@ void main() {
         () => createTestImage(width: 160, height: 80, cache: false)))!;
     final controller = LevixelController(galleryId: 'duplicates', items: [
       LevixelMedia(
-          id: 'photo',
-          type: LevixelMediaType.image,
-          url: 'file:///photo.png')
+          id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png')
     ]);
     try {
       await tester.pumpWidget(Directionality(
@@ -64,12 +60,12 @@ void main() {
       final prepared = calls
           .firstWhere((call) => call.method == 'prepare')
           .arguments as Map<Object?, Object?>;
-      final sources = (prepared['sources']! as List<Object?>)
-          .cast<Map<Object?, Object?>>();
+      final sources =
+          (prepared['sources']! as List<Object?>).cast<Map<Object?, Object?>>();
       expect(sources, hasLength(2));
       expect(sources.map((source) => source['sourceId']).toSet(), hasLength(2));
-      final selected = sources.singleWhere(
-          (source) => source['sourceId'] == prepared['sourceId']);
+      final selected = sources
+          .singleWhere((source) => source['sourceId'] == prepared['sourceId']);
       expect(selected['itemId'], 'photo');
       expect(selected['frame'],
           [bounds.left, bounds.top, bounds.width, bounds.height]);
@@ -100,8 +96,8 @@ void main() {
       controller.dispose();
       await tester.pumpWidget(const SizedBox.shrink());
       image.dispose();
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          channel, null);
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
     }
   }, timeout: const Timeout(Duration(seconds: 30)));
 }

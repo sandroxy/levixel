@@ -59,7 +59,7 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
             case "retry": result(current.viewer?.retry() ?? false)
             case "close":
                 current.closing = true
-                if let viewer = current.viewer { viewer.close { result(nil) } }
+                if let viewer = current.viewer { viewer.close(animated: try boolean(args, "animated")) { result(nil) } }
                 else { result(nil) }
             case "finish":
                 guard current.viewer == nil else { throw BridgeError("Dismiss the viewer before finishing", code: "OPEN_FAILED") }

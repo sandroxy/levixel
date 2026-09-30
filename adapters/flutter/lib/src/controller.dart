@@ -77,7 +77,8 @@ class LevixelController {
     try {
       await previous?.close();
       session.checkCurrent();
-      await WidgetsBinding.instance.endOfFrame;
+      await _Bridge.nextFrame();
+      session.checkCurrent();
       final sources = await session.captureSources();
       session.checkCurrent();
       String? selected = sourceId;
@@ -106,7 +107,7 @@ class LevixelController {
       if (selected != null) {
         _sources[selected]?._setHidden(session.id, true);
       }
-      await WidgetsBinding.instance.endOfFrame;
+      await _Bridge.nextFrame();
       session.checkCurrent();
       await _Bridge.channel.invokeMethod<void>('open', session.arguments);
       session.checkCurrent();
@@ -176,7 +177,7 @@ class _Bridge {
         if (!hidden || !session.closing) {
           source?._setHidden(session.id, hidden);
         }
-        await WidgetsBinding.instance.endOfFrame;
+        await nextFrame();
       } else if (call.method == 'event') {
         final event = LevixelEvent._(value);
         if (!session.controller._disposed) {
@@ -209,9 +210,41 @@ class _Bridge {
     report(error, stack);
   }
 
+  static Future<void> nextFrame() async {
+    final binding = WidgetsBinding.instance;
+    if (!binding.framesEnabled) {
+      return;
+    }
+    final waiter = _FrameWaiter();
+    binding.addObserver(waiter);
+    try {
+      unawaited(binding.endOfFrame.then((_) => waiter.complete()));
+      await waiter.done.future;
+    } finally {
+      binding.removeObserver(waiter);
+    }
+  }
+
   static void report(Object error, [StackTrace? stack]) {
     FlutterError.reportError(FlutterErrorDetails(
         exception: error, stack: stack, library: 'levixel'));
+  }
+}
+
+class _FrameWaiter with WidgetsBindingObserver {
+  final done = Completer<void>();
+
+  void complete() {
+    if (!done.isCompleted) {
+      done.complete();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!WidgetsBinding.instance.framesEnabled) {
+      complete();
+    }
   }
 }
 
@@ -232,10 +265,13 @@ class _Session {
   Map<String, Object?> get arguments => <String, Object?>{'requestId': id};
 
   void checkCurrent() {
-    if (closing || controller._disposed || _Bridge.current != this) {
+    if (closing ||
+        controller._disposed ||
+        _Bridge.current != this ||
+        !WidgetsBinding.instance.framesEnabled) {
       throw PlatformException(
           code: 'OPEN_CANCELLED',
-          message: 'The open request was replaced or closed');
+          message: 'The open request was replaced, closed, or suspended');
     }
   }
 
@@ -311,12 +347,17 @@ class _Session {
     try {
       if (prepared) {
         try {
-          await WidgetsBinding.instance.endOfFrame;
-          final sources = await captureSources();
-          await _Bridge.channel.invokeMethod<void>('updateSources',
-              <String, Object?>{...arguments, 'sources': sources});
+          await _Bridge.nextFrame();
+          if (WidgetsBinding.instance.framesEnabled) {
+            final sources = await captureSources();
+            await _Bridge.channel.invokeMethod<void>('updateSources',
+                <String, Object?>{...arguments, 'sources': sources});
+          }
         } finally {
-          await _Bridge.channel.invokeMethod<void>('close', arguments);
+          await _Bridge.channel.invokeMethod<void>('close', <String, Object?>{
+            ...arguments,
+            'animated': WidgetsBinding.instance.framesEnabled,
+          });
         }
       }
     } finally {
@@ -330,7 +371,7 @@ class _Session {
     for (final source in controller._sources.values.toList()) {
       source._setHidden(id, false);
     }
-    await WidgetsBinding.instance.endOfFrame;
+    await _Bridge.nextFrame();
     try {
       if (prepared) {
         await _Bridge.channel.invokeMethod<void>('finish', arguments);

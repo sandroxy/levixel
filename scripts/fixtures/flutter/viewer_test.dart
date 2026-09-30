@@ -7,6 +7,12 @@ import 'package:sandrox_levixel/levixel.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+  setUpAll(() {
+    // Native test runners can enable accessibility after Dart has started.
+    // Establish that platform-owned handle before per-test leak accounting.
+    binding.platformDispatcher.semanticsEnabledTestValue = true;
+  });
+  tearDownAll(binding.platformDispatcher.clearSemanticsEnabledTestValue);
 
   testWidgets(
     'native sessions preserve identity and restore Flutter thumbnails',

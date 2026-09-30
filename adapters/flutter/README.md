@@ -60,9 +60,11 @@ and Flutter thumbnail restoration. Opening another controller closes the active
 viewer in the same Flutter engine. Closing an inactive controller does not close
 another gallery. Disposal closes an owned viewer asynchronously and ends its
 event stream; await `close()` first when dismissal completion matters.
-An opening request replaced or closed before presentation fails with
+An opening request replaced, closed, or suspended before presentation fails with
 `PlatformException` code `OPEN_CANCELLED`. Source taps handle this expected
-cancellation without reporting an application error.
+cancellation without reporting an application error. When Flutter has stopped
+scheduling frames, `close()` dismisses without animation and releases the
+session without waiting for a foreground frame.
 
 Assign `controller.items` when the host gallery changes. An open viewer retains
 its opening media and action snapshots, so events always identify that session's

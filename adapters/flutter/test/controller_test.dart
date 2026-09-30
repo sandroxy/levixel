@@ -174,6 +174,35 @@ void main() {
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));
 
+  for (final suspendBeforeClose in [true, false]) {
+    final timing = suspendBeforeClose ? 'before closing' : 'during frame wait';
+    testWidgets('close settles when rendering stops $timing', (tester) async {
+      final controller =
+          LevixelController(galleryId: 'gallery', items: [media('first')]);
+      await settle(tester, controller.open());
+      try {
+        if (suspendBeforeClose) {
+          tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        }
+        final closing = controller.close();
+        if (!suspendBeforeClose) {
+          tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        }
+        await closing;
+        final close = calls.singleWhere((call) => call.method == 'close');
+        expect((close.arguments as Map<Object?, Object?>)['animated'], false);
+        expect(calls.where((call) => call.method == 'finish').length, 1);
+        await expectLater(
+            controller.open(),
+            throwsA(isA<PlatformException>()
+                .having((error) => error.code, 'code', 'OPEN_CANCELLED')));
+      } finally {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        controller.dispose();
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
   testWidgets('canceling a source tap does not report an application error',
       (tester) async {
     final controller =

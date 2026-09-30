@@ -112,7 +112,12 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                 case "close":
                     current.closing = true;
                     if (current.overlay == null) result.success(null);
-                    else { current.closeResults.add(result); current.overlay.requestClose(); }
+                    else {
+                        boolean animated = bool(args, "animated");
+                        current.closeResults.add(result);
+                        if (animated) current.overlay.requestClose();
+                        else current.overlay.dismissImmediately();
+                    }
                     break;
                 case "finish":
                     if (current.overlay != null) throw new IllegalStateException("Dismiss the viewer before finishing");
