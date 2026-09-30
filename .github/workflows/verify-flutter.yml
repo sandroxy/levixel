@@ -1,0 +1,161 @@
+name: Verify Flutter source
+
+on:
+  push:
+    paths:
+      - 'adapters/flutter/**'
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'scripts/test-flutter-source.sh'
+      - 'scripts/fixtures/flutter/**'
+      - '.github/workflows/verify-flutter.yml'
+  pull_request:
+    paths:
+      - 'adapters/flutter/**'
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'scripts/test-flutter-source.sh'
+      - 'scripts/fixtures/flutter/**'
+      - '.github/workflows/verify-flutter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  dart:
+    name: Dart analysis and session contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Install pinned Flutter SDK
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: flutter/flutter
+          ref: '3.47.5'
+          path: .toolchains/flutter
+          persist-credentials: false
+      - name: Verify SDK identity
+        run: |
+          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
+          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
+      - name: Check Dart source
+        run: ./scripts/test-flutter-source.sh dart
+      - name: Retain formatter diagnostics
+        if: always()
+        run: |
+          mkdir -p dist/development/flutter-source-tests/dart
+          dart format adapters/flutter/lib adapters/flutter/test scripts/fixtures/flutter
+          git diff -- adapters/flutter scripts/fixtures/flutter > dist/development/flutter-source-tests/dart/format.patch
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: flutter-dart-diagnostics
+          path: dist/development/flutter-source-tests/dart/
+          retention-days: 7
+
+  android:
+    name: Android native integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: flutter/flutter
+          ref: '3.47.5'
+          path: .toolchains/flutter
+          persist-credentials: false
+      - name: Verify SDK identity
+        run: |
+          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
+          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            native/android/**/*.gradle
+            native/android/gradle/wrapper/gradle-wrapper.properties
+            adapters/flutter/android/build.gradle
+      - name: Start Android emulator
+        env:
+          ANDROID_AVD_HOME: ${{ runner.temp }}/levixel-avd
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          sdkmanager 'system-images;android-35;google_apis;x86_64' 'emulator'
+          echo no | avdmanager create avd --name levixel-api35 --package 'system-images;android-35;google_apis;x86_64' --device pixel_6
+          "${ANDROID_HOME}/emulator/emulator" -avd levixel-api35 -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -memory 2048 -cores 2 > "${RUNNER_TEMP}/levixel-emulator.log" 2>&1 &
+          timeout 180 adb -s emulator-5554 wait-for-device
+          booted=false
+          for attempt in {1..90}; do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then booted=true; break; fi
+            sleep 2
+          done
+          if [[ "${booted}" != true ]]; then cat "${RUNNER_TEMP}/levixel-emulator.log"; exit 1; fi
+          adb -s emulator-5554 shell input keyevent 82
+      - name: Check Android bridge and thumbnail lifecycle
+        env:
+          LEVIXEL_FLUTTER_DEVICE: emulator-5554
+        run: ./scripts/test-flutter-source.sh android
+      - name: Collect Android diagnostics
+        if: failure()
+        run: adb -s emulator-5554 logcat -d > "${RUNNER_TEMP}/levixel-logcat.txt"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: failure()
+        with:
+          name: flutter-android-diagnostics
+          path: |
+            ${{ runner.temp }}/levixel-emulator.log
+            ${{ runner.temp }}/levixel-logcat.txt
+            dist/development/flutter-source-tests/android/host/build/**/reports/
+          retention-days: 7
+
+  ios:
+    name: iOS native integration (${{ matrix.target }})
+    runs-on: macos-26
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ios, ios-cocoapods]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: flutter/flutter
+          ref: '3.47.5'
+          path: .toolchains/flutter
+          persist-credentials: false
+      - name: Verify SDK identity and select simulator
+        run: |
+          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
+          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
+          device="$(xcrun simctl list devices available --json | ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("devices").values.flatten.find { |d| d.fetch("name").start_with?("iPhone") }.fetch("udid")')"
+          echo "LEVIXEL_FLUTTER_DEVICE=${device}" >> "${GITHUB_ENV}"
+          xcrun simctl boot "${device}"
+          xcrun simctl bootstatus "${device}" -b
+      - name: Check iOS bridge and thumbnail lifecycle
+        run: ./scripts/test-flutter-source.sh "${{ matrix.target }}"

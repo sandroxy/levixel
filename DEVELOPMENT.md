@@ -33,6 +33,22 @@ The command reuses `dist/development/ios-source-tests/DerivedData` and replaces
 serially; retain any needed result bundle before starting another run. Failed
 test results remain available at the same path for diagnosis.
 
+`./scripts/test-flutter-source.sh dart` checks Flutter formatting, static
+analysis, and session contracts. The `android`, `ios`, and `ios-cocoapods` targets
+build the current native source, stage a matching adapter package, and run
+thumbnail lifecycle tests in a generated Flutter host. Set
+`LEVIXEL_FLUTTER_DEVICE` to an already booted Android emulator or iOS simulator
+ID. Android requires Java 17 and the Android SDK; iOS requires Xcode, and the
+CocoaPods target also requires CocoaPods. The source CI workflow pins Flutter
+3.47.5 and exercises both iOS dependency managers.
+
+Flutter source-test output is reused under
+`dist/development/flutter-source-tests/<target>/`. These hosts check source
+integration and are not distributed or used as artifact acceptance hosts.
+Do not run the same target concurrently. See the
+[Flutter adapter API](adapters/flutter/README.md) for controller and source
+semantics.
+
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:
 
@@ -77,7 +93,7 @@ and artifact-reuse rules remain separate from development cache management.
 ```text
 levixel/
 ├── native/             # Android, iOS, and HarmonyOS native cores
-├── adapters/           # React Native, UniApp, and Web adapters
+├── adapters/           # Flutter, React Native, UniApp, and Web adapters
 ├── uni_modules/        # DCloud Marketplace UTS plugin source
 ├── contract/           # Cross-platform public contract
 ├── packaging/          # Platform artifact templates

@@ -1,0 +1,41 @@
+group = 'com.sandrox.levixel.flutter'
+
+apply plugin: 'com.android.library'
+
+def nativeProperties = new Properties()
+def nativeManifest = file('../native-version.properties')
+if (!nativeManifest.isFile()) {
+    throw new GradleException('Levixel requires a prepared package containing its native artifacts. See DEVELOPMENT.md in the Levixel repository.')
+}
+nativeManifest.withInputStream { nativeProperties.load(it) }
+def coreVersion = nativeProperties.getProperty('version')
+if (coreVersion == null || !file("maven/io/gitee/sandrox/levixel/${coreVersion}/levixel-${coreVersion}.aar").isFile()) {
+    throw new GradleException('The Levixel package is missing its declared native Android artifact.')
+}
+version = coreVersion
+def coreRepository = file('maven')
+
+rootProject.allprojects {
+    repositories {
+        exclusiveContent {
+            forRepository { maven { url = uri(coreRepository) } }
+            filter { includeModule('io.gitee.sandrox', 'levixel') }
+        }
+        maven { url = uri('https://jitpack.io') }
+    }
+}
+
+android {
+    namespace 'com.sandrox.levixel.flutter'
+    compileSdk 36
+    defaultConfig { minSdk 24 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "io.gitee.sandrox:levixel:${coreVersion}"
+    implementation 'com.google.android.material:material:1.13.0'
+}
