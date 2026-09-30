@@ -6,10 +6,19 @@ enum LevixelTheme { light, dark }
 
 enum LevixelActionLayout { list, grid }
 
-enum LevixelEventType { opened, indexChange, mediaLoad, mediaError, action, dismiss }
+enum LevixelEventType {
+  opened,
+  indexChange,
+  mediaLoad,
+  mediaError,
+  action,
+  dismiss
+}
 
 String _nonEmpty(String value, String name) {
-  if (value.trim().isEmpty) throw ArgumentError.value(value, name, 'Must not be blank');
+  if (value.trim().isEmpty) {
+    throw ArgumentError.value(value, name, 'Must not be blank');
+  }
   return value;
 }
 
@@ -24,8 +33,11 @@ class LevixelMedia {
     String? posterUrl,
   })  : id = _nonEmpty(id, 'id'),
         url = _nonEmpty(url, 'url'),
-        thumbnailUrl = thumbnailUrl == null ? null : _nonEmpty(thumbnailUrl, 'thumbnailUrl'),
-        posterUrl = posterUrl == null ? null : _nonEmpty(posterUrl, 'posterUrl');
+        thumbnailUrl = thumbnailUrl == null
+            ? null
+            : _nonEmpty(thumbnailUrl, 'thumbnailUrl'),
+        posterUrl =
+            posterUrl == null ? null : _nonEmpty(posterUrl, 'posterUrl');
 
   final String id;
   final LevixelMediaType type;
@@ -84,7 +96,9 @@ class LevixelEvent {
         payload = Map<String, Object?>.unmodifiable(
           (value['payload']! as Map<Object?, Object?>).cast<String, Object?>(),
         ),
-        time = DateTime.fromMillisecondsSinceEpoch(value['time']! as int);
+        time = DateTime.fromMillisecondsSinceEpoch(
+          (value['time']! as num).round(),
+        );
 
   final LevixelEventType type;
   final Map<String, Object?> payload;
@@ -100,7 +114,9 @@ List<LevixelMedia> _mediaSnapshot(Iterable<LevixelMedia> items) {
   final result = List<LevixelMedia>.unmodifiable(items);
   final ids = <String>{};
   for (final item in result) {
-    if (!ids.add(item.id)) throw ArgumentError('Media IDs must be unique: ${item.id}');
+    if (!ids.add(item.id)) {
+      throw ArgumentError('Media IDs must be unique: ${item.id}');
+    }
   }
   return result;
 }

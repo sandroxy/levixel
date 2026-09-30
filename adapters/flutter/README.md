@@ -75,8 +75,8 @@ thumbnail. A temporary native preview covers the handoff while the corresponding
 Flutter image is hidden or restored.
 
 Shared transitions require one decoded, opaque image using centered `cover`,
-`contain`, or `fill` sizing, without rotation, skew, tint, repetition, nine-patch
-stretching, or directional mirroring. Arbitrary paint effects and custom clip
+`contain`, or `fill` sizing, without rotation, skew, nonuniform scaling, tint,
+repetition, nine-patch stretching, or directional mirroring. Arbitrary paint effects and custom clip
 shapes cannot be reconstructed from an image and rectangle; use a plain image
 inside `LevixelSource` for matching transitions. Unavailable or unsupported
 sources use the native fade transition. The exported preview is bounded to

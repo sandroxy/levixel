@@ -15,7 +15,7 @@ if [[ "${target}" == dart ]]; then
   result=0
   dart format --output=none --set-exit-if-changed lib test "${script_dir}/fixtures/flutter" || result=1
   flutter analyze --fatal-infos || result=1
-  flutter test || result=1
+  flutter test --timeout 60s || result=1
   exit "${result}"
 fi
 
@@ -63,6 +63,7 @@ if [[ ! -f "${host_dir}/pubspec.yaml" ]]; then
 fi
 cat > "${host_dir}/pubspec.yaml" <<'YAML'
 name: levixel_source_host
+version: 1.0.0+1
 publish_to: none
 environment:
   sdk: '>=3.5.0 <4.0.0'

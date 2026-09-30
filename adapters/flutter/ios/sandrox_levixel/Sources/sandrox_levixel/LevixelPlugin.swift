@@ -12,6 +12,7 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
     private init(registrar: FlutterPluginRegistrar, channel: FlutterMethodChannel) {
         self.registrar = registrar
         self.channel = channel
+        super.init()
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {

@@ -48,6 +48,11 @@ jobs:
           ref: '3.47.5'
           path: .toolchains/flutter
           persist-credentials: false
+      - name: Cache Flutter SDK artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .toolchains/flutter/bin/cache
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
       - name: Verify SDK identity
         run: |
           test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
@@ -81,6 +86,11 @@ jobs:
           ref: '3.47.5'
           path: .toolchains/flutter
           persist-credentials: false
+      - name: Cache Flutter SDK artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .toolchains/flutter/bin/cache
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
       - name: Verify SDK identity
         run: |
           test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
@@ -100,6 +110,9 @@ jobs:
         run: |
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
+          export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+          echo "${ANDROID_HOME}/platform-tools" >> "${GITHUB_PATH}"
+          mkdir -p "${ANDROID_AVD_HOME}"
           sdkmanager 'system-images;android-35;google_apis;x86_64' 'emulator'
           echo no | avdmanager create avd --name levixel-api35 --package 'system-images;android-35;google_apis;x86_64' --device pixel_6
           "${ANDROID_HOME}/emulator/emulator" -avd levixel-api35 -no-window -no-audio -no-boot-anim -no-snapshot \
@@ -149,6 +162,11 @@ jobs:
           ref: '3.47.5'
           path: .toolchains/flutter
           persist-credentials: false
+      - name: Cache Flutter SDK artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .toolchains/flutter/bin/cache
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
       - name: Verify SDK identity and select simulator
         run: |
           test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
