@@ -133,7 +133,7 @@ jobs:
         if: failure()
         run: adb -s emulator-5554 logcat -d > "${RUNNER_TEMP}/levixel-logcat.txt"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: failure()
+        if: always()
         with:
           name: flutter-android-diagnostics
           path: |
@@ -182,5 +182,7 @@ jobs:
         if: always()
         with:
           name: flutter-${{ matrix.target }}-diagnostics
-          path: dist/development/flutter-source-tests/${{ matrix.target }}/native-test.log
+          path: |
+            dist/development/flutter-source-tests/${{ matrix.target }}/native-test.log
+            dist/development/flutter-source-tests/${{ matrix.target }}/latest.xcresult/
           retention-days: 7

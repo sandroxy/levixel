@@ -8,7 +8,7 @@ This directory is adapter source. Native builds require a prepared package with
 matching Android and iOS artifacts; a Git dependency on this directory alone is
 not an installable native package. Source checks are described in
 [DEVELOPMENT.md](../../DEVELOPMENT.md). `publish_to: none` prevents accidental
-publication of an incomplete package.
+publication of adapter source without its native artifacts.
 
 ## Gallery and source widgets
 
@@ -18,6 +18,7 @@ host reordering. Locations are native-readable URLs or absolute file paths;
 Flutter asset keys and `ImageProvider` instances are not native media locations.
 
 ```dart
+import 'package:flutter/widgets.dart';
 import 'package:sandrox_levixel/levixel.dart';
 
 final controller = LevixelController(

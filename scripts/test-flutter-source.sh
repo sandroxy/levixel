@@ -90,11 +90,35 @@ cd "${host_dir}"
 flutter pub get
 if [[ "${platform}" == android ]]; then
   : "${LEVIXEL_FLUTTER_DEVICE:?Set LEVIXEL_FLUTTER_DEVICE to the Android emulator or device ID}"
+  export ANDROID_SERIAL="${LEVIXEL_FLUTTER_DEVICE}"
+  test_package="${host_dir}/android/app/src/androidTest/java/com/sandrox/tests/levixel_source_host"
+  mkdir -p "${test_package}"
+  cp "${script_dir}/fixtures/flutter/NativeViewerTest.java" "${test_package}/NativeViewerTest.java"
+  cp "${script_dir}/fixtures/flutter/android-tests.gradle" "${host_dir}/android/levixel-source-tests.gradle"
+  ruby - "${host_dir}/android/app/build.gradle.kts" <<'RUBY'
+path = ARGV.fetch(0)
+contents = File.read(path)
+entry = 'apply(from = "../levixel-source-tests.gradle")'
+File.write(path, "#{contents}\n#{entry}\n") unless contents.include?(entry)
+RUBY
+  native_command=(bash "${script_dir}/fixtures/flutter/run-android-tests.sh" "${host_dir}")
 else
   : "${LEVIXEL_FLUTTER_DEVICE:?Set LEVIXEL_FLUTTER_DEVICE to an available iOS simulator ID}"
+  cp "${script_dir}/fixtures/flutter/RunnerTests.swift" "${host_dir}/ios/RunnerTests/RunnerTests.swift"
+  flutter build ios --debug --simulator --config-only --no-codesign --target integration_test/viewer_test.dart
+  if [[ "${target}" == ios-cocoapods ]]; then (cd ios && pod install); fi
+  for output in "${work_dir}/DerivedData" "${work_dir}/latest.xcresult"; do
+    if [[ -L "${output}" ]]; then echo "Flutter test output must not use symbolic links: ${output}" >&2; exit 1; fi
+  done
+  if [[ -e "${work_dir}/latest.xcresult" ]]; then rm -r "${work_dir}/latest.xcresult"; fi
+  native_command=(xcodebuild -quiet test -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug
+    -destination "platform=iOS Simulator,id=${LEVIXEL_FLUTTER_DEVICE},arch=$(uname -m)"
+    -derivedDataPath "${work_dir}/DerivedData" -resultBundlePath "${work_dir}/latest.xcresult"
+    -parallel-testing-enabled NO -test-timeouts-enabled YES
+    -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
 fi
-ruby -rtimeout - "${LEVIXEL_FLUTTER_TEST_TIMEOUT:-600}" flutter test integration_test/viewer_test.dart \
-  -d "${LEVIXEL_FLUTTER_DEVICE}" --reporter expanded --verbose <<'RUBY' 2>&1 | tee "${work_dir}/native-test.log"
+ruby -rtimeout - "${LEVIXEL_FLUTTER_TEST_TIMEOUT:-600}" "${native_command[@]}" <<'RUBY' 2>&1 | tee "${work_dir}/native-test.log"
 limit = Integer(ARGV.shift, 10)
 abort 'LEVIXEL_FLUTTER_TEST_TIMEOUT must be positive' unless limit.positive?
 
@@ -121,6 +145,3 @@ rescue Timeout::Error
   exit 124
 end
 RUBY
-if [[ "${platform}" == android ]]; then
-  ./android/gradlew -p android :sandrox_levixel:lintDebug --no-daemon --console=plain
-fi
