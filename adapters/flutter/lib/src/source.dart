@@ -108,7 +108,7 @@ class _LevixelSourceState extends State<LevixelSource> {
               actionLayout: widget.actionLayout,
               actionListIcons: widget.actionListIcons,
             )
-            .catchError(_Bridge.report)),
+            .catchError(_Bridge.reportOpenFailure)),
         child: Opacity(
           key: _opacityKey,
           opacity: _hiddenBy.isEmpty ? 1 : 0,

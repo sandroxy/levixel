@@ -308,7 +308,8 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
     private FlutterView findFlutterView(View view) {
         if (view instanceof FlutterView) {
             BinaryMessenger candidate = ((FlutterView) view).getBinaryMessenger();
-            if (candidate instanceof DartExecutor && ((DartExecutor) candidate).getBinaryMessenger() == messenger) return (FlutterView) view;
+            if (candidate == messenger || (candidate instanceof DartExecutor
+                    && ((DartExecutor) candidate).getBinaryMessenger() == messenger)) return (FlutterView) view;
         }
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;

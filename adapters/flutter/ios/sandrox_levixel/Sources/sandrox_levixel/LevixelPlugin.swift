@@ -34,9 +34,9 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
             let args = try object(call.arguments)
             let request = try text(args, "requestId")
             if call.method == "prepare" {
-                guard session == nil else { throw BridgeError("Close the previous viewer before preparing another") }
+                guard session == nil else { throw BridgeError("Close the previous viewer before preparing another", code: "OPEN_FAILED") }
                 guard let presenter = registrar?.viewController, presenter.viewIfLoaded?.window != nil else {
-                    throw BridgeError("The attached Flutter view is unavailable")
+                    throw BridgeError("The attached Flutter view is unavailable", code: "OPEN_FAILED")
                 }
                 let next = try ViewerSession(args, scope: engineScope, presenter: presenter, channel: channel)
                 do { try next.updateSources(array(args, "sources")) }
@@ -62,12 +62,13 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
                 if let viewer = current.viewer { viewer.close { result(nil) } }
                 else { result(nil) }
             case "finish":
-                guard current.viewer == nil else { throw BridgeError("Dismiss the viewer before finishing") }
+                guard current.viewer == nil else { throw BridgeError("Dismiss the viewer before finishing", code: "OPEN_FAILED") }
                 current.removeSources(); session = nil; result(nil)
             default: result(FlutterMethodNotImplemented)
             }
         } catch {
-            result(FlutterError(code: "INVALID_ARGUMENT", message: String(describing: error), details: nil))
+            let code = (error as? BridgeError)?.code ?? "OPEN_FAILED"
+            result(FlutterError(code: code, message: String(describing: error), details: nil))
         }
     }
 }
@@ -142,10 +143,10 @@ private final class ViewerSession {
     }
 
     func open() throws {
-        guard !closing, viewer == nil, let presenter, presenter.viewIfLoaded?.window != nil else { throw BridgeError("The viewer cannot be opened") }
+        guard !closing, viewer == nil, let presenter, presenter.viewIfLoaded?.window != nil else { throw BridgeError("The viewer cannot be opened", code: "OPEN_FAILED") }
         viewer = LevixelViewerSession.present(dataSource: LevixelArrayDataSource(items: media, itemIdentifiers: itemIds),
             initialIndex: index, configuration: configuration, from: presenter, galleryId: scopedGallery, sourceIdentifier: sourceId)
-        guard viewer != nil else { throw BridgeError("No presenter is available") }
+        guard viewer != nil else { throw BridgeError("No presenter is available", code: "OPEN_FAILED") }
     }
 
     func updateSources(_ values: [Any]) throws {
@@ -251,7 +252,11 @@ private final class SourceAnchor: UIView {
 
 private struct BridgeError: Error, CustomStringConvertible {
     let description: String
-    init(_ description: String) { self.description = description }
+    let code: String
+    init(_ description: String, code: String = "INVALID_ARGUMENT") {
+        self.description = description
+        self.code = code
+    }
 }
 
 private func object(_ value: Any?) throws -> [String: Any] {

@@ -29,10 +29,12 @@ void main() {
         );
         final loaded = host.controller.events.firstWhere(
           (event) =>
-              event.type == LevixelEventType.mediaLoad && event.itemId == 'first',
+              event.type == LevixelEventType.mediaLoad &&
+              event.itemId == 'first',
         );
         await tester.tap(firstSource);
-        await Future.wait([opened, loaded]).timeout(const Duration(seconds: 20));
+        await Future.wait([opened, loaded])
+            .timeout(const Duration(seconds: 20));
         expect(tester.widget<Opacity>(opacity).opacity, 0);
         host.reverseItems();
         await binding.endOfFrame;

@@ -48,6 +48,12 @@ Package.resolved
 npm-debug.log*
 pnpm-debug.log*
 
+# Flutter
+adapters/flutter/.dart_tool/
+adapters/flutter/.flutter-plugins-dependencies
+adapters/flutter/pubspec.lock
+.toolchains/
+
 # HarmonyOS
 **/.hvigor/
 **/oh_modules/

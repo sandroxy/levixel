@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sandrox_levixel/levixel.dart';
 
@@ -169,6 +170,40 @@ void main() {
         failure,
         isA<PlatformException>()
             .having((error) => error.code, 'code', 'OPEN_CANCELLED'));
+    expect(calls.where((call) => call.method == 'open'), isEmpty);
+    controller.dispose();
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('canceling a source tap does not report an application error',
+      (tester) async {
+    final controller =
+        LevixelController(galleryId: 'gallery', items: [media('first')]);
+    final preparation = Completer<void>();
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'prepare') {
+        await preparation.future;
+      }
+      return null;
+    });
+    await tester.pumpWidget(Directionality(
+      textDirection: TextDirection.ltr,
+      child: LevixelSource(
+        controller: controller,
+        itemId: 'first',
+        child: const SizedBox(width: 100, height: 100),
+      ),
+    ));
+    await tester.tap(find.byType(LevixelSource));
+    await tester.pump();
+    await tester.pump();
+    expect(calls.where((call) => call.method == 'prepare').length, 1);
+    final closing = controller.close();
+    preparation.complete();
+    await settle(tester, closing);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
     expect(calls.where((call) => call.method == 'open'), isEmpty);
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));

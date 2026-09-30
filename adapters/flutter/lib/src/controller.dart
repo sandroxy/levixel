@@ -202,6 +202,13 @@ class _Bridge {
     });
   }
 
+  static void reportOpenFailure(Object error, [StackTrace? stack]) {
+    if (error is PlatformException && error.code == 'OPEN_CANCELLED') {
+      return;
+    }
+    report(error, stack);
+  }
+
   static void report(Object error, [StackTrace? stack]) {
     FlutterError.reportError(FlutterErrorDetails(
         exception: error, stack: stack, library: 'levixel'));
