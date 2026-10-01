@@ -19,7 +19,6 @@ arguments=(-p android "-Ptarget=${host_dir}/${entry}" --no-daemon --console=plai
   "-Pandroid.testInstrumentationRunnerArguments.class=${test_class}")
 if [[ "${mode}" == gestures ]]; then
   ./android/gradlew "${arguments[@]}" app:assembleDebugAndroidTest :sandrox_levixel:lintDebug
-  arguments+=("-Pandroid.testInstrumentationRunnerArguments.additionalTestOutputDir=/sdcard/Android/data/com.sandrox.tests.levixel_source_host/files/gestures")
   bash "${script_dir}/record-gestures.sh" android "${host_dir}/../native-gestures.mp4" \
     ./android/gradlew "${arguments[@]}" app:connectedDebugAndroidTest
 else

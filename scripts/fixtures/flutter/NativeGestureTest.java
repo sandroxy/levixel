@@ -22,51 +22,61 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Objects;
 
 public final class NativeGestureTest {
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
     private final UiDevice device = UiDevice.getInstance(instrumentation);
-    private final File screenshots = new File(instrumentation.getTargetContext().getExternalFilesDir(null), "gestures");
+    private final File screenshots = new File(Objects.requireNonNull(
+            InstrumentationRegistry.getArguments().getString("additionalTestOutputDir"),
+            "Run native gesture checks through Gradle to collect their output"));
 
     @Test
     public void nativeTouchesPreserveMediaAndRestoreSources() throws Exception {
         assertTrue(screenshots.isDirectory() || screenshots.mkdirs());
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
-            openFirst();
-            assertTrue(device.swipe(x(0.85), y(0.5), x(0.15), y(0.5), 60));
-            awaitImage(false, "paged-second");
-            assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.5), 180));
-            UiObject2 action = device.wait(Until.findObject(By.desc("Inspect")), 10000);
-            assertNotNull("Long press must show native actions", action);
-            capture("actions");
-            action.click();
-            assertTrue(device.wait(Until.gone(By.desc("Inspect")), 10000));
-            dismissDrag();
-            awaitStatus("Dismiss 1 second 1 | Action inspect second 1");
+            try {
+                openFirst();
+                assertTrue(device.swipe(x(0.85), y(0.5), x(0.15), y(0.5), 60));
+                awaitImage(false, "paged-second");
+                assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.5), 180));
+                UiObject2 action = device.wait(Until.findObject(By.desc("Inspect")), 10000);
+                assertNotNull("Long press must show native actions", action);
+                capture("actions");
+                action.click();
+                assertTrue(device.wait(Until.gone(By.desc("Inspect")), 10000));
+                dismissDrag();
+                awaitStatus("Dismiss 1 second 1 | Action inspect second 1");
 
-            openFirst();
-            tap();
-            SystemClock.sleep(80);
-            tap();
-            device.waitForIdle();
-            assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
-            awaitImage(true, "double-tap-pan");
-            shrinkToFit();
-            dismissDrag();
-            awaitStatus("Dismiss 2 first 0 | Action inspect second 1");
+                openFirst();
+                tap();
+                SystemClock.sleep(80);
+                tap();
+                device.waitForIdle();
+                assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
+                awaitImage(true, "double-tap-pan");
+                shrinkToFit();
+                dismissDrag();
+                awaitStatus("Dismiss 2 first 0 | Action inspect second 1");
 
-            openFirst();
-            pinch(0.10f, 0.35f);
-            device.waitForIdle();
-            assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
-            awaitImage(true, "pinch-pan");
-            shrinkToFit();
-            tap();
-            awaitStatus("Dismiss 3 first 0 | Action inspect second 1");
-            capture("restored-sources");
-        } finally {
-            capture("final-state");
-            device.dumpWindowHierarchy(new File(screenshots, "hierarchy.xml"));
+                openFirst();
+                pinch(0.10f, 0.35f);
+                device.waitForIdle();
+                assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
+                awaitImage(true, "pinch-pan");
+                shrinkToFit();
+                tap();
+                awaitStatus("Dismiss 3 first 0 | Action inspect second 1");
+                capture("restored-sources");
+            } catch (Exception | AssertionError failure) {
+                try {
+                    capture("failure-state");
+                    device.dumpWindowHierarchy(new File(screenshots, "hierarchy.xml"));
+                } catch (Exception diagnosticsFailure) {
+                    failure.addSuppressed(diagnosticsFailure);
+                }
+                throw failure;
+            }
         }
     }
 
