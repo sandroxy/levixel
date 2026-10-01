@@ -117,6 +117,7 @@ void main() {
         LevixelController(galleryId: 'gallery', items: [media('first')]);
     final events = <LevixelEvent>[];
     final subscription = controller.events.listen(events.add);
+    addTearDown(subscription.cancel);
     await settle(tester, controller.open());
     final prepared = (calls
         .firstWhere((call) => call.method == 'prepare')
@@ -143,7 +144,6 @@ void main() {
       expect(event.time.millisecondsSinceEpoch, 1234);
     }
     await settle(tester, controller.close());
-    await settle(tester, subscription.cancel());
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));
 
