@@ -6,6 +6,10 @@ import 'package:sandrox_levixel/levixel.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(MaterialApp(home: ViewerHarness(files: await createMediaFiles())));
+}
+
+Future<List<File>> createMediaFiles() async {
   final directory = await Directory.systemTemp.createTemp(
     'levixel-source-test-',
   );
@@ -20,7 +24,7 @@ Future<void> main() async {
           .writeAsBytes(base64Decode(images[i])),
     );
   }
-  runApp(MaterialApp(home: ViewerHarness(files: files)));
+  return files;
 }
 
 class ViewerHarness extends StatefulWidget {

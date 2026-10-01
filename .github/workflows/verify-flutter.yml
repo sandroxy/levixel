@@ -129,6 +129,10 @@ jobs:
         env:
           LEVIXEL_FLUTTER_DEVICE: emulator-5554
         run: ./scripts/test-flutter-source.sh android
+      - name: Check Android native gestures
+        env:
+          LEVIXEL_FLUTTER_DEVICE: emulator-5554
+        run: ./scripts/test-flutter-source.sh android gestures
       - name: Collect Android diagnostics
         if: failure()
         run: adb -s emulator-5554 logcat -d > "${RUNNER_TEMP}/levixel-logcat.txt"
@@ -139,7 +143,9 @@ jobs:
           path: |
             ${{ runner.temp }}/levixel-emulator.log
             ${{ runner.temp }}/levixel-logcat.txt
-            dist/development/flutter-source-tests/android/native-test.log
+            dist/development/flutter-source-tests/android/*-test.log
+            dist/development/flutter-source-tests/android/native-gestures.mp4
+            dist/development/flutter-source-tests/android/screenshots/
             dist/development/flutter-source-tests/android/host/build/**/reports/
           retention-days: 7
 
@@ -178,20 +184,29 @@ jobs:
           xcrun simctl bootstatus "${device}" -b
       - name: Check iOS bridge and thumbnail lifecycle
         run: ./scripts/test-flutter-source.sh "${{ matrix.target }}"
+      - name: Install Xcode project support
+        run: gem install --user-install --no-document xcodeproj --version 1.27.0
+      - name: Check iOS native gestures
+        run: ./scripts/test-flutter-source.sh "${{ matrix.target }}" gestures
       - name: Export iOS test results
         if: always()
         run: |
           results="dist/development/flutter-source-tests/${{ matrix.target }}"
-          if [[ -d "${results}/latest.xcresult" ]]; then
-            xcrun xcresulttool get test-results summary --path "${results}/latest.xcresult" | tee "${results}/test-summary.json"
-            xcrun xcresulttool get log --type console --path "${results}/latest.xcresult" | tee "${results}/test-console.json"
-          fi
+          for name in latest gestures; do
+            if [[ -d "${results}/${name}.xcresult" ]]; then
+              xcrun xcresulttool get test-results summary --path "${results}/${name}.xcresult" | tee "${results}/${name}-summary.json"
+              xcrun xcresulttool get log --type console --path "${results}/${name}.xcresult" | tee "${results}/${name}-console.json"
+            fi
+          done
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: flutter-${{ matrix.target }}-diagnostics
           path: |
-            dist/development/flutter-source-tests/${{ matrix.target }}/native-test.log
-            dist/development/flutter-source-tests/${{ matrix.target }}/test-*.json
+            dist/development/flutter-source-tests/${{ matrix.target }}/*-test.log
+            dist/development/flutter-source-tests/${{ matrix.target }}/*-summary.json
+            dist/development/flutter-source-tests/${{ matrix.target }}/*-console.json
+            dist/development/flutter-source-tests/${{ matrix.target }}/native-gestures.mp4*
             dist/development/flutter-source-tests/${{ matrix.target }}/latest.xcresult/
+            dist/development/flutter-source-tests/${{ matrix.target }}/gestures.xcresult/
           retention-days: 7

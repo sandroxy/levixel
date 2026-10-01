@@ -49,11 +49,19 @@ integration and are not distributed or used as artifact acceptance hosts.
 Do not run the same target concurrently. See the
 [Flutter adapter API](adapters/flutter/README.md) for controller and source
 semantics.
-Native test commands retain detailed output in `native-test.log` in their target
-directory. Android retains its instrumentation and lint reports under the host's
-`build/` directory; iOS reuses `DerivedData/` and replaces `latest.xcresult` on
-each run. `LEVIXEL_FLUTTER_TEST_TIMEOUT` overrides the default 600-second limit
-for the native build and test command.
+Add `gestures` as the second argument to run native touch checks with UI Automator
+on Android or XCUITest on iOS. These checks exercise paging, long-press actions,
+double-tap and pinch zoom, drag dismissal, and Flutter source restoration. The
+iOS gesture host also requires the `xcodeproj` Ruby gem at version `1.27.0`.
+Gesture runs retain `native-gestures.mp4`; screenshots are stored under
+`screenshots/` on Android and in the iOS result bundle.
+
+Native test commands retain detailed output in `lifecycle-test.log` or
+`gestures-test.log` in their target directory. Android retains its
+instrumentation and lint reports under the host's
+`build/` directory; iOS reuses `DerivedData/` and replaces `latest.xcresult` or
+`gestures.xcresult` for the selected mode. `LEVIXEL_FLUTTER_TEST_TIMEOUT`
+overrides the default 600-second limit for the native build and test command.
 
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:
