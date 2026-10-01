@@ -84,7 +84,8 @@ class _GestureHarnessState extends State<GestureHarness> {
                           id: 'inspect',
                           label: 'Inspect',
                           onSelected: (event) => setState(() {
-                            _action = 'Action inspect '
+                            _action =
+                                'Action inspect '
                                 '${event.itemId} ${event.index}';
                           }),
                         ),

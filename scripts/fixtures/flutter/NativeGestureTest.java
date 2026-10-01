@@ -51,8 +51,7 @@ public final class NativeGestureTest {
             device.waitForIdle();
             assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
             awaitImage(true, "double-tap-pan");
-            pinch(0.42f, 0.02f);
-            device.waitForIdle();
+            shrinkToFit();
             dismissDrag();
             awaitStatus("Dismiss 2 first 0 | Action inspect second 1");
 
@@ -61,8 +60,7 @@ public final class NativeGestureTest {
             device.waitForIdle();
             assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.78), 80));
             awaitImage(true, "pinch-pan");
-            pinch(0.42f, 0.02f);
-            device.waitForIdle();
+            shrinkToFit();
             tap();
             awaitStatus("Dismiss 3 first 0 | Action inspect second 1");
             capture("restored-sources");
@@ -81,6 +79,30 @@ public final class NativeGestureTest {
 
     private void dismissDrag() {
         assertTrue(device.swipe(x(0.5), y(0.5), x(0.5), y(0.92), 80));
+    }
+
+    private void shrinkToFit() throws Exception {
+        // Android can end scale recognition before the fingers meet. Check the
+        // visible 4:3 fixture instead of assuming one pinch reaches minimum zoom.
+        for (int attempt = 0; attempt < 4; attempt++) {
+            pinch(0.42f, 0.02f);
+            device.waitForIdle();
+            Bitmap bitmap = instrumentation.getUiAutomation().takeScreenshot();
+            if (bitmap == null) continue;
+            int height = 0;
+            for (int row = 0; row < bitmap.getHeight(); row++) {
+                int pixel = bitmap.getPixel((int) (bitmap.getWidth() * 0.08), row);
+                if (Color.red(pixel) > 150 && Color.blue(pixel) < 110) height++;
+            }
+            double expected = bitmap.getWidth() * 0.75;
+            bitmap.recycle();
+            if (Math.abs(height - expected) <= expected * 0.02) {
+                capture("restored-image-fit");
+                return;
+            }
+        }
+        capture("missing-image-fit");
+        fail("Pinch gestures must restore the full-width 4:3 image before dismissal");
     }
 
     private void awaitStatus(String expected) {

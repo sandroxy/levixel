@@ -20,9 +20,6 @@ finish_recording() {
       adb -s "${LEVIXEL_FLUTTER_DEVICE}" pull "${remote_movie}" "${output}" || true
       adb -s "${LEVIXEL_FLUTTER_DEVICE}" shell rm -f "${remote_movie}" || true
     fi
-    adb -s "${LEVIXEL_FLUTTER_DEVICE}" pull \
-      /sdcard/Android/data/com.sandrox.tests.levixel_source_host/files/gestures \
-      "$(dirname "${output}")/screenshots" || true
   elif [[ -n "${record_pid}" ]]; then
     kill -INT "${record_pid}" 2>/dev/null || true
     wait "${record_pid}" || true

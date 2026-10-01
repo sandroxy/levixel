@@ -145,7 +145,7 @@ jobs:
             ${{ runner.temp }}/levixel-logcat.txt
             dist/development/flutter-source-tests/android/*-test.log
             dist/development/flutter-source-tests/android/native-gestures.mp4
-            dist/development/flutter-source-tests/android/screenshots/
+            dist/development/flutter-source-tests/android/host/build/app/outputs/connected_android_test_additional_output/
             dist/development/flutter-source-tests/android/host/build/**/reports/
           retention-days: 7
 
@@ -195,7 +195,8 @@ jobs:
           for name in latest gestures; do
             if [[ -d "${results}/${name}.xcresult" ]]; then
               xcrun xcresulttool get test-results summary --path "${results}/${name}.xcresult" | tee "${results}/${name}-summary.json"
-              xcrun xcresulttool get log --type console --path "${results}/${name}.xcresult" | tee "${results}/${name}-console.json"
+              xcrun xcresulttool get log --type console --path "${results}/${name}.xcresult" \
+                > "${results}/${name}-console.json" || rm -f "${results}/${name}-console.json"
             fi
           done
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
