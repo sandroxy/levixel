@@ -154,7 +154,7 @@ class _LevixelSourceState extends State<LevixelSource> {
         ),
       );
 
-  Future<Map<String, Object?>?> _capture() async {
+  Future<Map<String, Object?>?> _capture({bool allowEncoding = true}) async {
     if (!mounted) {
       return null;
     }
@@ -247,6 +247,9 @@ class _LevixelSourceState extends State<LevixelSource> {
       return null;
     }
     if (_encodedImage != image || _png == null) {
+      if (!allowEncoding) {
+        return null;
+      }
       final retained = image.clone();
       ui.Image? preview;
       ui.Picture? picture;
@@ -284,7 +287,7 @@ class _LevixelSourceState extends State<LevixelSource> {
       }
       // Encoding yields to host updates. Re-read clipping, image effects and
       // geometry together before handing the source to the native viewer.
-      return _capture();
+      return _capture(allowEncoding: false);
     }
     if (!mounted || _sourceId != sourceId || !render.attached) {
       return null;

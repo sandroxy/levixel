@@ -278,19 +278,31 @@ class _Session {
 
   Future<List<Map<String, Object?>>> captureSources() async {
     final allowed = items.map((item) => item.id).toSet();
-    final mounted = controller.items.map((item) => item.id).toSet();
-    final result = <Map<String, Object?>>[];
     for (final source in controller._sources.values.toList()) {
       if (!allowed.contains(source.widget.itemId) ||
-          !mounted.contains(source.widget.itemId)) {
+          !controller.items.any((item) => item.id == source.widget.itemId)) {
         continue;
       }
-      final value = await source._capture();
-      if (value != null && controller._sources[value['sourceId']] == source) {
-        result.add(value);
-      }
+      await source._capture();
     }
-    return result;
+    // Encoding another thumbnail can yield to removal, rebinding or repainting
+    // of an earlier one. Sample the complete batch without further encoding.
+    final mounted = controller.items.map((item) => item.id).toSet();
+    final sources = controller._sources.values.toList();
+    final snapshots = await Future.wait([
+      for (final source in sources)
+        if (allowed.contains(source.widget.itemId) &&
+            mounted.contains(source.widget.itemId))
+          source._capture(allowEncoding: false),
+    ]);
+    return [
+      for (final value in snapshots)
+        if (value != null &&
+            controller._sources[value['sourceId']]?.widget.itemId ==
+                value['itemId'] &&
+            controller.items.any((item) => item.id == value['itemId']))
+          value,
+    ];
   }
 
   void watchFrames() {

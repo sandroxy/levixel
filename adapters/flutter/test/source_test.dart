@@ -18,6 +18,264 @@ Future<void> pumpNativeWork(
 }
 
 void main() {
+  for (final change in ['item removal', 'opacity', 'color effect']) {
+    testWidgets('source batch refreshes $change during another image encoding',
+        (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opened = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method == 'open') {
+          opened = true;
+        }
+        return null;
+      });
+      final firstImage = (await tester.runAsync(
+          () => createTestImage(width: 80, height: 80, cache: false)))!;
+      final secondImage = (await tester.runAsync(
+          () => createTestImage(width: 160, height: 80, cache: false)))!;
+      final items = [
+        for (final id in ['first', 'second'])
+          LevixelMedia(
+              id: id, type: LevixelMediaType.image, url: 'file:///$id.png')
+      ];
+      final controller =
+          LevixelController(galleryId: 'source-batch', items: items);
+      final previousImageCallback = ui.Image.onCreate;
+      try {
+        const opacityKey = ValueKey<String>('first-opacity');
+        const imageKey = ValueKey<String>('first-image');
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Opacity(
+                key: opacityKey,
+                opacity: 1,
+                child: LevixelSource(
+                  controller: controller,
+                  itemId: 'first',
+                  child: RawImage(
+                      key: imageKey,
+                      image: firstImage,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover),
+                ),
+              ),
+              LevixelSource(
+                controller: controller,
+                itemId: 'second',
+                child: RawImage(
+                    image: secondImage,
+                    width: 100,
+                    height: 80,
+                    fit: BoxFit.cover),
+              ),
+            ]),
+          ),
+        ));
+        final opacity =
+            tester.renderObject<RenderOpacity>(find.byKey(opacityKey));
+        final rendered = tester.renderObject<RenderImage>(find.byKey(imageKey));
+        var changed = false;
+        ui.Image.onCreate = (created) {
+          previousImageCallback?.call(created);
+          if (changed || created.width != secondImage.width) {
+            return;
+          }
+          changed = true;
+          // The first source has already been captured when the second image
+          // is retained. Change the first source during that later capture.
+          switch (change) {
+            case 'item removal':
+              controller.items = [items.last];
+              break;
+            case 'opacity':
+              opacity.opacity = 0.4;
+              break;
+            case 'color effect':
+              rendered.color = const Color(0xFF0088FF);
+              break;
+          }
+        };
+        final opening = controller.open();
+        await pumpNativeWork(tester, () => opened);
+        await opening;
+        ui.Image.onCreate = previousImageCallback;
+        expect(changed, isTrue);
+        final prepared = calls
+            .firstWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        final sources = (prepared['sources']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
+        expect(prepared['items']! as List<Object?>, hasLength(2),
+            reason: 'The viewer keeps the immutable opening gallery');
+        if (change == 'opacity') {
+          expect(sources, hasLength(2));
+          expect(sources.first['itemId'], 'first');
+          expect(sources.first['opacity'], 0.4);
+        } else {
+          expect(sources.map((source) => source['itemId']), ['second']);
+          expect(prepared['sourceId'], isNull);
+        }
+        var closed = false;
+        final closing = controller.close().then((_) => closed = true);
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+        expect(tester.takeException(), isNull);
+      } finally {
+        ui.Image.onCreate = previousImageCallback;
+        controller.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        firstImage.dispose();
+        secondImage.dispose();
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
+  for (final change in ['remount', 'item rebind', 'controller switch']) {
+    testWidgets('$change restores visibility and replaces the source identity',
+        (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opens = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method == 'open') {
+          opens++;
+        }
+        return null;
+      });
+      final image = (await tester.runAsync(
+          () => createTestImage(width: 160, height: 80, cache: false)))!;
+      final items = [
+        for (final id in ['first', 'second'])
+          LevixelMedia(
+              id: id, type: LevixelMediaType.image, url: 'file:///$id.png')
+      ];
+      final original = LevixelController(galleryId: 'original', items: items);
+      final replacement =
+          LevixelController(galleryId: 'replacement', items: items);
+      var controller = original;
+      var itemId = 'first';
+      var visible = true;
+      late StateSetter rebuild;
+      List<Map<Object?, Object?>>? latestSources() {
+        final updates = calls.where((call) => call.method == 'updateSources');
+        if (updates.isEmpty) {
+          return null;
+        }
+        final value = updates.last.arguments as Map<Object?, Object?>;
+        return (value['sources']! as List<Object?>).cast<Map<Object?, Object?>>();
+      }
+
+      try {
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(builder: (context, setState) {
+            rebuild = setState;
+            return Center(
+              child: visible
+                  ? LevixelSource(
+                      key: const ValueKey<String>('source'),
+                      controller: controller,
+                      itemId: itemId,
+                      child: RawImage(
+                          image: image,
+                          width: 100,
+                          height: 80,
+                          fit: BoxFit.cover),
+                    )
+                  : const SizedBox.shrink(),
+            );
+          }),
+        ));
+        final source = find.byKey(const ValueKey<String>('source'));
+        final visibility =
+            find.descendant(of: source, matching: find.byType(Opacity));
+        final opening = original.open();
+        await pumpNativeWork(tester, () => opens == 1);
+        await opening;
+        final prepared = calls
+            .firstWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        final oldId = prepared['sourceId'];
+        expect(oldId, isNotNull);
+        expect(tester.widget<Opacity>(visibility).opacity, 0);
+
+        if (change == 'remount') {
+          rebuild(() => visible = false);
+          await pumpNativeWork(tester, () => latestSources()?.isEmpty ?? false);
+          rebuild(() => visible = true);
+        } else if (change == 'item rebind') {
+          rebuild(() => itemId = 'second');
+        } else {
+          rebuild(() => controller = replacement);
+        }
+        await pumpNativeWork(tester, () {
+          final sources = latestSources();
+          return sources != null &&
+              (change == 'controller switch'
+                  ? sources.isEmpty
+                  : sources.length == 1 && sources.single['sourceId'] != oldId);
+        });
+        expect(tester.widget<Opacity>(visibility).opacity, 1);
+        if (change != 'controller switch') {
+          expect(latestSources()!.single['itemId'], itemId);
+          expect(latestSources()!.single['png'], isA<Uint8List>(),
+              reason: 'A replacement anchor must receive its own preview');
+        }
+
+        var acknowledged = false;
+        final staleVisibility = tester.binding.defaultBinaryMessenger
+            .handlePlatformMessage(
+                channel.name,
+                const StandardMethodCodec().encodeMethodCall(MethodCall(
+                    'visibility', <String, Object?>{
+                  'requestId': prepared['requestId'],
+                  'sourceId': oldId,
+                  'hidden': true,
+                })),
+                null)
+            .then((_) => acknowledged = true);
+        await pumpNativeWork(tester, () => acknowledged);
+        await staleVisibility;
+        expect(tester.widget<Opacity>(visibility).opacity, 1,
+            reason: 'A stale native callback must not hide the replacement');
+
+        final reopening = controller.open(itemId: itemId);
+        await pumpNativeWork(tester, () => opens == 2);
+        await reopening;
+        final next = calls
+            .lastWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        expect(next['sourceId'], isNot(oldId));
+        expect(next['sourceId'], isNotNull);
+        expect(next['galleryId'], controller.galleryId);
+        expect(tester.widget<Opacity>(visibility).opacity, 0);
+        var closed = false;
+        final closing = controller.close().then((_) => closed = true);
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+        expect(tester.widget<Opacity>(visibility).opacity, 1);
+        expect(tester.takeException(), isNull);
+      } finally {
+        original.dispose();
+        replacement.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        image.dispose();
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
   for (final change in ['clipping', 'fit', 'color effect']) {
     testWidgets('source handoff refreshes $change changed during encoding',
         (tester) async {
