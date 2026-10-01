@@ -18,6 +18,96 @@ Future<void> pumpNativeWork(
 }
 
 void main() {
+  for (final change in ['item rebind', 'controller switch', 'style update']) {
+    testWidgets('an in-flight source tap respects $change', (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opened = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method == 'open') {
+          opened = true;
+        }
+        return null;
+      });
+      final items = [
+        for (final id in ['first', 'second'])
+          LevixelMedia(
+              id: id, type: LevixelMediaType.image, url: 'file:///$id.png')
+      ];
+      final original = LevixelController(galleryId: 'original', items: items);
+      final replacement =
+          LevixelController(galleryId: 'replacement', items: items);
+      var controller = original;
+      var itemId = 'first';
+      var cornerRadius = 0.0;
+      late StateSetter rebuild;
+      try {
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(builder: (context, setState) {
+            rebuild = setState;
+            return Center(
+              child: LevixelSource(
+                key: const ValueKey<String>('source'),
+                controller: controller,
+                itemId: itemId,
+                cornerRadius: cornerRadius,
+                child: const SizedBox(width: 100, height: 80),
+              ),
+            );
+          }),
+        ));
+        final source = find.byKey(const ValueKey<String>('source'));
+        final pressed = await tester.startGesture(tester.getCenter(source));
+        await tester.pump(const Duration(milliseconds: 150));
+        rebuild(() {
+          switch (change) {
+            case 'item rebind':
+              itemId = 'second';
+              break;
+            case 'controller switch':
+              controller = replacement;
+              break;
+            case 'style update':
+              cornerRadius = 12;
+              break;
+          }
+        });
+        await tester.pump();
+        await pressed.up();
+        await tester.pump();
+        await tester.pump();
+        if (change != 'style update') {
+          expect(calls, isEmpty,
+              reason: 'An old touch must not open a rebound source');
+          await tester.tap(source);
+        }
+        await pumpNativeWork(tester, () => opened);
+        final prepared = calls
+            .singleWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        final media = (prepared['items']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
+        expect(prepared['galleryId'], controller.galleryId);
+        expect(media[prepared['index']! as int]['id'], itemId);
+        expect(calls.where((call) => call.method == 'open'), hasLength(1));
+        var closed = false;
+        final closing = controller.close().then((_) => closed = true);
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+        expect(tester.takeException(), isNull);
+      } finally {
+        original.dispose();
+        replacement.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
   for (final change in ['item removal', 'opacity', 'color effect']) {
     testWidgets('source batch refreshes $change during another image encoding',
         (tester) async {

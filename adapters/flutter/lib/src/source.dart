@@ -131,6 +131,8 @@ class _LevixelSourceState extends State<LevixelSource> {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
+        // Rebinding a source cancels any gesture that began on its old media.
+        key: ValueKey<String>(_sourceId),
         behavior: HitTestBehavior.opaque,
         onTap: () => unawaited(widget.controller
             ._open(
