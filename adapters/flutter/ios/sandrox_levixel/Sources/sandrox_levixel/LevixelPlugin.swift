@@ -177,6 +177,8 @@ private final class SourceAnchor: UIView {
     private var visibilitySequence = 0
     private var displayLink: CADisplayLink?
     private var remainingFrames = 0
+    private var preview = false
+    private var opacity: CGFloat = 1
 
     init(session: ViewerSession, sourceId: String, itemId: String) {
         self.session = session; self.sourceId = sourceId; self.itemId = itemId
@@ -196,6 +198,9 @@ private final class SourceAnchor: UIView {
         let sourceFrame = try rect(args["frame"], scale: scale), clip = try rect(args["clip"], scale: scale)
         let radius = try number(args["cornerRadius"]) * scale
         guard radius >= 0 else { throw BridgeError("Invalid corner radius") }
+        opacity = try number(args["opacity"])
+        guard opacity > 0, opacity <= 1 else { throw BridgeError("Invalid source opacity") }
+        image.alpha = preview ? opacity : 0
         frame = clip
         layer.cornerRadius = clip == sourceFrame ? radius : 0
         image.frame = sourceFrame.offsetBy(dx: -clip.minX, dy: -clip.minY)
@@ -218,7 +223,10 @@ private final class SourceAnchor: UIView {
         registration?.register(galleryId: session.scopedGallery, itemIdentifier: itemId, cornerRadius: radius)
     }
 
-    func showPreview(_ show: Bool) { image.alpha = show ? 1 : 0 }
+    func showPreview(_ show: Bool) {
+        preview = show
+        image.alpha = show ? opacity : 0
+    }
 
     override var alpha: CGFloat {
         didSet {

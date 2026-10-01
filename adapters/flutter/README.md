@@ -101,18 +101,21 @@ same item; the clicked widget supplies the preferred transition source.
 
 ## Transitions
 
-A source exports the decoded image, visible rectangle, centered fit, and uniform
-corner radius to the native core. It does not create a platform view for each
+A source exports the decoded image, visible rectangle, centered fit, opacity,
+and uniform corner radius to the native core. It does not create a platform view for each
 thumbnail. A temporary native preview covers the handoff while the corresponding
 Flutter image is hidden or restored.
 
-Shared transitions require one decoded, opaque image using centered `cover`,
+Shared transitions require one decoded image using centered `cover`,
 `contain`, or `fill` sizing, without rotation, skew, nonuniform scaling, tint,
 repetition, nine-patch stretching, or directional mirroring. Arbitrary paint
 effects and custom clip shapes cannot be reconstructed from an image and
 rectangle; use a plain image
 inside `LevixelSource` for matching transitions. Unavailable or unsupported
-sources use the native fade transition. The exported preview is bounded to
+sources use the native fade transition. Image opacity and Flutter opacity
+ancestors are preserved during thumbnail handoff, including updates while the
+viewer is open. Fully transparent sources are not transition targets. The
+exported preview is bounded to
 1,024 pixels per dimension; the viewer independently loads the full media URL.
 
 ## Actions and events

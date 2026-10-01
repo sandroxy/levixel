@@ -3,8 +3,8 @@ part of '../levixel.dart';
 /// A Flutter thumbnail registered by stable media identity.
 ///
 /// The child remains a Flutter widget. Shared transitions use its decoded image,
-/// layout, clipping, and uniform [cornerRadius]. Unsupported image effects or
-/// unavailable geometry use the native viewer's fade transition.
+/// layout, opacity, clipping, and uniform [cornerRadius]. Unsupported image
+/// effects or unavailable geometry use the native viewer's fade transition.
 class LevixelSource extends StatefulWidget {
   const LevixelSource({
     super.key,
@@ -96,6 +96,39 @@ class _LevixelSourceState extends State<LevixelSource> {
     _png = null;
   }
 
+  double _paintOpacity(RenderObject object) {
+    if (object == _opacityKey.currentContext?.findRenderObject()) {
+      // The native viewer's visibility lease is separate from host styling.
+      return 1;
+    }
+    if (object is RenderOpacity) {
+      return object.opacity;
+    }
+    if (object is RenderAnimatedOpacity) {
+      return object.opacity.value;
+    }
+    if (object is RenderSliverOpacity) {
+      return object.opacity;
+    }
+    if (object is RenderSliverAnimatedOpacity) {
+      return object.opacity.value;
+    }
+    if (object is RenderImage) {
+      return object.opacity?.value ?? 1;
+    }
+    return 1;
+  }
+
+  double _effectiveOpacity(RenderImage image) {
+    var opacity = 1.0;
+    RenderObject? current = image;
+    while (current != null) {
+      opacity *= _paintOpacity(current);
+      current = current.parent;
+    }
+    return opacity;
+  }
+
   @override
   Widget build(BuildContext context) => GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -135,10 +168,7 @@ class _LevixelSourceState extends State<LevixelSource> {
       if (object is RenderOffstage && object.offstage) {
         return;
       }
-      if (object is RenderOpacity && object.opacity < 0.999) {
-        return;
-      }
-      if (object is RenderAnimatedOpacity && object.opacity.value < 0.999) {
+      if (_paintOpacity(object) <= 0) {
         return;
       }
       if (object is RenderClipPath || object is RenderClipOval) {
@@ -164,8 +194,11 @@ class _LevixelSourceState extends State<LevixelSource> {
         render.centerSlice != null ||
         render.matchTextDirection ||
         render.repeat != ImageRepeat.noRepeat ||
-        (render.opacity?.value ?? 1) < 0.999 ||
         render.alignment.resolve(render.textDirection) != Alignment.center) {
+      return null;
+    }
+    final opacity = _effectiveOpacity(render);
+    if (!opacity.isFinite || opacity <= 0 || opacity > 1) {
       return null;
     }
     var fit = render.fit ?? BoxFit.scaleDown;
@@ -197,14 +230,6 @@ class _LevixelSourceState extends State<LevixelSource> {
     while (child.parent != null) {
       final parent = child.parent!;
       if (parent is RenderOffstage && parent.offstage) {
-        return null;
-      }
-      if (parent is RenderOpacity &&
-          parent != _opacityKey.currentContext?.findRenderObject() &&
-          parent.opacity < 0.999) {
-        return null;
-      }
-      if (parent is RenderAnimatedOpacity && parent.opacity.value < 0.999) {
         return null;
       }
       if (parent is RenderClipPath || parent is RenderClipOval) {
@@ -261,10 +286,10 @@ class _LevixelSourceState extends State<LevixelSource> {
     if (!mounted || _sourceId != sourceId || !render.attached) {
       return null;
     }
-    // Encoding is asynchronous; changed geometry belongs to the next snapshot.
-    if (MatrixUtils.transformRect(
-            render.getTransformTo(null), Offset.zero & render.size) !=
-        frame) {
+    // Encoding is asynchronous; changed paint belongs to the next snapshot.
+    final currentFrame = MatrixUtils.transformRect(
+        render.getTransformTo(null), Offset.zero & render.size);
+    if (_effectiveOpacity(render) != opacity || currentFrame != frame) {
       return null;
     }
     final container = root is RenderBox
@@ -274,7 +299,7 @@ class _LevixelSourceState extends State<LevixelSource> {
     final radius =
         container == frame ? widget.cornerRadius * math.min(m[0], m[5]) : 0.0;
     final signature =
-        '$sourceId:${widget.itemId}:$frame:$clip:$radius:$fit:$_imageVersion:${view.devicePixelRatio}';
+        '$sourceId:${widget.itemId}:$frame:$clip:$radius:$fit:$opacity:$_imageVersion:${view.devicePixelRatio}';
     return <String, Object?>{
       'sourceId': sourceId,
       'itemId': widget.itemId,
@@ -283,6 +308,7 @@ class _LevixelSourceState extends State<LevixelSource> {
       'cornerRadius': radius,
       'pixelRatio': view.devicePixelRatio,
       'fit': fit.name,
+      'opacity': opacity,
       'png': _png,
       'imageVersion': _imageVersion,
       'signature': signature,

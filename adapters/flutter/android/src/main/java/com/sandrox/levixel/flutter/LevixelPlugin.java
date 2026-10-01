@@ -236,7 +236,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
         final String id, itemId, key;
         final ImageView image;
         boolean preview, ready;
-        float radius;
+        float radius, opacity = 1f;
         int visibilitySequence;
 
         Source(Session owner, String id, String itemId) {
@@ -249,7 +249,14 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                 @Override public void getOutline(View view, Outline outline) { outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius); }
             });
             image = new AppCompatImageView(getContext()) {
-                @Override protected void onDraw(Canvas canvas) { if (preview) super.onDraw(canvas); }
+                @Override protected void onDraw(Canvas canvas) {
+                    if (!preview) return;
+                    // Native transitions own View alpha. Apply host opacity only
+                    // to the handoff preview, without changing that visibility lease.
+                    int saved = canvas.saveLayerAlpha(0, 0, getWidth(), getHeight(), Math.round(opacity * 255));
+                    try { super.onDraw(canvas); }
+                    finally { canvas.restoreToCount(saved); }
+                }
             };
             addView(image); ready = true;
         }
@@ -266,6 +273,9 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             image.setX(frame.left - clip.left); image.setY(frame.top - clip.top);
             radius = frame.equals(clip) ? number(args.get("cornerRadius")) * scale : 0;
             if (radius < 0) throw new IllegalArgumentException("Invalid corner radius");
+            opacity = number(args.get("opacity"));
+            if (opacity <= 0 || opacity > 1) throw new IllegalArgumentException("Invalid source opacity");
+            image.invalidate();
             invalidateOutline();
             String fit = text(args, "fit");
             if (fit.equals("cover")) image.setScaleType(ImageView.ScaleType.CENTER_CROP);
