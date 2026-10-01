@@ -71,11 +71,11 @@ class LevixelController {
       }
     }
     final previous = _Bridge.current;
-    final session = _Session(this, snapshot, actionSnapshot);
+    final session = _Session(this, snapshot, actionSnapshot, previous?.close());
     _Bridge.current = session;
     _Bridge.sessions[session.id] = session;
     try {
-      await previous?.close();
+      await session.previousClose;
       session.checkCurrent();
       await _Bridge.nextFrame();
       session.checkCurrent();
@@ -249,12 +249,13 @@ class _FrameWaiter with WidgetsBindingObserver {
 }
 
 class _Session {
-  _Session(this.controller, this.items, this.actions)
+  _Session(this.controller, this.items, this.actions, this.previousClose)
       : id = 'flutter-${++_Bridge.nextId}';
   final String id;
   final LevixelController controller;
   final List<LevixelMedia> items;
   final List<LevixelAction> actions;
+  final Future<void>? previousClose;
   bool prepared = false;
   bool closing = false;
   bool _syncing = false;
@@ -345,6 +346,9 @@ class _Session {
   Future<void> _close() async {
     closing = true;
     try {
+      // A canceled opening still owns the wait for the preceding native viewer.
+      // Its replacement must wait until that viewer has finished closing.
+      await previousClose;
       if (prepared) {
         try {
           await _Bridge.nextFrame();

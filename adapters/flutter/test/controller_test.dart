@@ -179,6 +179,131 @@ void main() {
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));
 
+  for (final sameController in [true, false]) {
+    final owner = sameController ? 'one gallery' : 'different galleries';
+    testWidgets('rapid opens in $owner wait for the active native viewer',
+        (tester) async {
+      final first = LevixelController(
+          galleryId: 'first-gallery',
+          items: sameController
+              ? [media('first'), media('middle'), media('latest')]
+              : [media('first')]);
+      final middle = sameController
+          ? first
+          : LevixelController(
+              galleryId: 'middle-gallery', items: [media('middle')]);
+      final latest = sameController
+          ? first
+          : LevixelController(
+              galleryId: 'latest-gallery', items: [media('latest')]);
+      for (final controller in {first, middle, latest}) {
+        addTearDown(controller.dispose);
+      }
+      await settle(tester, first.open());
+      final initial = (calls
+          .singleWhere((call) => call.method == 'prepare')
+          .arguments as Map<Object?, Object?>)['requestId'];
+      Object? activeRequest = initial;
+      final dismissal = Completer<void>();
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        final request = (call.arguments as Map<Object?, Object?>)['requestId'];
+        if (call.method == 'close' && request == initial) {
+          await dismissal.future;
+        } else if (call.method == 'finish' && request == activeRequest) {
+          activeRequest = null;
+        } else if (call.method == 'prepare') {
+          if (activeRequest != null) {
+            throw PlatformException(code: 'OPEN_FAILED');
+          }
+          activeRequest = request;
+        }
+        return null;
+      });
+      Object? middleFailure;
+      Object? latestFailure;
+      final middleOpening =
+          middle.open(itemId: 'middle').catchError((Object error) {
+        middleFailure = error;
+      });
+      final latestOpening =
+          latest.open(itemId: 'latest').catchError((Object error) {
+        latestFailure = error;
+      });
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+      final preparationsBeforeDismissal =
+          calls.where((call) => call.method == 'prepare').length;
+      dismissal.complete();
+      await settle(
+          tester, Future.wait([middleOpening, latestOpening]).then((_) {}));
+      final prepared = calls
+          .where((call) => call.method == 'prepare')
+          .map((call) => call.arguments as Map<Object?, Object?>)
+          .toList();
+      await settle(tester, latest.close());
+      expect(preparationsBeforeDismissal, 1,
+          reason: 'A queued replacement must preserve the native close wait');
+      expect(
+          middleFailure,
+          isA<PlatformException>()
+              .having((error) => error.code, 'code', 'OPEN_CANCELLED'));
+      expect(latestFailure, isNull);
+      expect(prepared, hasLength(2));
+      expect(prepared.last['galleryId'], latest.galleryId);
+      final latestItems = prepared.last['items']! as List<Object?>;
+      final latestItem = latestItems[prepared.last['index']! as int]!
+          as Map<Object?, Object?>;
+      expect(latestItem['id'], 'latest');
+      expect(activeRequest, isNull);
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
+  testWidgets('closing a queued opening awaits the preceding native dismissal',
+      (tester) async {
+    final first = LevixelController(
+        galleryId: 'first-gallery', items: [media('first')]);
+    final next = LevixelController(
+        galleryId: 'next-gallery', items: [media('next')]);
+    addTearDown(first.dispose);
+    addTearDown(next.dispose);
+    await settle(tester, first.open());
+    final dismissal = Completer<void>();
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
+      calls.add(call);
+      if (call.method == 'close') {
+        await dismissal.future;
+      }
+      return null;
+    });
+    Object? failure;
+    final opening = next.open().catchError((Object error) {
+      failure = error;
+    });
+    var closed = false;
+    final closing = next.close().then((_) {
+      closed = true;
+    });
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    final closedBeforeDismissal = closed;
+    dismissal.complete();
+    await settle(tester, Future.wait([opening, closing]).then((_) {}));
+    expect(closedBeforeDismissal, isFalse);
+    expect(closed, isTrue);
+    expect(
+        failure,
+        isA<PlatformException>()
+            .having((error) => error.code, 'code', 'OPEN_CANCELLED'));
+    expect(calls.where((call) => call.method == 'prepare').length, 1);
+    expect(calls.where((call) => call.method == 'close').length, 1);
+    expect(calls.where((call) => call.method == 'finish').length, 1);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   testWidgets('a close during preparation cancels the delayed open',
       (tester) async {
     final controller =
