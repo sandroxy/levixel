@@ -9,6 +9,7 @@ enum LevixelActionLayout { list, grid }
 enum LevixelEventType {
   opened,
   indexChange,
+  longPress,
   mediaLoad,
   mediaError,
   action,

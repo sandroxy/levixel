@@ -48,12 +48,14 @@ ios_xcframework="${plugin_dir}/dist/native-ios/levixel-${version}.xcframework.zi
 ios_swift_package="${plugin_dir}/dist/native-ios/levixel-${version}-swift-package.zip"
 harmony_har="${plugin_dir}/dist/native-harmonyos/levixel-${version}.har"
 react_native_package="${plugin_dir}/dist/react-native/levixel-react-native-${version}.tgz"
+flutter_package="${plugin_dir}/dist/flutter/levixel-flutter-${version}.zip"
 uniapp_uts_package="${plugin_dir}/dist/uniapp/levixel-uniapp-${version}.zip"
 uniapp_legacy_package="${plugin_dir}/dist/uniapp/levixel-uniapp-legacy-${version}.zip"
 uniapp_marketplace="${plugin_dir}/dist/uniapp/levixel-uniapp-${version}-marketplace.md"
 web_package="${plugin_dir}/dist/web/levixel-web-${version}.tgz"
 
 artifacts=(
+  "${flutter_package}"
   "${android_aar}"
   "${android_maven}"
   "${ios_xcframework}"
@@ -95,6 +97,10 @@ verify_sidecar() {
 for artifact in "${artifacts[@]}"; do
   verify_sidecar "${artifact}"
 done
+
+flutter_verify_arguments=()
+if [[ ${allow_dirty} -eq 1 ]]; then flutter_verify_arguments+=(--allow-dirty); fi
+"${script_dir}/verify-flutter-package.sh" "${flutter_verify_arguments[@]}"
 
 read -r native_commit native_dirty native_signed < <(ruby -I "${script_dir}" \
   -rjson -rdigest -r native-release-manifest -e '
@@ -198,6 +204,9 @@ snapshot_arguments=(
   --qualification packageIdentitiesVerified=true
   --qualification canonicalTagUnused=true
   --automated-target android
+  --automated-target flutter-android
+  --automated-target flutter-ios
+  --automated-target flutter-ios-cocoapods
   --automated-target ios
   --automated-target harmonyos
   --automated-target react-native-android
@@ -207,6 +216,7 @@ snapshot_arguments=(
   --automated-target uniapp-legacy
   --automated-target web
   --artifact "native-android-aar=${android_aar}"
+  --artifact "flutter-package=${flutter_package}"
   --artifact "native-android-maven-repository=${android_maven}"
   --artifact "native-ios-xcframework=${ios_xcframework}"
   --artifact "native-ios-swift-package=${ios_swift_package}"
@@ -220,6 +230,7 @@ snapshot_arguments=(
   --artifact "native-build-checksums=${native_checksums}"
 )
 sidecar_artifacts=(
+  "flutter-package=${flutter_package}"
   "native-android-aar=${android_aar}"
   "native-android-maven-repository=${android_maven}"
   "native-ios-xcframework=${ios_xcframework}"

@@ -14,6 +14,7 @@
   ],
   "artifactRoles": {
     "required": [
+      "checksum-flutter-package",
       "checksum-native-android-aar",
       "checksum-native-android-maven-repository",
       "checksum-native-harmonyos-har",
@@ -23,6 +24,7 @@
       "checksum-uniapp-legacy-package",
       "checksum-uniapp-uts-package",
       "checksum-web-package",
+      "flutter-package",
       "native-android-aar",
       "native-android-maven-repository",
       "native-build-checksums",
@@ -46,6 +48,9 @@
   "acceptance": {
     "automatedTargets": [
       "android",
+      "flutter-android",
+      "flutter-ios",
+      "flutter-ios-cocoapods",
       "harmonyos",
       "ios",
       "react-native-android",

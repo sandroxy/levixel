@@ -123,10 +123,12 @@ native-readable icon locations and groups, disabled/destructive flags, and an
 `onSelected` callback. Grid actions require an icon. Callbacks belong to the
 opening snapshot and receive the native event's media identity.
 
-`controller.events` emits `indexChange`, `opened`, `mediaLoad`, `mediaError`,
-`action`, and `dismiss`. Each event exposes its timestamp, session ID, gallery ID,
+`controller.events` emits `indexChange`, `opened`, `longPress`, `mediaLoad`,
+`mediaError`, `action`, and `dismiss`. Each event exposes its timestamp, session ID, gallery ID,
 item ID, index, and native payload. Subscribe before opening to receive initial
-events, and cancel host subscriptions when they are no longer needed.
+events, and cancel host subscriptions when they are no longer needed. Long press
+emits `longPress` even when the opening has no actions; an empty action list
+leaves the viewer open without showing a drawer.
 The initial `indexChange` precedes `opened`. Media loading and preloading can
 emit events before opening finishes or for an adjacent item; use `itemId` to
 identify their media. A thumbnail preview alone does not emit `mediaLoad`.

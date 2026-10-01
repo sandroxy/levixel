@@ -34,36 +34,12 @@ serially; retain any needed result bundle before starting another run. Failed
 test results remain available at the same path for diagnosis.
 
 `./scripts/test-flutter-source.sh dart` checks Flutter formatting, static
-analysis, and session contracts. The `android`, `ios`, and `ios-cocoapods` targets
-build the current native source, stage a matching adapter package, and run
-thumbnail lifecycle tests in a generated Flutter host through Android
-instrumentation and XCTest. Set
-`LEVIXEL_FLUTTER_DEVICE` to an already booted Android emulator or iOS simulator
-ID. Android requires Java 17 and the Android SDK; iOS requires Xcode, and the
-CocoaPods target also requires CocoaPods. The source CI workflow pins Flutter
-3.47.5 and exercises both iOS dependency managers.
-
-Flutter source-test output is reused under
-`dist/development/flutter-source-tests/<target>/`. These hosts check source
-integration and are not distributed or used as artifact acceptance hosts.
-Do not run the same target concurrently. See the
-[Flutter adapter API](adapters/flutter/README.md) for controller and source
-semantics.
-Add `gestures` as the second argument to run native touch checks with UI Automator
-on Android or XCUITest on iOS. These checks exercise paging, long-press actions,
-double-tap and pinch zoom, drag dismissal, and Flutter source restoration. The
-iOS gesture host also requires the `xcodeproj` Ruby gem at version `1.27.0`.
-Gesture runs retain `native-gestures.mp4`; Android screenshots are collected by
-Gradle under the host's
-`build/app/outputs/connected_android_test_additional_output/` directory. iOS
-screenshots are retained in the result bundle.
-
-Native test commands retain detailed output in `lifecycle-test.log` or
-`gestures-test.log` in their target directory. Android retains its
-instrumentation and lint reports under the host's
-`build/` directory; iOS reuses `DerivedData/` and replaces `latest.xcresult` or
-`gestures.xcresult` for the selected mode. `LEVIXEL_FLUTTER_TEST_TIMEOUT`
-overrides the default 600-second limit for the native build and test command.
+analysis, and controller/session contracts. The workflow pins the Flutter SDK identity.
+Consumer applications, source integration, native touch tests, recordings, and
+immutable artifact acceptance belong to the independent consumer repository.
+They consume the public adapter and the Android/iOS cores without becoming
+product build dependencies. See the [Flutter adapter API](adapters/flutter/README.md)
+for controller and source semantics.
 
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:

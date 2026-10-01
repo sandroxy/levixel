@@ -112,6 +112,41 @@ void main() {
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));
 
+  testWidgets('forwards every native event', (tester) async {
+    final controller =
+        LevixelController(galleryId: 'gallery', items: [media('first')]);
+    final events = <LevixelEvent>[];
+    final subscription = controller.events.listen(events.add);
+    await settle(tester, controller.open());
+    final prepared = (calls
+        .firstWhere((call) => call.method == 'prepare')
+        .arguments as Map<Object?, Object?>);
+    final request = prepared['requestId']! as String;
+    const nativeTypes = [
+      'indexChange',
+      'opened',
+      'longPress',
+      'mediaLoad',
+      'mediaError',
+      'action',
+      'dismiss',
+    ];
+    for (final type in nativeTypes) {
+      await nativeEvent(tester, request, type, time: 1234.0);
+    }
+    expect(events.map((event) => event.type.name), nativeTypes);
+    for (final event in events) {
+      expect(event.galleryId, 'gallery');
+      expect(event.sessionId, 'native-session');
+      expect(event.itemId, 'first');
+      expect(event.index, 0);
+      expect(event.time.millisecondsSinceEpoch, 1234);
+    }
+    await settle(tester, controller.close());
+    await subscription.cancel();
+    controller.dispose();
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   testWidgets('close awaits native dismissal and shares one completion',
       (tester) async {
     final controller =

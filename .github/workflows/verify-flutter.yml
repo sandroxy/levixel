@@ -1,4 +1,4 @@
-name: Verify Flutter source
+name: Verify Flutter contracts
 
 on:
   push:
@@ -8,7 +8,6 @@ on:
       - 'native/ios/**'
       - 'plugin.yaml'
       - 'scripts/test-flutter-source.sh'
-      - 'scripts/fixtures/flutter/**'
       - '.github/workflows/verify-flutter.yml'
   pull_request:
     paths:
@@ -17,7 +16,6 @@ on:
       - 'native/ios/**'
       - 'plugin.yaml'
       - 'scripts/test-flutter-source.sh'
-      - 'scripts/fixtures/flutter/**'
       - '.github/workflows/verify-flutter.yml'
   workflow_dispatch:
 
@@ -63,151 +61,11 @@ jobs:
         if: always()
         run: |
           mkdir -p dist/development/flutter-source-tests/dart
-          dart format adapters/flutter/lib adapters/flutter/test scripts/fixtures/flutter
-          git diff -- adapters/flutter scripts/fixtures/flutter > dist/development/flutter-source-tests/dart/format.patch
+          dart format adapters/flutter/lib adapters/flutter/test
+          git diff -- adapters/flutter > dist/development/flutter-source-tests/dart/format.patch
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: flutter-dart-diagnostics
           path: dist/development/flutter-source-tests/dart/
-          retention-days: 7
-
-  android:
-    name: Android native integration
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          persist-credentials: false
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          repository: flutter/flutter
-          ref: '3.47.5'
-          path: .toolchains/flutter
-          persist-credentials: false
-      - name: Cache Flutter SDK artifacts
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: .toolchains/flutter/bin/cache
-          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
-      - name: Verify SDK identity
-        run: |
-          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
-          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-          cache-dependency-path: |
-            native/android/**/*.gradle
-            native/android/gradle/wrapper/gradle-wrapper.properties
-            adapters/flutter/android/build.gradle
-      - name: Start Android emulator
-        env:
-          ANDROID_AVD_HOME: ${{ runner.temp }}/levixel-avd
-        run: |
-          test -c /dev/kvm
-          sudo chmod a+rw /dev/kvm
-          export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
-          echo "${ANDROID_HOME}/platform-tools" >> "${GITHUB_PATH}"
-          mkdir -p "${ANDROID_AVD_HOME}"
-          sdkmanager 'system-images;android-35;google_apis;x86_64' 'emulator'
-          echo no | avdmanager create avd --name levixel-api35 --package 'system-images;android-35;google_apis;x86_64' --device pixel_6
-          "${ANDROID_HOME}/emulator/emulator" -avd levixel-api35 -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu swiftshader_indirect -memory 2048 -cores 2 > "${RUNNER_TEMP}/levixel-emulator.log" 2>&1 &
-          timeout 180 adb -s emulator-5554 wait-for-device
-          booted=false
-          for attempt in {1..90}; do
-            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then booted=true; break; fi
-            sleep 2
-          done
-          if [[ "${booted}" != true ]]; then cat "${RUNNER_TEMP}/levixel-emulator.log"; exit 1; fi
-          adb -s emulator-5554 shell input keyevent 82
-      - name: Check Android bridge and thumbnail lifecycle
-        env:
-          LEVIXEL_FLUTTER_DEVICE: emulator-5554
-        run: ./scripts/test-flutter-source.sh android
-      - name: Check Android native gestures
-        env:
-          LEVIXEL_FLUTTER_DEVICE: emulator-5554
-        run: ./scripts/test-flutter-source.sh android gestures
-      - name: Collect Android diagnostics
-        if: failure()
-        run: adb -s emulator-5554 logcat -d > "${RUNNER_TEMP}/levixel-logcat.txt"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: flutter-android-diagnostics
-          path: |
-            ${{ runner.temp }}/levixel-emulator.log
-            ${{ runner.temp }}/levixel-logcat.txt
-            dist/development/flutter-source-tests/android/*-test.log
-            dist/development/flutter-source-tests/android/native-gestures.mp4
-            dist/development/flutter-source-tests/android/host/build/app/outputs/connected_android_test_additional_output/
-            dist/development/flutter-source-tests/android/host/build/**/reports/
-          retention-days: 7
-
-  ios:
-    name: iOS native integration (${{ matrix.target }})
-    runs-on: macos-26
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [ios, ios-cocoapods]
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          persist-credentials: false
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          repository: flutter/flutter
-          ref: '3.47.5'
-          path: .toolchains/flutter
-          persist-credentials: false
-      - name: Cache Flutter SDK artifacts
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: .toolchains/flutter/bin/cache
-          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
-      - name: Verify SDK identity and select simulator
-        run: |
-          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
-          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
-          device="$(xcrun simctl list devices available --json | ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("devices").values.flatten.find { |d| d.fetch("name").start_with?("iPhone") }.fetch("udid")')"
-          echo "LEVIXEL_FLUTTER_DEVICE=${device}" >> "${GITHUB_ENV}"
-          xcrun simctl boot "${device}"
-          xcrun simctl bootstatus "${device}" -b
-      - name: Check iOS bridge and thumbnail lifecycle
-        run: ./scripts/test-flutter-source.sh "${{ matrix.target }}"
-      - name: Install Xcode project support
-        run: gem install --user-install --no-document xcodeproj --version 1.27.0
-      - name: Check iOS native gestures
-        run: ./scripts/test-flutter-source.sh "${{ matrix.target }}" gestures
-      - name: Export iOS test results
-        if: always()
-        run: |
-          results="dist/development/flutter-source-tests/${{ matrix.target }}"
-          for name in latest gestures; do
-            if [[ -d "${results}/${name}.xcresult" ]]; then
-              xcrun xcresulttool get test-results summary --path "${results}/${name}.xcresult" | tee "${results}/${name}-summary.json"
-              xcrun xcresulttool get log --type console --path "${results}/${name}.xcresult" \
-                > "${results}/${name}-console.json" || rm -f "${results}/${name}-console.json"
-            fi
-          done
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: flutter-${{ matrix.target }}-diagnostics
-          path: |
-            dist/development/flutter-source-tests/${{ matrix.target }}/*-test.log
-            dist/development/flutter-source-tests/${{ matrix.target }}/*-summary.json
-            dist/development/flutter-source-tests/${{ matrix.target }}/*-console.json
-            dist/development/flutter-source-tests/${{ matrix.target }}/native-gestures.mp4*
-            dist/development/flutter-source-tests/${{ matrix.target }}/latest.xcresult/
-            dist/development/flutter-source-tests/${{ matrix.target }}/gestures.xcresult/
           retention-days: 7
