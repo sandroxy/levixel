@@ -166,8 +166,8 @@ void main() {
       final prepared = calls
           .firstWhere((call) => call.method == 'prepare')
           .arguments as Map<Object?, Object?>;
-      final initial =
-          (prepared['sources']! as List<Object?>).single as Map<Object?, Object?>;
+      final initial = (prepared['sources']! as List<Object?>).single
+          as Map<Object?, Object?>;
       expect(initial['opacity'], closeTo(0.3, 0.000001));
       expect(tester.widget<Opacity>(visibility).opacity, 0);
 
@@ -180,7 +180,8 @@ void main() {
       });
       expect(latestSources()!.single['sourceId'], initial['sourceId']);
       expect(tester.widget<Opacity>(visibility).opacity, 0,
-          reason: 'A style update must not release the native visibility lease');
+          reason:
+              'A style update must not release the native visibility lease');
 
       rebuild(() => hostOpacity = 0);
       await pumpNativeWork(tester, () => latestSources()?.isEmpty ?? false);
