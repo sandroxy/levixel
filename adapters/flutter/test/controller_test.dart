@@ -143,7 +143,7 @@ void main() {
       expect(event.time.millisecondsSinceEpoch, 1234);
     }
     await settle(tester, controller.close());
-    await subscription.cancel();
+    await settle(tester, subscription.cancel());
     controller.dispose();
   }, timeout: const Timeout(Duration(seconds: 30)));
 
