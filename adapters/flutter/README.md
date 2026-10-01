@@ -4,11 +4,37 @@
 viewers. Flutter renders the host interface; the existing native cores own media
 loading, paging, zoom, drag dismissal, video playback, actions, and transitions.
 
-This directory is adapter source. Native builds require a prepared package with
-matching Android and iOS artifacts; a Git dependency on this directory alone is
-not an installable native package. Source checks are described in
-[DEVELOPMENT.md](../../DEVELOPMENT.md). `publish_to: none` prevents accidental
-publication of adapter source without its native artifacts.
+## Installation
+
+Native builds require a prepared `levixel-flutter-<version>.zip` package. Verify
+its SHA-256 against the accompanying `.sha256` file, then extract its
+`sandrox_levixel/` directory under your application's `vendor/` directory.
+Add the extracted package as a path dependency:
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  sandrox_levixel:
+    path: vendor/sandrox_levixel
+```
+
+Run `flutter pub get` and rebuild the application. Keep the extracted package
+intact: it includes the matching Android Maven repository, the device and
+simulator iOS XCFramework, native provenance, and legal notices. Android resolves
+the core from that embedded Maven repository; its runtime dependencies still
+require access to Google Maven, Maven Central, and JitPack.
+
+Android requires API 24 or later, compile SDK 36, and Java 17. iOS requires iOS 15
+or later. The adapter declares Flutter 3.44 or later and supports Flutter's Swift
+Package Manager and CocoaPods integration. Set the application's minimum
+deployment targets accordingly.
+
+The repository's `adapters/flutter` directory contains adapter source without
+native binaries; a Git dependency on that directory alone is not installable.
+`publish_to: none` prevents accidental pub.dev publication. Maintainers building
+the package should use the repository's
+[development guide](https://github.com/sandroxy/levixel/blob/master/DEVELOPMENT.md).
 
 ## Gallery and source widgets
 
@@ -82,8 +108,9 @@ Flutter image is hidden or restored.
 
 Shared transitions require one decoded, opaque image using centered `cover`,
 `contain`, or `fill` sizing, without rotation, skew, nonuniform scaling, tint,
-repetition, nine-patch stretching, or directional mirroring. Arbitrary paint effects and custom clip
-shapes cannot be reconstructed from an image and rectangle; use a plain image
+repetition, nine-patch stretching, or directional mirroring. Arbitrary paint
+effects and custom clip shapes cannot be reconstructed from an image and
+rectangle; use a plain image
 inside `LevixelSource` for matching transitions. Unavailable or unsupported
 sources use the native fade transition. The exported preview is bounded to
 1,024 pixels per dimension; the viewer independently loads the full media URL.
@@ -105,8 +132,3 @@ emit events before opening finishes or for an adjacent item; use `itemId` to
 identify their media. A thumbnail preview alone does not emit `mediaLoad`.
 `controller.retry()` requests the native viewer's current retry operation and
 reports whether it was accepted.
-
-Android requires API 24 or later; iOS requires iOS 15 or later. The adapter
-declares Flutter 3.44 or later and supplies both Swift Package Manager and
-CocoaPods integration. Source CI pins its Flutter SDK and runs the same native
-lifecycle checks through both iOS dependency managers.

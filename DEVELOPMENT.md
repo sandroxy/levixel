@@ -53,8 +53,10 @@ Add `gestures` as the second argument to run native touch checks with UI Automat
 on Android or XCUITest on iOS. These checks exercise paging, long-press actions,
 double-tap and pinch zoom, drag dismissal, and Flutter source restoration. The
 iOS gesture host also requires the `xcodeproj` Ruby gem at version `1.27.0`.
-Gesture runs retain `native-gestures.mp4`; screenshots are stored under
-`screenshots/` on Android and in the iOS result bundle.
+Gesture runs retain `native-gestures.mp4`; Android screenshots are collected by
+Gradle under the host's
+`build/app/outputs/connected_android_test_additional_output/` directory. iOS
+screenshots are retained in the result bundle.
 
 Native test commands retain detailed output in `lifecycle-test.log` or
 `gestures-test.log` in their target directory. Android retains its
@@ -166,6 +168,40 @@ The iOS source-only regression entry point is:
 ```sh
 ./scripts/test-native-ios-source.sh
 ```
+
+## Flutter
+
+Prepare and verify the native release inputs before packaging the Flutter
+adapter. The package tools require Python 3.9 or later, Ruby, Git, Java's `jar`
+command, and the native artifact verification tools described above.
+
+```sh
+./scripts/package-flutter.sh
+./scripts/verify-flutter-package.sh
+```
+
+The builder writes `dist/flutter/levixel-flutter-<version>.zip` and its SHA-256
+sidecar. The ZIP contains a `sandrox_levixel/` package root with Dart and bridge
+source, the native Android Maven repository, the device and simulator iOS
+XCFramework, legal notices, and the original `native-release.json`. It does not
+rebuild native cores. Its input manifest must identify the same source commit,
+and every embedded native input must match the manifest's byte count and hash.
+The iOS source-provenance and adapter API checks also apply.
+
+The verifier is read-only and can inspect an explicit ZIP path as its first
+argument. It checks the checksum, source and legal-file bytes, package identity,
+native contents, and provenance against the current release checkout. Both
+commands require clean source and native inputs unless `--allow-dirty` is used
+for a local rehearsal. The builder verifies temporary output before installing
+it and refuses to overwrite different same-version bytes or an incomplete
+candidate; use `--replace` only after rejecting that local candidate.
+
+`python3 -B scripts/test-flutter-package.py` exercises archive integrity,
+native-input boundaries, and immutable output handling using fixtures. These
+checks do not compile a consumer or accept a release. Exact packaged bytes must
+also pass Android and iOS artifact-only consumer checks, including both iOS
+dependency managers. Installation and controller usage are documented in the
+[Flutter adapter guide](adapters/flutter/README.md).
 
 ## React Native
 

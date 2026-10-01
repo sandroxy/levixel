@@ -1,0 +1,38 @@
+name: Verify Flutter packaging
+
+on:
+  push:
+    paths:
+      - 'adapters/flutter/**'
+      - 'scripts/*flutter*'
+      - '.github/workflows/verify-flutter-package.yml'
+  pull_request:
+    paths:
+      - 'adapters/flutter/**'
+      - 'scripts/*flutter*'
+      - '.github/workflows/verify-flutter-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package archive and native input boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Check package tools
+        run: |
+          bash -n scripts/package-flutter.sh scripts/verify-flutter-package.sh
+          python3 -B scripts/test-flutter-package.py
+          python3 -B scripts/flutter-package.py check-source
+          ./scripts/package-flutter.sh --help
+          ./scripts/verify-flutter-package.sh --help
