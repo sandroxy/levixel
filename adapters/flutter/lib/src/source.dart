@@ -282,14 +282,11 @@ class _LevixelSourceState extends State<LevixelSource> {
         picture?.dispose();
         retained.dispose();
       }
+      // Encoding yields to host updates. Re-read clipping, image effects and
+      // geometry together before handing the source to the native viewer.
+      return _capture();
     }
     if (!mounted || _sourceId != sourceId || !render.attached) {
-      return null;
-    }
-    // Encoding is asynchronous; changed paint belongs to the next snapshot.
-    final currentFrame = MatrixUtils.transformRect(
-        render.getTransformTo(null), Offset.zero & render.size);
-    if (_effectiveOpacity(render) != opacity || currentFrame != frame) {
       return null;
     }
     final container = root is RenderBox

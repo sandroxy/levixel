@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +18,124 @@ Future<void> pumpNativeWork(
 }
 
 void main() {
+  for (final change in ['clipping', 'fit', 'color effect']) {
+    testWidgets('source handoff refreshes $change changed during encoding',
+        (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opened = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method == 'open') {
+          opened = true;
+        }
+        return null;
+      });
+      final image = (await tester.runAsync(
+          () => createTestImage(width: 160, height: 80, cache: false)))!;
+      final controller = LevixelController(galleryId: 'paint-change', items: [
+        LevixelMedia(
+            id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png')
+      ]);
+      final previousImageCallback = ui.Image.onCreate;
+      try {
+        const clipKey = ValueKey<String>('clip');
+        const imageKey = ValueKey<String>('image');
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ClipRect(
+              key: clipKey,
+              clipBehavior: Clip.none,
+              child: SizedBox(
+                width: 60,
+                height: 80,
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: 100,
+                  maxWidth: 100,
+                  minHeight: 80,
+                  maxHeight: 80,
+                  child: LevixelSource(
+                    controller: controller,
+                    itemId: 'photo',
+                    child: RawImage(
+                        key: imageKey,
+                        image: image,
+                        width: 100,
+                        height: 80,
+                        fit: BoxFit.cover),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ));
+        final clip = tester.renderObject<RenderClipRect>(find.byKey(clipKey));
+        final rendered = tester.renderObject<RenderImage>(find.byKey(imageKey));
+        final frame = tester.getRect(find.byKey(imageKey));
+        final clipped = frame.intersect(tester.getRect(find.byKey(clipKey)));
+        var changed = false;
+        ui.Image.onCreate = (created) {
+          previousImageCallback?.call(created);
+          if (changed) {
+            return;
+          }
+          changed = true;
+          // Image retention/encoding starts after the initial paint snapshot.
+          // Mutate actual render state there without depending on a timer.
+          switch (change) {
+            case 'clipping':
+              clip.clipBehavior = Clip.hardEdge;
+              break;
+            case 'fit':
+              rendered.fit = BoxFit.contain;
+              break;
+            case 'color effect':
+              rendered.color = const Color(0xFF0088FF);
+              break;
+          }
+        };
+        final opening = controller.open();
+        await pumpNativeWork(tester, () => opened);
+        await opening;
+        ui.Image.onCreate = previousImageCallback;
+        expect(changed, isTrue);
+        final prepared = calls
+            .firstWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        final sources = (prepared['sources']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
+        if (change == 'color effect') {
+          expect(sources, isEmpty,
+              reason: 'An unsupported effect must not export a preview');
+          expect(prepared['sourceId'], isNull);
+        } else {
+          final source = sources.single;
+          final visible = change == 'clipping' ? clipped : frame;
+          expect(source['clip'],
+              [visible.left, visible.top, visible.width, visible.height]);
+          expect(source['fit'], change == 'fit' ? 'contain' : 'cover');
+        }
+        var closed = false;
+        final closing = controller.close().then((_) {
+          closed = true;
+        });
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+        expect(tester.takeException(), isNull);
+      } finally {
+        ui.Image.onCreate = previousImageCallback;
+        controller.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        image.dispose();
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
   testWidgets('a tapped duplicate exports its decoded image and geometry',
       (tester) async {
     const channel = MethodChannel('com.sandrox.levixel/flutter');
