@@ -37,5 +37,6 @@ android {
 
 dependencies {
     implementation "io.gitee.sandrox:levixel:${coreVersion}"
+    implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'com.google.android.material:material:1.13.0'
 }

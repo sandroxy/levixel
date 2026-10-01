@@ -182,11 +182,13 @@ void main() {
       await settle(tester, controller.open());
       try {
         if (suspendBeforeClose) {
-          tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+          tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.paused);
         }
         final closing = controller.close();
         if (!suspendBeforeClose) {
-          tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+          tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.paused);
         }
         await closing;
         final close = calls.singleWhere((call) => call.method == 'close');
@@ -197,7 +199,8 @@ void main() {
             throwsA(isA<PlatformException>()
                 .having((error) => error.code, 'code', 'OPEN_CANCELLED')));
       } finally {
-        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
         controller.dispose();
       }
     }, timeout: const Timeout(Duration(seconds: 30)));

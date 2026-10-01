@@ -19,6 +19,7 @@ import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.widget.AppCompatImageView;
 
 import com.sandrox.levixel.LevixelAction;
 import com.sandrox.levixel.LevixelActionLayout;
@@ -239,7 +240,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
         int visibilitySequence;
 
         Source(Session owner, String id, String itemId) {
-            super(activity);
+            super(new ContextThemeWrapper(activity, com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar));
             this.owner = owner; this.id = id; this.itemId = itemId;
             key = LevixelSharedElementNames.forItem(owner.scopedGallery, owner.byId.get(itemId));
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
@@ -247,7 +248,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             setOutlineProvider(new ViewOutlineProvider() {
                 @Override public void getOutline(View view, Outline outline) { outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius); }
             });
-            image = new ImageView(activity) {
+            image = new AppCompatImageView(getContext()) {
                 @Override protected void onDraw(Canvas canvas) { if (preview) super.onDraw(canvas); }
             };
             addView(image); ready = true;
