@@ -129,6 +129,49 @@ class _LevixelSourceState extends State<LevixelSource> {
     return opacity;
   }
 
+  bool _hasPaintEffects(BuildContext root) {
+    bool unsupported(Widget value) =>
+        value is ColorFiltered ||
+        (value is ImageFiltered && value.enabled) ||
+        value is ShaderMask ||
+        (value is BackdropFilter && value.enabled);
+    var found = false;
+    void visit(Element element) {
+      if (found) {
+        return;
+      }
+      if (element is RenderObjectElement) {
+        final object = element.renderObject;
+        if ((object is RenderOffstage && object.offstage) ||
+            _paintOpacity(object) <= 0) {
+          return;
+        }
+      }
+      found = unsupported(element.widget);
+      if (!found) {
+        element.visitChildElements(visit);
+      }
+    }
+
+    root.visitChildElements(visit);
+    root.visitAncestorElements((element) {
+      found = found || unsupported(element.widget);
+      return !found;
+    });
+    return found;
+  }
+
+  bool _supportedTransform(List<double> m) =>
+      m.every((value) => value.isFinite) &&
+      m[0] > 0 &&
+      m[5] > 0 &&
+      (m[0] - m[5]).abs() <= 0.0001 &&
+      m[1].abs() <= 0.0001 &&
+      m[4].abs() <= 0.0001 &&
+      m[3].abs() <= 0.0001 &&
+      m[7].abs() <= 0.0001 &&
+      (m[15] - 1).abs() <= 0.0001;
+
   @override
   Widget build(BuildContext context) => GestureDetector(
         // Rebinding a source cancels any gesture that began on its old media.
@@ -161,10 +204,18 @@ class _LevixelSourceState extends State<LevixelSource> {
       return null;
     }
     final sourceId = _sourceId;
-    final root = _contentKey.currentContext?.findRenderObject();
+    final rootContext = _contentKey.currentContext;
+    if (rootContext == null) {
+      return null;
+    }
+    final root = rootContext.findRenderObject();
     if (root == null || !root.attached) {
       return null;
     }
+    if (_hasPaintEffects(rootContext)) {
+      return null;
+    }
+    final sourceClip = root is RenderProxyBox ? root.child : null;
     final images = <RenderImage>[];
     void visit(RenderObject object) {
       if (object is RenderOffstage && object.offstage) {
@@ -214,14 +265,7 @@ class _LevixelSourceState extends State<LevixelSource> {
     }
     final transform = render.getTransformTo(null);
     final m = transform.storage;
-    if (m[0] <= 0 ||
-        m[5] <= 0 ||
-        (m[0] - m[5]).abs() > 0.0001 ||
-        m[1].abs() > 0.0001 ||
-        m[4].abs() > 0.0001 ||
-        m[3].abs() > 0.0001 ||
-        m[7].abs() > 0.0001 ||
-        (m[15] - 1).abs() > 0.0001) {
+    if (!_supportedTransform(m)) {
       return null;
     }
     final frame =
@@ -237,15 +281,47 @@ class _LevixelSourceState extends State<LevixelSource> {
       if (parent is RenderClipPath || parent is RenderClipOval) {
         return null;
       }
+      // Approximate paint clips are semantics bounds, not arbitrary clip
+      // shapes. Only the source's own rounded rectangle has a native radius.
+      if ((parent is RenderClipRect &&
+              parent.clipBehavior != Clip.none &&
+              parent.clipper != null) ||
+          (parent is RenderClipRRect &&
+              parent != sourceClip &&
+              parent.clipBehavior != Clip.none &&
+              (parent.clipper != null ||
+                  parent.borderRadius != BorderRadius.zero)) ||
+          (parent is RenderClipRSuperellipse &&
+              parent.clipBehavior != Clip.none &&
+              (parent.clipper != null ||
+                  parent.borderRadius != BorderRadius.zero)) ||
+          (parent is RenderPhysicalModel &&
+              parent.clipBehavior != Clip.none &&
+              (parent.shape != BoxShape.rectangle ||
+                  (parent.borderRadius ?? BorderRadius.zero) !=
+                      BorderRadius.zero)) ||
+          (parent is RenderPhysicalShape && parent.clipBehavior != Clip.none)) {
+        return null;
+      }
       final bounds = parent.describeApproximatePaintClip(child);
       if (bounds != null) {
-        clip = clip.intersect(
-            MatrixUtils.transformRect(parent.getTransformTo(null), bounds));
+        final clipTransform = parent.getTransformTo(null);
+        if (!_supportedTransform(clipTransform.storage)) {
+          return null;
+        }
+        clip = clip.intersect(MatrixUtils.transformRect(clipTransform, bounds));
       }
       child = parent;
     }
     clip = clip.intersect(frame);
     if (clip.isEmpty || !frame.isFinite || !clip.isFinite) {
+      return null;
+    }
+    final container = root is RenderBox
+        ? MatrixUtils.transformRect(
+            root.getTransformTo(null), Offset.zero & root.size)
+        : frame;
+    if (widget.cornerRadius > 0 && container != frame) {
       return null;
     }
     if (_encodedImage != image || _png == null) {
@@ -294,10 +370,6 @@ class _LevixelSourceState extends State<LevixelSource> {
     if (!mounted || _sourceId != sourceId || !render.attached) {
       return null;
     }
-    final container = root is RenderBox
-        ? MatrixUtils.transformRect(
-            root.getTransformTo(null), Offset.zero & root.size)
-        : frame;
     final radius =
         container == frame ? widget.cornerRadius * math.min(m[0], m[5]) : 0.0;
     final signature =

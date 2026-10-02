@@ -9,6 +9,7 @@ import android.graphics.Outline;
 import android.graphics.RectF;
 import android.os.Build;
 import android.view.ContextThemeWrapper;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -93,8 +94,6 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                 session = next;
                 try { next.updateSources(list(args, "sources")); }
                 catch (RuntimeException error) { next.removeSources(); session = null; throw error; }
-                Source selected = next.sources.get(next.sourceId);
-                if (selected != null) selected.showPreview(true);
                 result.success(null);
                 return;
             }
@@ -218,6 +217,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                     if (overlay != null) overlay.bringToFront();
                 }
                 anchor.update(source);
+                if (overlay == null && sourceId.equals(this.sourceId)) anchor.showPreview(true);
             }
             for (String sourceId : new ArrayList<>(sources.keySet())) {
                 if (!retained.contains(sourceId)) sources.remove(sourceId).remove();
@@ -267,9 +267,11 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             RectF frame = rect(args.get("frame"), scale), clip = rect(args.get("clip"), scale);
             int[] flutterOrigin = new int[2], hostOrigin = new int[2];
             owner.flutterView.getLocationOnScreen(flutterOrigin); owner.host.getLocationOnScreen(hostOrigin);
-            setLayoutParams(new FrameLayout.LayoutParams((int) Math.ceil(clip.width()), (int) Math.ceil(clip.height())));
+            // Flutter exports physical left/top coordinates, independent of
+            // the Activity's layout direction.
+            setLayoutParams(new FrameLayout.LayoutParams((int) Math.ceil(clip.width()), (int) Math.ceil(clip.height()), Gravity.TOP | Gravity.LEFT));
             setX(clip.left + flutterOrigin[0] - hostOrigin[0]); setY(clip.top + flutterOrigin[1] - hostOrigin[1]);
-            image.setLayoutParams(new FrameLayout.LayoutParams((int) Math.ceil(frame.width()), (int) Math.ceil(frame.height())));
+            image.setLayoutParams(new FrameLayout.LayoutParams((int) Math.ceil(frame.width()), (int) Math.ceil(frame.height()), Gravity.TOP | Gravity.LEFT));
             image.setX(frame.left - clip.left); image.setY(frame.top - clip.top);
             radius = frame.equals(clip) ? number(args.get("cornerRadius")) * scale : 0;
             if (radius < 0) throw new IllegalArgumentException("Invalid corner radius");

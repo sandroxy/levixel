@@ -17,7 +17,297 @@ Future<void> pumpNativeWork(
   expect(completed(), isTrue);
 }
 
+class _InsetClipper extends CustomClipper<Rect> {
+  const _InsetClipper();
+
+  @override
+  Rect getClip(Size size) => (Offset.zero & size).deflate(10);
+
+  @override
+  bool shouldReclip(_InsetClipper oldClipper) => false;
+}
+
+Widget sourcePaint(String effect, Widget child) {
+  switch (effect) {
+    case 'color filter':
+      return ColorFiltered(
+          colorFilter: const ColorFilter.mode(Color(0xFF0088FF), BlendMode.srcIn),
+          child: child);
+    case 'image filter':
+    case 'disabled image filter':
+      return ImageFiltered(
+          enabled: effect != 'disabled image filter',
+          imageFilter: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+          child: child);
+    case 'shader mask':
+      return ShaderMask(
+          shaderCallback: (bounds) => ui.Gradient.linear(
+              bounds.topLeft, bounds.bottomRight,
+              const [Color(0xFF0088FF), Color(0xFFFF8800)]),
+          child: child);
+    case 'backdrop filter':
+      return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2), child: child);
+    case 'rounded clip':
+      return ClipRRect(
+          borderRadius: BorderRadius.circular(20), child: child);
+    case 'superellipse clip':
+      return ClipRSuperellipse(
+          borderRadius: BorderRadius.circular(20), child: child);
+    case 'custom rect clip':
+      return ClipRect(clipper: const _InsetClipper(), child: child);
+    case 'counter-rotated clip':
+      return Transform.rotate(
+          angle: 0.3,
+          child: ClipRect(child: Transform.rotate(angle: -0.3, child: child)));
+    case 'rounded physical clip':
+      return PhysicalModel(
+          color: const Color(0xFF000000),
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: child);
+    case 'rectangular physical clip':
+      return PhysicalModel(
+          color: const Color(0xFF000000),
+          clipBehavior: Clip.hardEdge,
+          child: child);
+    case 'overflowing rounded source':
+      return SizedBox(
+          width: 60,
+          height: 80,
+          child: OverflowBox(
+              minWidth: 100,
+              maxWidth: 100,
+              minHeight: 80,
+              maxHeight: 80,
+              child: child));
+    default:
+      throw ArgumentError.value(effect, 'effect');
+  }
+}
+
 void main() {
+  for (final change in [
+    'remove during prepare',
+    'effect during prepare',
+    'move during prepare',
+    'available during prepare',
+    'remove after open',
+  ]) {
+    testWidgets('source handoff reconciles $change', (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opened = false;
+      var visible = true;
+      Color? tint = change == 'available during prepare'
+          ? const Color(0xFF0088FF)
+          : null;
+      var offset = Offset.zero;
+      late StateSetter rebuild;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method ==
+            (change == 'remove after open' ? 'open' : 'prepare')) {
+          rebuild(() {
+            if (change.startsWith('remove')) {
+              visible = false;
+            } else if (change == 'effect during prepare') {
+              tint = const Color(0xFF0088FF);
+            } else if (change == 'available during prepare') {
+              tint = null;
+            } else {
+              offset = const Offset(24, 12);
+            }
+          });
+        }
+        if (call.method == 'open') {
+          opened = true;
+        }
+        return null;
+      });
+      final image = (await tester.runAsync(
+          () => createTestImage(width: 160, height: 80, cache: false)))!;
+      final controller = LevixelController(galleryId: 'handoff', items: [
+        LevixelMedia(
+            id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png')
+      ]);
+      List<Map<Object?, Object?>>? latestSources() {
+        final updates = calls.where((call) => call.method == 'updateSources');
+        if (updates.isEmpty) {
+          return null;
+        }
+        final arguments = updates.last.arguments as Map<Object?, Object?>;
+        return (arguments['sources']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
+      }
+
+      try {
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(builder: (context, setState) {
+            rebuild = setState;
+            return Center(
+              child: visible
+                  ? Transform.translate(
+                      offset: offset,
+                      child: LevixelSource(
+                        controller: controller,
+                        itemId: 'photo',
+                        child: RawImage(
+                            image: image,
+                            width: 100,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            color: tint),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            );
+          }),
+        ));
+        Future<void>? opening;
+        if (change == 'available during prepare') {
+          await tester.tap(find.byType(LevixelSource));
+        } else {
+          opening = controller.open();
+        }
+        await pumpNativeWork(tester, () => opened);
+        await opening;
+        final prepared = calls
+            .singleWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        expect(prepared['sources'],
+            hasLength(change == 'available during prepare' ? 0 : 1));
+        if (change == 'remove after open') {
+          await pumpNativeWork(tester, () => latestSources()?.isEmpty ?? false);
+        } else {
+          expect(calls.indexWhere((call) => call.method == 'updateSources'),
+              lessThan(calls.indexWhere((call) => call.method == 'open')));
+        }
+        final updated = latestSources();
+        expect(updated, isNotNull);
+        if (change == 'move during prepare' ||
+            change == 'available during prepare') {
+          final frame = tester.getRect(find.byType(RawImage));
+          final source = updated!.single;
+          expect(source['frame'],
+              [frame.left, frame.top, frame.width, frame.height]);
+          expect(source.containsKey('png'), change == 'available during prepare',
+              reason: 'New anchors need pixels; geometry updates reuse them');
+        } else {
+          expect(updated, isEmpty);
+        }
+        if (change == 'effect during prepare' ||
+            change == 'available during prepare') {
+          final visibility = find.descendant(
+              of: find.byType(LevixelSource), matching: find.byType(Opacity));
+          expect(tester.widget<Opacity>(visibility).opacity,
+              change == 'available during prepare' ? 0 : 1,
+              reason: 'Only the reconciled opening source owns visibility');
+        }
+        var closed = false;
+        final closing = controller.close().then((_) => closed = true);
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+        expect(tester.takeException(), isNull);
+      } finally {
+        controller.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        image.dispose();
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
+  for (final effect in [
+    'color filter',
+    'image filter',
+    'shader mask',
+    'backdrop filter',
+    'rounded clip',
+    'superellipse clip',
+    'custom rect clip',
+    'counter-rotated clip',
+    'rounded physical clip',
+    'overflowing rounded source',
+    'disabled image filter',
+    'rectangular physical clip',
+  ]) {
+    final placements = [
+      'child',
+      if (['color filter', 'image filter', 'shader mask', 'backdrop filter']
+          .contains(effect))
+        'ancestor',
+    ];
+    for (final placement in placements) {
+      testWidgets('$placement $effect selects a matching transition',
+          (tester) async {
+        const channel = MethodChannel('com.sandrox.levixel/flutter');
+        final calls = <MethodCall>[];
+        var opened = false;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+            (call) async {
+          calls.add(call);
+          if (call.method == 'open') {
+            opened = true;
+          }
+          return null;
+        });
+        final image = (await tester.runAsync(
+            () => createTestImage(width: 160, height: 80, cache: false)))!;
+        final controller = LevixelController(galleryId: 'paint', items: [
+          LevixelMedia(
+              id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png')
+        ]);
+        final supported = effect == 'disabled image filter' ||
+            effect == 'rectangular physical clip';
+        try {
+          final preview = RawImage(
+              image: image, width: 100, height: 80, fit: BoxFit.cover);
+          final source = LevixelSource(
+            controller: controller,
+            itemId: 'photo',
+            cornerRadius: effect == 'overflowing rounded source' ? 12 : 0,
+            child: placement == 'child' ? sourcePaint(effect, preview) : preview,
+          );
+          await tester.pumpWidget(Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+                child: placement == 'ancestor'
+                    ? sourcePaint(effect, source)
+                    : source),
+          ));
+          await tester.tap(find.byType(LevixelSource));
+          await pumpNativeWork(tester, () => opened);
+          final prepared = calls
+              .singleWhere((call) => call.method == 'prepare')
+              .arguments as Map<Object?, Object?>;
+          expect(prepared['sourceId'], isNotNull,
+              reason: 'Tapping retains the exact preferred source identity');
+          expect(prepared['sources'], hasLength(supported ? 1 : 0));
+          final visibility = find.descendant(
+              of: find.byType(LevixelSource), matching: find.byType(Opacity));
+          expect(tester.widget<Opacity>(visibility).opacity, supported ? 0 : 1,
+              reason: 'Only a native transition source may hide the thumbnail');
+          var closed = false;
+          final closing = controller.close().then((_) => closed = true);
+          await pumpNativeWork(tester, () => closed);
+          await closing;
+          expect(tester.widget<Opacity>(visibility).opacity, 1);
+          expect(tester.takeException(), isNull);
+        } finally {
+          controller.dispose();
+          await tester.pumpWidget(const SizedBox.shrink());
+          image.dispose();
+          tester.binding.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        }
+      }, timeout: const Timeout(Duration(seconds: 30)));
+    }
+  }
+
   for (final change in ['item rebind', 'controller switch', 'style update']) {
     testWidgets('an in-flight source tap respects $change', (tester) async {
       const channel = MethodChannel('com.sandrox.levixel/flutter');

@@ -42,7 +42,6 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
                 do { try next.updateSources(array(args, "sources")) }
                 catch { next.removeSources(); throw error }
                 session = next
-                if let sourceId = next.sourceId { next.sources[sourceId]?.showPreview(true) }
                 result(nil)
                 return
             }
@@ -161,6 +160,7 @@ private final class ViewerSession {
             if source.superview == nil { host.addSubview(source) }
             sources[sourceId] = source
             try source.update(args, host: host)
+            if viewer == nil && sourceId == self.sourceId { source.showPreview(true) }
         }
         for id in Array(sources.keys) where !retained.contains(id) { sources.removeValue(forKey: id)?.remove() }
     }

@@ -104,11 +104,26 @@ class LevixelController {
         'actionListIcons': actionListIcons,
       });
       session.checkCurrent();
-      if (selected != null) {
-        _sources[selected]?._setHidden(session.id, true);
-      }
+      session.rememberSources(sources);
+      final hiddenSource = selected != null && session.hasSource(selected)
+          ? _sources[selected]
+          : null;
+      hiddenSource?._setHidden(session.id, true);
       await _Bridge.nextFrame();
       session.checkCurrent();
+      // Preparation and the Flutter handoff frame can change source geometry
+      // or eligibility. Reconcile the anchors before native presentation.
+      await session.syncSources();
+      session.checkCurrent();
+      final openingSource = selected != null && session.hasSource(selected)
+          ? _sources[selected]
+          : null;
+      if (hiddenSource != openingSource) {
+        hiddenSource?._setHidden(session.id, false);
+        openingSource?._setHidden(session.id, true);
+        await _Bridge.nextFrame();
+        session.checkCurrent();
+      }
       await _Bridge.channel.invokeMethod<void>('open', session.arguments);
       session.checkCurrent();
       session.watchFrames();
@@ -265,6 +280,19 @@ class _Session {
   Map<String, int> _sentImages = <String, int>{};
   Map<String, Object?> get arguments => <String, Object?>{'requestId': id};
 
+  bool hasSource(String sourceId) => _sentSignatures.containsKey(sourceId);
+
+  void rememberSources(List<Map<String, Object?>> sources) {
+    _sentSignatures = <String, String>{
+      for (final source in sources)
+        source['sourceId']! as String: source['signature']! as String,
+    };
+    _sentImages = <String, int>{
+      for (final source in sources)
+        source['sourceId']! as String: source['imageVersion']! as int,
+    };
+  }
+
   void checkCurrent() {
     if (closing ||
         controller._disposed ||
@@ -344,11 +372,7 @@ class _Session {
       }
       await _Bridge.channel.invokeMethod<void>(
           'updateSources', <String, Object?>{...arguments, 'sources': sources});
-      _sentSignatures = signatures;
-      _sentImages = <String, int>{
-        for (final source in sources)
-          source['sourceId']! as String: source['imageVersion']! as int
-      };
+      rememberSources(sources);
     } finally {
       _syncing = false;
     }
