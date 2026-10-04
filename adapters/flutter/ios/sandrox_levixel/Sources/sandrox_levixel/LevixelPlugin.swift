@@ -62,7 +62,12 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
                 else { result(nil) }
             case "finish":
                 guard current.viewer == nil else { throw BridgeError("Dismiss the viewer before finishing", code: "OPEN_FAILED") }
-                current.removeSources(); session = nil; result(nil)
+                current.closing = true
+                current.handoffs.whenComplete { [weak self, weak current] in
+                    current?.removeSources()
+                    if self?.session === current { self?.session = nil }
+                    result(nil)
+                }
             default: result(FlutterMethodNotImplemented)
             }
         } catch {
@@ -85,6 +90,7 @@ private final class ViewerSession {
     var configuration: LevixelViewerConfiguration
     var viewer: LevixelViewerSession?
     var sources: [String: SourceAnchor] = [:]
+    let handoffs = SourceHandoffs()
     var closing = false
 
     init(_ args: [String: Any], scope: String, presenter: UIViewController, channel: FlutterMethodChannel) throws {
@@ -177,6 +183,7 @@ private final class SourceAnchor: UIView {
     private var visibilitySequence = 0
     private var displayLink: CADisplayLink?
     private var remainingFrames = 0
+    private var completePendingHandoff: (() -> Void)?
     private var preview = false
     private var opacity: CGFloat = 1
 
@@ -187,9 +194,13 @@ private final class SourceAnchor: UIView {
         image.alpha = 0
         addSubview(image)
         registration = LevixelSourceRegistration(view: self, sourceIdentifier: sourceId, imageViewProvider: { ($0 as? SourceAnchor)?.image })
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(sceneWillDeactivate), name: UIScene.willDeactivateNotification, object: nil)
     }
 
     required init?(coder: NSCoder) { nil }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
 
     func update(_ args: [String: Any], host: UIView) throws {
         guard let session, let screen = host.window?.screen else { return }
@@ -231,13 +242,18 @@ private final class SourceAnchor: UIView {
     override var alpha: CGFloat {
         didSet {
             guard alpha != oldValue, let session else { return }
-            displayLink?.invalidate(); displayLink = nil
             let hidden = alpha == 0
+            // Reserve before replying to Dart: its dismiss handler can send
+            // finish before the visibility reply reaches this platform thread.
+            let handoff = !hidden && canPresentFrames ? session.handoffs.begin() : nil
+            stopHandoff()
+            completePendingHandoff = handoff
             showPreview(!hidden)
             visibilitySequence += 1
             let sequence = visibilitySequence
             session.channel.invokeMethod("visibility", arguments: ["requestId": session.id, "sourceId": sourceId, "hidden": hidden]) { [weak self] _ in
                 guard let self, self.visibilitySequence == sequence, !hidden, self.superview != nil else { return }
+                guard self.completePendingHandoff != nil, self.canPresentFrames else { self.stopHandoff(); return }
                 self.remainingFrames = 2
                 let link = CADisplayLink(target: self, selector: #selector(self.finishHandoff))
                 self.displayLink = link; link.add(to: .main, forMode: .common)
@@ -248,13 +264,37 @@ private final class SourceAnchor: UIView {
     @objc private func finishHandoff() {
         remainingFrames -= 1
         guard remainingFrames <= 0 else { return }
-        displayLink?.invalidate(); displayLink = nil; showPreview(false)
+        stopHandoff()
+    }
+
+    private var canPresentFrames: Bool {
+        guard let window else { return false }
+        if let scene = window.windowScene { return scene.activationState == .foregroundActive }
+        return UIApplication.shared.applicationState == .active
+    }
+
+    @objc private func applicationWillResignActive(_ notification: Notification) {
+        stopHandoff()
+    }
+
+    @objc private func sceneWillDeactivate(_ notification: Notification) {
+        guard let scene = notification.object as? UIScene, scene === window?.windowScene else { return }
+        stopHandoff()
+    }
+
+    @objc private func stopHandoff() {
+        displayLink?.invalidate(); displayLink = nil; remainingFrames = 0
+        showPreview(false)
+        let completion = completePendingHandoff
+        completePendingHandoff = nil
+        completion?()
     }
 
     func remove() {
         registration?.unregister()
-        displayLink?.invalidate(); displayLink = nil
+        visibilitySequence += 1
         removeFromSuperview(); image.image = nil
+        stopHandoff()
     }
 }
 

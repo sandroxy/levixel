@@ -35,6 +35,9 @@ test results remain available at the same path for diagnosis.
 
 `./scripts/test-flutter-source.sh dart` checks Flutter formatting, static
 analysis, and controller/session contracts. The workflow pins the Flutter SDK identity.
+On macOS, `./scripts/test-flutter-source.sh ios` checks source-restoration
+cleanup ordering with Swift. Native rendering and lifecycle checks still run
+in the independent iOS consumers.
 Consumer applications, source integration, native touch tests, recordings, and
 immutable artifact acceptance belong to the independent consumer repository.
 They consume the public adapter and the Android/iOS cores without becoming
