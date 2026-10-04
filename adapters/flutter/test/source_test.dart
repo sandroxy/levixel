@@ -31,7 +31,8 @@ Widget sourcePaint(String effect, Widget child) {
   switch (effect) {
     case 'color filter':
       return ColorFiltered(
-          colorFilter: const ColorFilter.mode(Color(0xFF0088FF), BlendMode.srcIn),
+          colorFilter:
+              const ColorFilter.mode(Color(0xFF0088FF), BlendMode.srcIn),
           child: child);
     case 'image filter':
     case 'disabled image filter':
@@ -41,16 +42,14 @@ Widget sourcePaint(String effect, Widget child) {
           child: child);
     case 'shader mask':
       return ShaderMask(
-          shaderCallback: (bounds) => ui.Gradient.linear(
-              bounds.topLeft, bounds.bottomRight,
-              const [Color(0xFF0088FF), Color(0xFFFF8800)]),
+          shaderCallback: (bounds) => ui.Gradient.linear(bounds.topLeft,
+              bounds.bottomRight, const [Color(0xFF0088FF), Color(0xFFFF8800)]),
           child: child);
     case 'backdrop filter':
       return BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2), child: child);
     case 'rounded clip':
-      return ClipRRect(
-          borderRadius: BorderRadius.circular(20), child: child);
+      return ClipRRect(borderRadius: BorderRadius.circular(20), child: child);
     case 'superellipse clip':
       return ClipRSuperellipse(
           borderRadius: BorderRadius.circular(20), child: child);
@@ -99,9 +98,8 @@ void main() {
       final calls = <MethodCall>[];
       var opened = false;
       var visible = true;
-      Color? tint = change == 'available during prepare'
-          ? const Color(0xFF0088FF)
-          : null;
+      Color? tint =
+          change == 'available during prepare' ? const Color(0xFF0088FF) : null;
       var offset = Offset.zero;
       late StateSetter rebuild;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
@@ -193,7 +191,8 @@ void main() {
           final source = updated!.single;
           expect(source['frame'],
               [frame.left, frame.top, frame.width, frame.height]);
-          expect(source.containsKey('png'), change == 'available during prepare',
+          expect(
+              source.containsKey('png'), change == 'available during prepare',
               reason: 'New anchors need pixels; geometry updates reuse them');
         } else {
           expect(updated, isEmpty);
@@ -259,18 +258,21 @@ void main() {
             () => createTestImage(width: 160, height: 80, cache: false)))!;
         final controller = LevixelController(galleryId: 'paint', items: [
           LevixelMedia(
-              id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png')
+              id: 'photo',
+              type: LevixelMediaType.image,
+              url: 'file:///photo.png')
         ]);
         final supported = effect == 'disabled image filter' ||
             effect == 'rectangular physical clip';
         try {
-          final preview = RawImage(
-              image: image, width: 100, height: 80, fit: BoxFit.cover);
+          final preview =
+              RawImage(image: image, width: 100, height: 80, fit: BoxFit.cover);
           final source = LevixelSource(
             controller: controller,
             itemId: 'photo',
             cornerRadius: effect == 'overflowing rounded source' ? 12 : 0,
-            child: placement == 'child' ? sourcePaint(effect, preview) : preview,
+            child:
+                placement == 'child' ? sourcePaint(effect, preview) : preview,
           );
           await tester.pumpWidget(Directionality(
             textDirection: TextDirection.ltr,
@@ -378,8 +380,8 @@ void main() {
         final prepared = calls
             .singleWhere((call) => call.method == 'prepare')
             .arguments as Map<Object?, Object?>;
-        final media = (prepared['items']! as List<Object?>)
-            .cast<Map<Object?, Object?>>();
+        final media =
+            (prepared['items']! as List<Object?>).cast<Map<Object?, Object?>>();
         expect(prepared['galleryId'], controller.galleryId);
         expect(media[prepared['index']! as int]['id'], itemId);
         expect(calls.where((call) => call.method == 'open'), hasLength(1));
@@ -552,7 +554,8 @@ void main() {
           return null;
         }
         final value = updates.last.arguments as Map<Object?, Object?>;
-        return (value['sources']! as List<Object?>).cast<Map<Object?, Object?>>();
+        return (value['sources']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
       }
 
       try {
@@ -616,8 +619,8 @@ void main() {
         final staleVisibility = tester.binding.defaultBinaryMessenger
             .handlePlatformMessage(
                 channel.name,
-                const StandardMethodCodec().encodeMethodCall(MethodCall(
-                    'visibility', <String, Object?>{
+                const StandardMethodCodec().encodeMethodCall(
+                    MethodCall('visibility', <String, Object?>{
                   'requestId': prepared['requestId'],
                   'sourceId': oldId,
                   'hidden': true,

@@ -254,8 +254,8 @@ void main() {
       expect(prepared, hasLength(2));
       expect(prepared.last['galleryId'], latest.galleryId);
       final latestItems = prepared.last['items']! as List<Object?>;
-      final latestItem = latestItems[prepared.last['index']! as int]!
-          as Map<Object?, Object?>;
+      final latestItem =
+          latestItems[prepared.last['index']! as int]! as Map<Object?, Object?>;
       expect(latestItem['id'], 'latest');
       expect(activeRequest, isNull);
     }, timeout: const Timeout(Duration(seconds: 30)));
@@ -263,10 +263,10 @@ void main() {
 
   testWidgets('closing a queued opening awaits the preceding native dismissal',
       (tester) async {
-    final first = LevixelController(
-        galleryId: 'first-gallery', items: [media('first')]);
-    final next = LevixelController(
-        galleryId: 'next-gallery', items: [media('next')]);
+    final first =
+        LevixelController(galleryId: 'first-gallery', items: [media('first')]);
+    final next =
+        LevixelController(galleryId: 'next-gallery', items: [media('next')]);
     addTearDown(first.dispose);
     addTearDown(next.dispose);
     await settle(tester, first.open());
