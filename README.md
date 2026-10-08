@@ -22,7 +22,7 @@ Levixel 是一套强调原生手感的共享转场图片与视频查看器，支
 - 缩略图、加载态、原图与视频首帧之间的连续交接
 - 图片与视频长按事件，可配置列表或网格操作抽屉
 - 带媒体身份的会话与加载事件、失败提示及手动和程序重试
-- 为 Android、iOS、HarmonyOS、React Native、UniApp 及受支持的现代 Web 浏览器提供正式发行包
+- 为 Android、iOS、HarmonyOS、Flutter、React Native、UniApp 及受支持的现代 Web 浏览器提供平台集成与发行包
 
 ## 支持平台与分发
 
@@ -31,6 +31,7 @@ Levixel 是一套强调原生手感的共享转场图片与视频查看器，支
 | Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | [Android 指南](native/android/README.md)，提供 AAR 离线镜像 |
 | iOS | [Swift Package](https://github.com/sandroxy/levixel) | [iOS 指南](native/ios/README.md)，通过校验和验证的 XCFramework |
 | HarmonyOS | [OHPM](https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel) · `@sandrox/levixel` | 原生 HAR，同时在 GitHub Releases 提供离线镜像 |
+| Flutter | [GitHub Releases](https://github.com/sandroxy/levixel/releases) · `sandrox_levixel` | Android/iOS 插件 ZIP，内含原生运行时，支持 SwiftPM 与 CocoaPods |
 | React Native / Expo | [npm](https://www.npmjs.com/package/@sandrox/levixel) · `@sandrox/levixel` | React Native 组件与随包提供的 Android/iOS 原生运行时 |
 | UniApp | [DCloud 插件市场](https://ext.dcloud.net.cn/plugin?id=29394) | 经典 uni-app 与 uni-app x Vapor 的 Android/iOS App |
 | Web | [npm](https://www.npmjs.com/package/@sandrox/levixel-web) · `@sandrox/levixel-web` | 无框架依赖的 ESM 浏览器运行时 |
@@ -78,6 +79,14 @@ ohpm install @sandrox/levixel
 对应 GitHub Release 同时提供 HAR 与 SHA-256 文件，供离线或手动集成。
 
 组件接口与完整示例见 [HarmonyOS 使用说明](native/harmonyos/levixel/README.md)。
+
+## Flutter
+
+要求 Flutter 3.44 或更新版本、Android API 24 或 iOS 15.0。Android 构建使用 compile SDK 36 与 Java 17。
+
+从对应 GitHub Release 下载 `levixel-flutter-<version>.zip`，核对随附的 SHA-256 后，将其中的 `sandrox_levixel/` 解压到应用的 `vendor/` 目录，并通过 `pubspec.yaml` 中的 path 依赖接入。ZIP 包含匹配的 Android/iOS 原生运行时；iOS 支持 Swift Package Manager 和 CocoaPods。
+
+通过 `LevixelController` 管理媒体与会话，用 `LevixelSource` 将 Flutter 缩略图连接到原生查看器。安装步骤、转场边界、动态列表、操作菜单与事件见 [Flutter 接入说明](adapters/flutter/README.md)。
 
 ## React Native / Expo
 

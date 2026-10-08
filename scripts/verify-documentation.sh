@@ -15,6 +15,7 @@ public_integration_guides=(
   "${plugin_dir}/README-EN.md"
   "${plugin_dir}/native/android/README.md"
   "${plugin_dir}/native/ios/README.md"
+  "${plugin_dir}/adapters/flutter/README.md"
   "${plugin_dir}/adapters/react-native/README.md"
   "${plugin_dir}/adapters/web/README.md"
   "${plugin_dir}/native/harmonyos/levixel/README.md"
@@ -187,7 +188,7 @@ node -e '
     throw new Error("UniApp public description must describe user value, not bridge architecture")
 ' "${package_json}"
 
-for platform in Android iOS HarmonyOS "React Native / Expo" UniApp Web; do
+for platform in Android iOS HarmonyOS Flutter "React Native / Expo" UniApp Web; do
   if ! grep -Fq "| ${platform} |" "${plugin_dir}/README.md" || \
      ! grep -Fq "| ${platform} |" "${plugin_dir}/README-EN.md"; then
     echo "Root README platform tables are out of sync at ${platform}." >&2
@@ -200,6 +201,7 @@ ruby -e '
     "Android" => "https://central.sonatype.com/artifact/io.gitee.sandrox/levixel",
     "iOS" => "https://github.com/sandroxy/levixel",
     "HarmonyOS" => "https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel",
+    "Flutter" => "https://github.com/sandroxy/levixel/releases",
     "React Native / Expo" => "https://www.npmjs.com/package/@sandrox/levixel",
     "UniApp" => "https://ext.dcloud.net.cn/plugin?id=29394",
     "Web" => "https://www.npmjs.com/package/@sandrox/levixel-web"

@@ -2,6 +2,9 @@
 
 ## 1.5.0 - 2026-09-20
 
+- Adds Flutter Android/iOS support through `LevixelController` and `LevixelSource`, reusing the native viewers for media loading, shared transitions, gestures, video playback, actions, and session events.
+- Distributes Flutter as a ZIP with the matching Android Maven repository and iOS XCFramework, supporting both Swift Package Manager and CocoaPods.
+- Keeps iOS image gestures responsive over the loading indicator while full-resolution media is still loading.
 - Supports multiple source views for the same media across native Android/iOS, React Native, HarmonyOS, Web, classic UniApp (UTS/legacy), and UniApp x Vapor, without duplicating media entries. Opening uses the tapped thumbnail's image, position, clipping, and radius; other thumbnails remain visible.
 - Remembers the selected source across paging, image replacement, and updates to other thumbnails. If that source becomes unavailable, return transitions use another visible source of the same media, or fade when none remains.
 - Restores thumbnails to their original opacity after cell reuse, interrupted opening, and dismissal.

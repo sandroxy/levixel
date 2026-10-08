@@ -22,7 +22,7 @@ The interaction direction draws inspiration from the media-centered direct manip
 - Continuous handoff across thumbnails, loading states, original images, and video frames
 - Image and video long-press events with configurable list or grid action sheets
 - Session and loading events with media identity, visible failure controls, and programmatic retry
-- Published packages for Android, iOS, HarmonyOS, React Native, UniApp, and supported modern Web browsers
+- Integrations and distribution packages for Android, iOS, HarmonyOS, Flutter, React Native, UniApp, and supported modern Web browsers
 
 ## Platforms and distribution
 
@@ -31,6 +31,7 @@ The interaction direction draws inspiration from the media-centered direct manip
 | Android | [Maven Central](https://central.sonatype.com/artifact/io.gitee.sandrox/levixel) · `io.gitee.sandrox:levixel` | [Android guide](native/android/README.md), with an offline AAR mirror |
 | iOS | [Swift Package](https://github.com/sandroxy/levixel) | [iOS guide](native/ios/README.md), with checksum-verified XCFramework |
 | HarmonyOS | [OHPM](https://ohpm.openharmony.cn/#/cn/detail/@sandrox%2Flevixel) · `@sandrox/levixel` | Native HAR with an offline mirror on GitHub Releases |
+| Flutter | [GitHub Releases](https://github.com/sandroxy/levixel/releases) · `sandrox_levixel` | Android/iOS plugin ZIP with native runtimes, supporting SwiftPM and CocoaPods |
 | React Native / Expo | [npm](https://www.npmjs.com/package/@sandrox/levixel) · `@sandrox/levixel` | React Native components with the required Android/iOS native runtimes included |
 | UniApp | [DCloud Marketplace](https://ext.dcloud.net.cn/plugin?id=29394) | Classic uni-app and uni-app x Vapor Android/iOS Apps |
 | Web | [npm](https://www.npmjs.com/package/@sandrox/levixel-web) · `@sandrox/levixel-web` | Framework-independent ESM browser runtime |
@@ -78,6 +79,14 @@ ohpm install @sandrox/levixel
 The matching GitHub Release also provides the HAR and its SHA-256 file for offline or manual integration.
 
 See the [HarmonyOS guide](native/harmonyos/levixel/README.md) for the component API and a complete example.
+
+## Flutter
+
+Requires Flutter 3.44 or newer, Android API 24 or iOS 15.0. Android builds use compile SDK 36 and Java 17.
+
+Download `levixel-flutter-<version>.zip` from the matching GitHub Release, verify its accompanying SHA-256, and extract `sandrox_levixel/` into your application's `vendor/` directory. Add it as a path dependency in `pubspec.yaml`. The ZIP includes the matching Android/iOS native runtimes; iOS supports Swift Package Manager and CocoaPods.
+
+Manage media and sessions with `LevixelController`, and connect Flutter thumbnails to the native viewer with `LevixelSource`. See the [Flutter guide](adapters/flutter/README.md) for installation, transition requirements, dynamic lists, actions, and events.
 
 ## React Native / Expo
 
