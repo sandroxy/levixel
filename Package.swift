@@ -17,7 +17,7 @@ let package = Package(
         .binaryTarget(
             name: "Levixel",
             url: "https://github.com/sandroxy/levixel/releases/download/1.5.0/levixel-1.5.0.xcframework.zip",
-            checksum: "d60899928fc4af1a5bac8dcac18258a6eff55d4bd34e42acd8db65c19decad96"
+            checksum: "afde6311cd1cc08e6e30158ea8bda22cec5ddec5a62630dc8fb5bef8ef4b7810"
         )
     ]
 )
