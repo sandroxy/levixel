@@ -167,6 +167,10 @@ public final class LevixelSourceHint {
                         resolved.contentRight,
                         resolved.contentBottom
                 ),
+                new RectF(sourceLeftInWindow - resolved.visibleLeft,
+                        sourceTopInWindow - resolved.visibleTop,
+                        sourceLeftInWindow + sourceWidth - resolved.visibleLeft,
+                        sourceTopInWindow + sourceHeight - resolved.visibleTop),
                 resolved.cornerRadius
         );
     }
@@ -233,10 +237,6 @@ public final class LevixelSourceHint {
             return null;
         }
 
-        boolean fullContainerVisible = approximatelyEqual(visibleLeft, sourceLeftInWindow)
-                && approximatelyEqual(visibleTop, sourceTopInWindow)
-                && approximatelyEqual(visibleRight, sourceRight)
-                && approximatelyEqual(visibleBottom, sourceBottom);
         return new ResolvedGeometry(
                 visibleLeft,
                 visibleTop,
@@ -246,7 +246,7 @@ public final class LevixelSourceHint {
                 contentTop - visibleTop,
                 contentRight - visibleLeft,
                 contentBottom - visibleTop,
-                fullContainerVisible ? Math.min(cornerRadius, Math.min(sourceWidth, sourceHeight) * 0.5f) : 0f
+                Math.min(cornerRadius, Math.min(sourceWidth, sourceHeight) * 0.5f)
         );
     }
 
@@ -266,10 +266,6 @@ public final class LevixelSourceHint {
                 && Float.isFinite(bottom)
                 && right > left
                 && bottom > top;
-    }
-
-    private static boolean approximatelyEqual(float first, float second) {
-        return Math.abs(first - second) <= 0.5f;
     }
 
     static final class ResolvedGeometry {

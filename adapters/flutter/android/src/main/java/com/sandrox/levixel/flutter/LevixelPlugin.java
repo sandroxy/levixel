@@ -269,10 +269,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             this.owner = owner; this.id = id; this.itemId = itemId;
             key = LevixelSharedElementNames.forItem(owner.scopedGallery, owner.byId.get(itemId));
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-            setClipChildren(true); setClipToOutline(true);
-            setOutlineProvider(new ViewOutlineProvider() {
-                @Override public void getOutline(View view, Outline outline) { outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius); }
-            });
+            setClipChildren(true);
             image = new AppCompatImageView(getContext()) {
                 @Override protected void onDraw(Canvas canvas) {
                     if (!preview) return;
@@ -289,6 +286,10 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                     }
                 }
             };
+            image.setClipToOutline(true);
+            image.setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) { outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius); }
+            });
             addView(image); ready = true;
         }
 
@@ -304,12 +305,12 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             setX(clip.left + flutterOrigin[0] - hostOrigin[0]); setY(clip.top + flutterOrigin[1] - hostOrigin[1]);
             image.setLayoutParams(new FrameLayout.LayoutParams((int) Math.ceil(frame.width()), (int) Math.ceil(frame.height()), Gravity.TOP | Gravity.LEFT));
             image.setX(frame.left - clip.left); image.setY(frame.top - clip.top);
-            radius = frame.equals(clip) ? number(args.get("cornerRadius")) * scale : 0;
+            radius = number(args.get("cornerRadius")) * scale;
             if (radius < 0) throw new IllegalArgumentException("Invalid corner radius");
             opacity = number(args.get("opacity"));
             if (opacity <= 0 || opacity > 1) throw new IllegalArgumentException("Invalid source opacity");
             image.invalidate();
-            invalidateOutline();
+            image.invalidateOutline();
             String fit = text(args, "fit");
             if (fit.equals("cover")) image.setScaleType(ImageView.ScaleType.CENTER_CROP);
             else if (fit.equals("contain")) image.setScaleType(ImageView.ScaleType.FIT_CENTER);

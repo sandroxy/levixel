@@ -1,12 +1,11 @@
 package com.sandrox.levixel;
 
 import android.content.Context;
-import android.graphics.Outline;
+import android.graphics.Canvas;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
-import android.view.View;
-import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -15,6 +14,7 @@ import androidx.annotation.NonNull;
 public final class LevixelTransitionSnapshotView extends FrameLayout {
     private final ImageView imageView;
     private float cornerRadius;
+    private final Path roundedClip = new Path();
 
     public LevixelTransitionSnapshotView(@NonNull Context context, @NonNull Drawable drawable) {
         super(context);
@@ -24,12 +24,6 @@ public final class LevixelTransitionSnapshotView extends FrameLayout {
         imageView.setScaleType(ImageView.ScaleType.FIT_XY);
         imageView.setImageDrawable(drawable);
         addView(imageView);
-        setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, Outline outline) {
-                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cornerRadius);
-            }
-        });
     }
 
     public void applyGeometry(@NonNull LevixelSharedElementGeometry geometry) {
@@ -68,9 +62,18 @@ public final class LevixelTransitionSnapshotView extends FrameLayout {
         imageView.setY(contentFrame.top);
 
         cornerRadius = Math.max(0f, geometry.getCornerRadius());
-        setClipToOutline(cornerRadius > 0.01f);
-        if (cornerRadius > 0.01f) {
-            invalidateOutline();
-        }
+        roundedClip.reset();
+        roundedClip.addRoundRect(geometry.getRoundedFrameInVisibleBounds(),
+                cornerRadius, cornerRadius, Path.Direction.CW);
+        invalidate();
+    }
+
+    @Override protected void dispatchDraw(Canvas canvas) {
+        // The viewport cuts the original rounded source; its cut edges must
+        // stay straight without removing the source's surviving rounded corners.
+        int saved = canvas.save();
+        if (cornerRadius > 0f) canvas.clipPath(roundedClip);
+        try { super.dispatchDraw(canvas); }
+        finally { canvas.restoreToCount(saved); }
     }
 }

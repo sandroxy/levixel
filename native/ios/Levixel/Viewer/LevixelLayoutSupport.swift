@@ -4,6 +4,16 @@ struct LevixelSharedElementGeometry {
     let visibleFrameInWindow: CGRect
     let contentFrameInVisibleBounds: CGRect
     let cornerRadius: CGFloat
+    let roundedFrameInVisibleBounds: CGRect
+
+    init(visibleFrameInWindow: CGRect, contentFrameInVisibleBounds: CGRect,
+         cornerRadius: CGFloat, roundedFrameInVisibleBounds: CGRect? = nil) {
+        self.visibleFrameInWindow = visibleFrameInWindow
+        self.contentFrameInVisibleBounds = contentFrameInVisibleBounds
+        self.cornerRadius = cornerRadius
+        self.roundedFrameInVisibleBounds = roundedFrameInVisibleBounds
+            ?? CGRect(origin: .zero, size: visibleFrameInWindow.size)
+    }
 }
 
 struct LevixelSharedElementState {
@@ -35,7 +45,8 @@ extension LevixelSharedElementGeometry {
         LevixelSharedElementGeometry(
             visibleFrameInWindow: visibleFrameInWindow.levixelPixelAligned(scale: scale),
             contentFrameInVisibleBounds: contentFrameInVisibleBounds.levixelPixelAligned(scale: scale),
-            cornerRadius: (cornerRadius * scale).rounded() / scale
+            cornerRadius: (cornerRadius * scale).rounded() / scale,
+            roundedFrameInVisibleBounds: roundedFrameInVisibleBounds.levixelPixelAligned(scale: scale)
         )
     }
 
@@ -46,6 +57,7 @@ extension LevixelSharedElementGeometry {
                 tolerance: tolerance
             )
             && abs(cornerRadius - other.cornerRadius) <= tolerance
+            && roundedFrameInVisibleBounds.levixelApproximatelyEquals(other.roundedFrameInVisibleBounds, tolerance: tolerance)
     }
 }
 
@@ -167,8 +179,6 @@ extension UIImageView {
         }
 
         let sourceFrame = frameInWindow()
-        let fullSourceVisible = clippingFrame.levixelApproximatelyEquals(sourceFrame)
-            && visibleFrame.levixelApproximatelyEquals(sourceFrame)
         let requestedCornerRadius = cornerRadius
             ?? levixelConfiguredSourceCornerRadius
             ?? ((clipsToBounds || layer.masksToBounds) ? layer.cornerRadius : 0)
@@ -182,7 +192,8 @@ extension UIImageView {
                 dx: -visibleFrame.minX,
                 dy: -visibleFrame.minY
             ),
-            cornerRadius: fullSourceVisible ? resolvedCornerRadius : 0
+            cornerRadius: resolvedCornerRadius,
+            roundedFrameInVisibleBounds: sourceFrame.offsetBy(dx: -visibleFrame.minX, dy: -visibleFrame.minY)
         )
         let scale = window?.screen.scale ?? UIScreen.main.scale
         return LevixelSharedElementState(

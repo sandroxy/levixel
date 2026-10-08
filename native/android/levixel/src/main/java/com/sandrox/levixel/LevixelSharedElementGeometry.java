@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 public final class LevixelSharedElementGeometry {
     private final RectF visibleFrameInWindow;
     private final RectF contentFrameInVisibleBounds;
+    private final RectF roundedFrameInVisibleBounds;
     private final float cornerRadius;
 
     public LevixelSharedElementGeometry(@NonNull RectF visibleFrameInWindow, @NonNull RectF contentFrameInVisibleBounds) {
@@ -18,8 +19,19 @@ public final class LevixelSharedElementGeometry {
             @NonNull RectF contentFrameInVisibleBounds,
             float cornerRadius
     ) {
+        this(visibleFrameInWindow, contentFrameInVisibleBounds,
+                new RectF(0f, 0f, visibleFrameInWindow.width(), visibleFrameInWindow.height()), cornerRadius);
+    }
+
+    LevixelSharedElementGeometry(
+            @NonNull RectF visibleFrameInWindow,
+            @NonNull RectF contentFrameInVisibleBounds,
+            @NonNull RectF roundedFrameInVisibleBounds,
+            float cornerRadius
+    ) {
         this.visibleFrameInWindow = new RectF(visibleFrameInWindow);
         this.contentFrameInVisibleBounds = new RectF(contentFrameInVisibleBounds);
+        this.roundedFrameInVisibleBounds = new RectF(roundedFrameInVisibleBounds);
         this.cornerRadius = Math.max(0f, cornerRadius);
     }
 
@@ -35,5 +47,10 @@ public final class LevixelSharedElementGeometry {
 
     public float getCornerRadius() {
         return cornerRadius;
+    }
+
+    @NonNull
+    RectF getRoundedFrameInVisibleBounds() {
+        return new RectF(roundedFrameInVisibleBounds);
     }
 }

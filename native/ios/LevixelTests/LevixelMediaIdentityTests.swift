@@ -315,7 +315,8 @@ final class LevixelMediaIdentityTests: XCTestCase {
             state.geometry.contentFrameInVisibleBounds,
             CGRect(x: 0, y: 0, width: 80, height: 80)
         )
-        XCTAssertEqual(state.geometry.cornerRadius, 0)
+        XCTAssertEqual(state.geometry.cornerRadius, 12)
+        XCTAssertEqual(state.geometry.roundedFrameInVisibleBounds, CGRect(x: 0, y: 0, width: 80, height: 80))
     }
 
     func testConfiguredSourceCornerRadiusDrivesTheFullSourceTransition() throws {
@@ -365,7 +366,59 @@ final class LevixelMediaIdentityTests: XCTestCase {
         }
 
         let state = try XCTUnwrap(imageView.levixelSharedElementState())
-        XCTAssertEqual(state.geometry.cornerRadius, 0)
+        XCTAssertEqual(state.geometry.cornerRadius, 12)
+        XCTAssertEqual(state.geometry.roundedFrameInVisibleBounds, CGRect(x: 0, y: -20, width: 80, height: 80))
+    }
+
+    func testClippedSnapshotsMatchOriginalRoundedSourcePixels() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let media = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 100), format: format).image { _ in
+            UIColor.red.setFill()
+            UIRectFill(CGRect(x: 0, y: 0, width: 100, height: 100))
+        }
+        let source = UIImageView(image: media)
+        source.frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        source.contentMode = .scaleToFill
+        func alpha(_ image: CGImage, _ x: Int, _ y: Int) throws -> Int {
+            let pixel = try XCTUnwrap(image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+            var bytes = [UInt8](repeating: 0, count: 4)
+            let context = try XCTUnwrap(CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8,
+                bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return Int(bytes[3])
+        }
+        for clip in [CGRect(x: 0, y: 0, width: 100, height: 100),
+                     CGRect(x: 0, y: 0, width: 100, height: 50),
+                     CGRect(x: 0, y: 50, width: 100, height: 50),
+                     CGRect(x: 0, y: 0, width: 50, height: 100),
+                     CGRect(x: 50, y: 0, width: 50, height: 100),
+                     CGRect(x: 8, y: 8, width: 77, height: 78)] {
+            let state = try XCTUnwrap(source.levixelSharedElementState(clippingFrameInWindow: clip, cornerRadius: 20))
+            let snapshot = LevixelTransitionSnapshotView(image: media)
+            snapshot.frame = CGRect(origin: .zero, size: clip.size)
+            snapshot.applyContentFrame(state.geometry.contentFrameInVisibleBounds,
+                                       roundedFrame: state.geometry.roundedFrameInVisibleBounds,
+                                       cornerRadius: state.geometry.cornerRadius)
+            let renderer = UIGraphicsImageRenderer(size: clip.size, format: format)
+            let rendered = try XCTUnwrap(renderer.image { snapshot.layer.render(in: $0.cgContext) }.cgImage)
+            let expected = try XCTUnwrap(renderer.image { context in
+                context.cgContext.translateBy(x: -clip.minX, y: -clip.minY)
+                UIColor.red.setFill()
+                UIBezierPath(roundedRect: source.bounds, cornerRadius: 20).fill()
+            }.cgImage)
+            for y in stride(from: 1, to: expected.height, by: 3) {
+                for x in stride(from: 1, to: expected.width, by: 3) {
+                    let value = try alpha(expected, x, y)
+                    if value < 20 || value > 235 {
+                        XCTAssertEqual(Double(try alpha(rendered, x, y)), Double(value), accuracy: 20,
+                                       "Clipped source \(clip) at \(x),\(y)")
+                    }
+                }
+            }
+        }
     }
 
     func testRegistryKeepsThePluginHiddenSourceAnchorResolvable() {

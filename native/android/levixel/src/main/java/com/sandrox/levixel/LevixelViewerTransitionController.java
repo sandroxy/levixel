@@ -179,6 +179,7 @@ public final class LevixelViewerTransitionController {
         return new LevixelSharedElementGeometry(
                 visibleFrame,
                 contentFrame,
+                interpolateRect(start.getRoundedFrameInVisibleBounds(), end.getRoundedFrameInVisibleBounds(), progress),
                 lerp(start.getCornerRadius(), end.getCornerRadius(), progress)
         );
     }
@@ -202,6 +203,7 @@ public final class LevixelViewerTransitionController {
         return new LevixelSharedElementGeometry(
                 visibleFrame,
                 geometry.getContentFrameInVisibleBounds(),
+                geometry.getRoundedFrameInVisibleBounds(),
                 geometry.getCornerRadius()
         );
     }

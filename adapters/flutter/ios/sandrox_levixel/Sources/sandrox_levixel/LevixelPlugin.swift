@@ -192,6 +192,7 @@ private final class SourceAnchor: UIView {
         super.init(frame: .zero)
         clipsToBounds = true; isUserInteractionEnabled = false; accessibilityElementsHidden = true
         image.alpha = 0
+        image.clipsToBounds = true
         addSubview(image)
         registration = LevixelSourceRegistration(view: self, sourceIdentifier: sourceId, imageViewProvider: { ($0 as? SourceAnchor)?.image })
         NotificationCenter.default.addObserver(self, selector: #selector(applicationWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
@@ -213,7 +214,7 @@ private final class SourceAnchor: UIView {
         guard opacity > 0, opacity <= 1 else { throw BridgeError("Invalid source opacity") }
         image.alpha = preview ? opacity : 0
         frame = clip
-        layer.cornerRadius = clip == sourceFrame ? radius : 0
+        image.layer.cornerRadius = radius
         image.frame = sourceFrame.offsetBy(dx: -clip.minX, dy: -clip.minY)
         switch try text(args, "fit") {
         case "cover": image.contentMode = .scaleAspectFill

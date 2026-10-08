@@ -38,7 +38,7 @@ public final class LevixelSourceHintTest {
         assertEquals(0f, geometry.contentTop, TOLERANCE);
         assertEquals(50f, geometry.contentRight, TOLERANCE);
         assertEquals(50f, geometry.contentBottom, TOLERANCE);
-        assertEquals(0f, geometry.cornerRadius, TOLERANCE);
+        assertEquals(8f, geometry.cornerRadius, TOLERANCE);
     }
 
     @Test
@@ -49,7 +49,7 @@ public final class LevixelSourceHintTest {
     }
 
     @Test
-    public void partiallyVisibleSourceIsClippedAndDoesNotInventRoundedCorners() {
+    public void partiallyVisibleSourcePreservesItsOriginalRadius() {
         LevixelSourceHint hint = hint(-20f, 20f, 100f, 50f, LevixelSourceHint.ObjectFit.FILL, 8f);
 
         LevixelSourceHint.ResolvedGeometry geometry = hint.resolve(0f, 0f, 200f, 200f, 0f, 0f);
@@ -57,7 +57,7 @@ public final class LevixelSourceHintTest {
         assertNotNull(geometry);
         assertRect(geometry, 0f, 20f, 80f, 70f);
         assertEquals(-20f, geometry.contentLeft, TOLERANCE);
-        assertEquals(0f, geometry.cornerRadius, TOLERANCE);
+        assertEquals(8f, geometry.cornerRadius, TOLERANCE);
     }
 
     @Test
@@ -76,7 +76,7 @@ public final class LevixelSourceHintTest {
         assertNotNull(geometry);
         assertRect(geometry, 10f, 0f, 110f, 80f);
         assertEquals(-20f, geometry.contentTop, TOLERANCE);
-        assertEquals(0f, geometry.cornerRadius, TOLERANCE);
+        assertEquals(8f, geometry.cornerRadius, TOLERANCE);
     }
 
     @Test

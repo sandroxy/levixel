@@ -86,11 +86,8 @@ public final class LevixelLayoutSupport {
                 new LevixelSharedElementGeometry(
                         visibleFrameInWindow,
                         contentFrameInVisibleBounds,
-                        resolveVisibleCornerRadius(
-                                imageBoundsInWindow,
-                                visibleFrameInWindow,
-                                cornerRadius
-                        )
+                        relativeBounds(imageBoundsInWindow, visibleFrameInWindow),
+                        resolveSourceCornerRadius(imageBoundsInWindow, cornerRadius)
                 )
         );
     }
@@ -146,11 +143,8 @@ public final class LevixelLayoutSupport {
         return new LevixelSharedElementGeometry(
                 visibleFrameInWindow,
                 contentFrameInVisibleBounds,
-                resolveVisibleCornerRadius(
-                        imageBoundsInWindow,
-                        visibleFrameInWindow,
-                        cornerRadius
-                )
+                relativeBounds(imageBoundsInWindow, visibleFrameInWindow),
+                resolveSourceCornerRadius(imageBoundsInWindow, cornerRadius)
         );
     }
 
@@ -183,19 +177,16 @@ public final class LevixelLayoutSupport {
         );
     }
 
-    static float resolveVisibleCornerRadius(
+    private static RectF relativeBounds(RectF source, RectF visible) {
+        return new RectF(source.left - visible.left, source.top - visible.top,
+                source.right - visible.left, source.bottom - visible.top);
+    }
+
+    static float resolveSourceCornerRadius(
             @NonNull RectF sourceBounds,
-            @NonNull RectF visibleFrame,
             float cornerRadius
     ) {
         if (!Float.isFinite(cornerRadius) || cornerRadius <= 0f) {
-            return 0f;
-        }
-        boolean fullSourceVisible = approximatelyEqual(sourceBounds.left, visibleFrame.left)
-                && approximatelyEqual(sourceBounds.top, visibleFrame.top)
-                && approximatelyEqual(sourceBounds.right, visibleFrame.right)
-                && approximatelyEqual(sourceBounds.bottom, visibleFrame.bottom);
-        if (!fullSourceVisible) {
             return 0f;
         }
         return Math.min(
@@ -205,10 +196,6 @@ public final class LevixelLayoutSupport {
                         sourceBounds.bottom - sourceBounds.top
                 ) * 0.5f
         );
-    }
-
-    private static boolean approximatelyEqual(float first, float second) {
-        return Math.abs(first - second) <= 0.5f;
     }
 
     @Nullable

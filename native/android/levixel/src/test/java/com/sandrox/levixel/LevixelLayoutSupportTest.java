@@ -15,32 +15,18 @@ public final class LevixelLayoutSupportTest {
 
         assertEquals(
                 8f,
-                LevixelLayoutSupport.resolveVisibleCornerRadius(
+                LevixelLayoutSupport.resolveSourceCornerRadius(
                         source,
-                        rect(10f, 20f, 110f, 80f),
                         8f
                 ),
                 TOLERANCE
         );
         assertEquals(
                 30f,
-                LevixelLayoutSupport.resolveVisibleCornerRadius(
+                LevixelLayoutSupport.resolveSourceCornerRadius(
                         source,
-                        rect(10f, 20f, 110f, 80f),
                         80f
                 ),
-                TOLERANCE
-        );
-    }
-
-    @Test
-    public void clippedSourceDoesNotInventRoundedViewportCorners() {
-        RectF source = rect(10f, 20f, 110f, 80f);
-        RectF clipped = rect(10f, 20f, 100f, 80f);
-
-        assertEquals(
-                0f,
-                LevixelLayoutSupport.resolveVisibleCornerRadius(source, clipped, 8f),
                 TOLERANCE
         );
     }
@@ -51,18 +37,16 @@ public final class LevixelLayoutSupportTest {
 
         assertEquals(
                 0f,
-                LevixelLayoutSupport.resolveVisibleCornerRadius(
+                LevixelLayoutSupport.resolveSourceCornerRadius(
                         source,
-                        rect(10f, 20f, 110f, 80f),
                         0f
                 ),
                 TOLERANCE
         );
         assertEquals(
                 0f,
-                LevixelLayoutSupport.resolveVisibleCornerRadius(
+                LevixelLayoutSupport.resolveSourceCornerRadius(
                         source,
-                        rect(10f, 20f, 110f, 80f),
                         Float.NaN
                 ),
                 TOLERANCE

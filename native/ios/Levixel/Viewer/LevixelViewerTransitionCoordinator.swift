@@ -1,7 +1,8 @@
 import UIKit
 
-private final class LevixelTransitionSnapshotView: UIView {
+final class LevixelTransitionSnapshotView: UIView {
     private let imageView = UIImageView()
+    private let roundedView = UIView()
 
     init(image: UIImage) {
         super.init(frame: .zero)
@@ -12,7 +13,9 @@ private final class LevixelTransitionSnapshotView: UIView {
         imageView.image = image
         imageView.backgroundColor = .clear
         imageView.contentMode = .scaleToFill
-        addSubview(imageView)
+        roundedView.clipsToBounds = true
+        addSubview(roundedView)
+        roundedView.addSubview(imageView)
     }
 
     required init?(coder: NSCoder) {
@@ -23,8 +26,11 @@ private final class LevixelTransitionSnapshotView: UIView {
         imageView.image = image
     }
 
-    func applyContentFrame(_ frame: CGRect) {
-        imageView.frame = frame
+    func applyContentFrame(_ frame: CGRect, roundedFrame: CGRect, cornerRadius: CGFloat) {
+        // Preserve the original source shape inside the independent viewport clip.
+        roundedView.frame = roundedFrame
+        roundedView.layer.cornerRadius = cornerRadius
+        imageView.frame = frame.offsetBy(dx: -roundedFrame.minX, dy: -roundedFrame.minY)
     }
 }
 
@@ -299,8 +305,9 @@ final class LevixelViewerTransitionCoordinator {
 
     private func apply(_ geometry: LevixelSharedElementGeometry, to snapshotView: LevixelTransitionSnapshotView) {
         snapshotView.frame = frameInContainer(fromWindowFrame: geometry.visibleFrameInWindow)
-        snapshotView.applyContentFrame(geometry.contentFrameInVisibleBounds)
-        snapshotView.layer.cornerRadius = geometry.cornerRadius
+        snapshotView.applyContentFrame(geometry.contentFrameInVisibleBounds,
+                                       roundedFrame: geometry.roundedFrameInVisibleBounds,
+                                       cornerRadius: geometry.cornerRadius)
     }
 
     private func defaultGeometry(for imageSize: CGSize, in windowBounds: CGRect) -> LevixelSharedElementGeometry {
