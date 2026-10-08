@@ -77,9 +77,10 @@ class LevixelController {
     try {
       await session.previousClose;
       session.checkCurrent();
-      await _Bridge.nextFrame();
+      await _Bridge.pendingFrame();
       session.checkCurrent();
-      final sources = await session.captureSources();
+      final sources = await session.captureSources(
+          openingItemId: snapshot[target].id, preferredSourceId: sourceId);
       session.checkCurrent();
       String? selected = sourceId;
       if (selected == null) {
@@ -113,7 +114,8 @@ class LevixelController {
       session.checkCurrent();
       // Preparation and the Flutter handoff frame can change source geometry
       // or eligibility. Reconcile the anchors before native presentation.
-      await session.syncSources();
+      await session.syncSources(
+          openingItemId: snapshot[target].id, preferredSourceId: selected);
       session.checkCurrent();
       final openingSource = selected != null && session.hasSource(selected)
           ? _sources[selected]
@@ -127,6 +129,7 @@ class LevixelController {
       await _Bridge.channel.invokeMethod<void>('open', session.arguments);
       session.checkCurrent();
       session.watchFrames();
+      WidgetsBinding.instance.scheduleFrame();
     } catch (_) {
       await session.close();
       rethrow;
@@ -240,6 +243,15 @@ class _Bridge {
     }
   }
 
+  static Future<void> pendingFrame() async {
+    final binding = WidgetsBinding.instance;
+    if (binding.hasScheduledFrame ||
+        (binding.schedulerPhase != SchedulerPhase.idle &&
+            binding.schedulerPhase != SchedulerPhase.postFrameCallbacks)) {
+      await nextFrame();
+    }
+  }
+
   static void report(Object error, [StackTrace? stack]) {
     FlutterError.reportError(FlutterErrorDetails(
         exception: error, stack: stack, library: 'levixel'));
@@ -304,14 +316,26 @@ class _Session {
     }
   }
 
-  Future<List<Map<String, Object?>>> captureSources() async {
+  Future<List<Map<String, Object?>>> captureSources(
+      {String? openingItemId, String? preferredSourceId}) async {
     final allowed = items.map((item) => item.id).toSet();
     for (final source in controller._sources.values.toList()) {
       if (!allowed.contains(source.widget.itemId) ||
           !controller.items.any((item) => item.id == source.widget.itemId)) {
         continue;
       }
-      await source._capture();
+      if (openingItemId != null &&
+          (source.widget.itemId != openingItemId ||
+              (preferredSourceId != null &&
+                  source._sourceId != preferredSourceId))) {
+        continue;
+      }
+      final captured = await source._capture();
+      // Presentation needs only its selected thumbnail. Other mounted sources
+      // are synchronized after opening, without blocking the tap on their PNGs.
+      if (openingItemId != null && captured != null) {
+        break;
+      }
     }
     // Encoding another thumbnail can yield to removal, rebinding or repainting
     // of an earlier one. Sample the complete batch without further encoding.
@@ -348,13 +372,15 @@ class _Session {
     });
   }
 
-  Future<void> syncSources() async {
+  Future<void> syncSources(
+      {String? openingItemId, String? preferredSourceId}) async {
     if (closing || !prepared || _syncing) {
       return;
     }
     _syncing = true;
     try {
-      final sources = await captureSources();
+      final sources = await captureSources(
+          openingItemId: openingItemId, preferredSourceId: preferredSourceId);
       if (closing) {
         return;
       }
@@ -417,9 +443,6 @@ class _Session {
         await _Bridge.channel.invokeMethod<void>('finish', arguments);
       }
     } finally {
-      for (final source in controller._sources.values) {
-        source._releasePreview();
-      }
       _Bridge.sessions.remove(id);
       if (_Bridge.current == this) {
         _Bridge.current = null;

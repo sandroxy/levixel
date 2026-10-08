@@ -38,6 +38,8 @@ class _LevixelSourceState extends State<LevixelSource> {
   late String _sourceId;
   ui.Image? _encodedImage;
   Uint8List? _png;
+  ui.Image? _encodingImage;
+  Future<void>? _encoding;
   int _imageVersion = 0;
 
   @override
@@ -91,9 +93,10 @@ class _LevixelSourceState extends State<LevixelSource> {
     }
   }
 
-  void _releasePreview() {
-    _encodedImage = null;
-    _png = null;
+  void _preparePreview(PointerDownEvent event) {
+    // Preparing pixels does not claim the gesture or hide the Flutter source.
+    // A scroll or cancelled pointer must never present the native viewer.
+    unawaited(_capture().then<void>((_) {}).catchError(_Bridge.report));
   }
 
   double _paintOpacity(RenderObject object) {
@@ -187,14 +190,17 @@ class _LevixelSourceState extends State<LevixelSource> {
               actionListIcons: widget.actionListIcons,
             )
             .catchError(_Bridge.reportOpenFailure)),
-        child: Opacity(
-          key: _opacityKey,
-          opacity: _hiddenBy.isEmpty ? 1 : 0,
-          child: RepaintBoundary(
-            key: _contentKey,
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(widget.cornerRadius),
-                child: widget.child),
+        child: Listener(
+          onPointerDown: _preparePreview,
+          child: Opacity(
+            key: _opacityKey,
+            opacity: _hiddenBy.isEmpty ? 1 : 0,
+            child: RepaintBoundary(
+              key: _contentKey,
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.cornerRadius),
+                  child: widget.child),
+            ),
           ),
         ),
       );
@@ -328,40 +334,20 @@ class _LevixelSourceState extends State<LevixelSource> {
       if (!allowEncoding) {
         return null;
       }
-      final retained = image.clone();
-      ui.Image? preview;
-      ui.Picture? picture;
+      if (_encodingImage == image && _encoding != null) {
+        await _encoding;
+        return _capture(allowEncoding: false);
+      }
+      final encoding = _encodePreview(image, render, sourceId, frame, view);
+      _encodingImage = image;
+      _encoding = encoding;
       try {
-        final longest = math.max(image.width, image.height);
-        final previewSide = math.min(1024,
-            math.max(frame.width, frame.height) * view.devicePixelRatio * 2);
-        final ratio = math.min(1.0, previewSide / longest);
-        final width = math.max(1, (image.width * ratio).round());
-        final height = math.max(1, (image.height * ratio).round());
-        final recorder = ui.PictureRecorder();
-        final canvas = ui.Canvas(recorder);
-        canvas.drawImageRect(
-            retained,
-            ui.Rect.fromLTWH(
-                0, 0, retained.width.toDouble(), retained.height.toDouble()),
-            ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-            ui.Paint()..filterQuality = ui.FilterQuality.medium);
-        picture = recorder.endRecording();
-        preview = await picture.toImage(width, height);
-        final data = await preview.toByteData(format: ui.ImageByteFormat.png);
-        if (!mounted ||
-            _sourceId != sourceId ||
-            render.image != image ||
-            data == null) {
-          return null;
-        }
-        _encodedImage = image;
-        _png = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-        _imageVersion++;
+        await encoding;
       } finally {
-        preview?.dispose();
-        picture?.dispose();
-        retained.dispose();
+        if (_encoding == encoding) {
+          _encodingImage = null;
+          _encoding = null;
+        }
       }
       // Encoding yields to host updates. Re-read clipping, image effects and
       // geometry together before handing the source to the native viewer.
@@ -387,5 +373,44 @@ class _LevixelSourceState extends State<LevixelSource> {
       'imageVersion': _imageVersion,
       'signature': signature,
     };
+  }
+
+  Future<void> _encodePreview(ui.Image image, RenderImage render,
+      String sourceId, Rect frame, ui.FlutterView view) async {
+    final retained = image.clone();
+    ui.Image? preview;
+    ui.Picture? picture;
+    try {
+      final longest = math.max(image.width, image.height);
+      final previewSide = math.min(1024,
+          math.max(frame.width, frame.height) * view.devicePixelRatio * 2);
+      final ratio = math.min(1.0, previewSide / longest);
+      final width = math.max(1, (image.width * ratio).round());
+      final height = math.max(1, (image.height * ratio).round());
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      canvas.drawImageRect(
+          retained,
+          ui.Rect.fromLTWH(
+              0, 0, retained.width.toDouble(), retained.height.toDouble()),
+          ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+          ui.Paint()..filterQuality = ui.FilterQuality.medium);
+      picture = recorder.endRecording();
+      preview = await picture.toImage(width, height);
+      final data = await preview.toByteData(format: ui.ImageByteFormat.png);
+      if (!mounted ||
+          _sourceId != sourceId ||
+          render.image != image ||
+          data == null) {
+        return;
+      }
+      _encodedImage = image;
+      _png = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      _imageVersion++;
+    } finally {
+      preview?.dispose();
+      picture?.dispose();
+      retained.dispose();
+    }
   }
 }

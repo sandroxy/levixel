@@ -86,6 +86,147 @@ Widget sourcePaint(String effect, Widget child) {
 }
 
 void main() {
+  testWidgets('opening does not wait for unrelated thumbnail encoding',
+      (tester) async {
+    const channel = MethodChannel('com.sandrox.levixel/flutter');
+    final calls = <MethodCall>[];
+    var opened = false;
+    final images = (await tester.runAsync(() async => [
+          await createTestImage(width: 80, height: 80, cache: false),
+          await createTestImage(width: 160, height: 80, cache: false),
+        ]))!;
+    final controller = LevixelController(galleryId: 'opening', items: [
+      for (final id in ['other', 'selected'])
+        LevixelMedia(
+            id: id, type: LevixelMediaType.image, url: 'file:///$id.png'),
+    ]);
+    final previousImageCallback = ui.Image.onCreate;
+    var unrelatedEncodedBeforeOpen = false;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
+      calls.add(call);
+      if (call.method == 'open') opened = true;
+      return null;
+    });
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (var i = 0; i < images.length; i++)
+              LevixelSource(
+                controller: controller,
+                itemId: i == 0 ? 'other' : 'selected',
+                child: RawImage(image: images[i], width: 100, height: 80),
+              ),
+          ]),
+        ),
+      ));
+      ui.Image.onCreate = (created) {
+        previousImageCallback?.call(created);
+        if (!opened && created.isCloneOf(images.first)) {
+          unrelatedEncodedBeforeOpen = true;
+        }
+      };
+      final opening = controller.open(itemId: 'selected');
+      await pumpNativeWork(tester, () => opened);
+      await opening;
+      expect(unrelatedEncodedBeforeOpen, isFalse,
+          reason: 'An unrelated image must not delay the selected transition');
+      await pumpNativeWork(
+          tester, () => calls.any((call) => call.method == 'updateSources'));
+      final update = calls
+          .lastWhere((call) => call.method == 'updateSources')
+          .arguments as Map<Object?, Object?>;
+      expect(update['sources'], hasLength(2),
+          reason:
+              'Remaining sources must still register for paging and return');
+      var closed = false;
+      final closing = controller.close().then((_) => closed = true);
+      await pumpNativeWork(tester, () => closed);
+      await closing;
+    } finally {
+      ui.Image.onCreate = previousImageCallback;
+      controller.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
+      for (final image in images) {
+        image.dispose();
+      }
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    }
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('cancelled pointer preparation is reused without opening',
+      (tester) async {
+    const channel = MethodChannel('com.sandrox.levixel/flutter');
+    final calls = <MethodCall>[];
+    var opened = 0;
+    final image = (await tester.runAsync(
+        () => createTestImage(width: 160, height: 80, cache: false)))!;
+    final controller = LevixelController(galleryId: 'pointer', items: [
+      LevixelMedia(
+          id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png'),
+    ]);
+    final previousCreate = ui.Image.onCreate;
+    final previousDispose = ui.Image.onDispose;
+    final pending = <ui.Image>{};
+    var createdCount = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
+      calls.add(call);
+      if (call.method == 'open') opened++;
+      return null;
+    });
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: LevixelSource(
+            controller: controller,
+            itemId: 'photo',
+            child: RawImage(image: image, width: 100, height: 80),
+          ),
+        ),
+      ));
+      ui.Image.onCreate = (image) {
+        previousCreate?.call(image);
+        pending.add(image);
+        createdCount++;
+      };
+      ui.Image.onDispose = (image) {
+        previousDispose?.call(image);
+        pending.remove(image);
+      };
+      final source = find.byType(LevixelSource);
+      final pointer = await tester.startGesture(tester.getCenter(source));
+      await pumpNativeWork(tester, () => createdCount > 0 && pending.isEmpty);
+      await pointer.cancel();
+      expect(calls, isEmpty,
+          reason: 'A cancelled pointer must not prepare a native viewer');
+      createdCount = 0;
+      for (var cycle = 1; cycle <= 2; cycle++) {
+        await tester.tap(source);
+        await pumpNativeWork(tester, () => opened == cycle);
+        expect(createdCount, 0,
+            reason: 'Unchanged decoded previews survive dismissal');
+        var closed = false;
+        final closing = controller.close().then((_) => closed = true);
+        await pumpNativeWork(tester, () => closed);
+        await closing;
+      }
+      expect(tester.takeException(), isNull);
+    } finally {
+      ui.Image.onCreate = previousCreate;
+      ui.Image.onDispose = previousDispose;
+      controller.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
+      image.dispose();
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    }
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   for (final change in [
     'remove during prepare',
     'effect during prepare',
@@ -486,12 +627,19 @@ void main() {
         final opening = controller.open();
         await pumpNativeWork(tester, () => opened);
         await opening;
+        await pumpNativeWork(
+            tester,
+            () =>
+                changed && calls.any((call) => call.method == 'updateSources'));
         ui.Image.onCreate = previousImageCallback;
         expect(changed, isTrue);
         final prepared = calls
             .firstWhere((call) => call.method == 'prepare')
             .arguments as Map<Object?, Object?>;
-        final sources = (prepared['sources']! as List<Object?>)
+        final updated = calls
+            .lastWhere((call) => call.method == 'updateSources')
+            .arguments as Map<Object?, Object?>;
+        final sources = (updated['sources']! as List<Object?>)
             .cast<Map<Object?, Object?>>();
         expect(prepared['items']! as List<Object?>, hasLength(2),
             reason: 'The viewer keeps the immutable opening gallery');
@@ -501,7 +649,10 @@ void main() {
           expect(sources.first['opacity'], 0.4);
         } else {
           expect(sources.map((source) => source['itemId']), ['second']);
-          expect(prepared['sourceId'], isNull);
+          expect(
+              sources
+                  .any((source) => source['sourceId'] == prepared['sourceId']),
+              isFalse);
         }
         var closed = false;
         final closing = controller.close().then((_) => closed = true);
@@ -824,8 +975,8 @@ void main() {
           .arguments as Map<Object?, Object?>;
       final sources =
           (prepared['sources']! as List<Object?>).cast<Map<Object?, Object?>>();
-      expect(sources, hasLength(2));
-      expect(sources.map((source) => source['sourceId']).toSet(), hasLength(2));
+      expect(sources, hasLength(1),
+          reason: 'Only the clicked duplicate blocks presentation');
       final selected = sources
           .singleWhere((source) => source['sourceId'] == prepared['sourceId']);
       expect(selected['itemId'], 'photo');
@@ -847,6 +998,16 @@ void main() {
           of: find.byKey(const ValueKey<String>('left')),
           matching: find.byType(Opacity));
       expect(tester.widget<Opacity>(otherOpacity).opacity, 1);
+      await pumpNativeWork(
+          tester, () => calls.any((call) => call.method == 'updateSources'));
+      final updated = calls
+          .lastWhere((call) => call.method == 'updateSources')
+          .arguments as Map<Object?, Object?>;
+      final synchronized =
+          (updated['sources']! as List<Object?>).cast<Map<Object?, Object?>>();
+      expect(synchronized.map((source) => source['sourceId']).toSet(),
+          hasLength(2),
+          reason: 'Both duplicates remain return targets');
       var closed = false;
       final closing = controller.close().then((_) {
         closed = true;

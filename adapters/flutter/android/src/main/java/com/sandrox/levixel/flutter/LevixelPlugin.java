@@ -13,6 +13,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.window.OnBackInvokedCallback;
@@ -94,7 +95,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                 session = next;
                 try { next.updateSources(list(args, "sources")); }
                 catch (RuntimeException error) { next.removeSources(); session = null; throw error; }
-                result.success(null);
+                next.prepare(result);
                 return;
             }
             Session current = session;
@@ -111,6 +112,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                 case "retry": result.success(current.overlay != null && current.overlay.retry()); break;
                 case "close":
                     current.closing = true;
+                    current.completePreparation();
                     if (current.overlay == null) result.success(null);
                     else {
                         boolean animated = bool(args, "animated");
@@ -141,6 +143,7 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
         final ViewGroup host;
         final FlutterView flutterView;
         LevixelViewerOverlayView overlay;
+        MethodChannel.Result prepareResult;
         boolean closing;
         Object backCallback;
 
@@ -178,6 +181,25 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                         optionalText(action, "group"), bool(action, "disabled"), bool(action, "destructive"), null));
             }
             LevixelAction.snapshot(actions, actionLayout);
+        }
+
+        void prepare(MethodChannel.Result result) {
+            Source source = sources.get(sourceId);
+            if (source == null) { result.success(null); return; }
+            prepareResult = result;
+            source.awaitPreview();
+        }
+
+        void completePreparation() {
+            MethodChannel.Result pending = prepareResult;
+            prepareResult = null;
+            if (pending == null) return;
+            if (session != this || closing || !flutterView.isAttachedToWindow()
+                    || flutterView.getWindowVisibility() != View.VISIBLE) {
+                pending.error("OPEN_CANCELLED", "The source presentation was cancelled", null);
+            } else {
+                pending.success(null);
+            }
         }
 
         void open() {
@@ -236,6 +258,9 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
         final String id, itemId, key;
         final ImageView image;
         boolean preview, ready;
+        boolean previewDrawPending;
+        ViewTreeObserver previewObserver;
+        final Runnable previewCommitted = this::completePreview;
         float radius, opacity = 1f;
         int visibilitySequence;
 
@@ -256,6 +281,12 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
                     int saved = canvas.saveLayerAlpha(0, 0, getWidth(), getHeight(), Math.round(opacity * 255));
                     try { super.onDraw(canvas); }
                     finally { canvas.restoreToCount(saved); }
+                    if (previewDrawPending) {
+                        previewDrawPending = false;
+                        // Older renderers expose drawing, but no submission
+                        // callback. Complete after this draw's native vsync.
+                        postOnAnimation(previewCommitted);
+                    }
                 }
             };
             addView(image); ready = true;
@@ -299,6 +330,29 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
 
         void showPreview(boolean value) { preview = value; image.invalidate(); }
 
+        void awaitPreview() {
+            // Flutter's surface and this window present independently. Register
+            // before drawing so the callback belongs to the preview's frame;
+            // registering from onDraw would wait for an unrelated later frame.
+            if (Build.VERSION.SDK_INT >= 29 && image.isHardwareAccelerated()) {
+                previewObserver = image.getViewTreeObserver();
+                previewObserver.registerFrameCommitCallback(previewCommitted);
+            } else {
+                previewDrawPending = true;
+            }
+            image.invalidate();
+        }
+
+        void completePreview() {
+            previewObserver = null;
+            owner.completePreparation();
+        }
+
+        @Override protected void onWindowVisibilityChanged(int visibility) {
+            super.onWindowVisibilityChanged(visibility);
+            if (ready && visibility != View.VISIBLE) owner.completePreparation();
+        }
+
         @Override public void setAlpha(float alpha) {
             float previous = getAlpha(); super.setAlpha(alpha);
             if (!ready || previous == alpha) return;
@@ -317,6 +371,13 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
         }
 
         void remove() {
+            previewDrawPending = false;
+            image.removeCallbacks(previewCommitted);
+            if (Build.VERSION.SDK_INT >= 29 && previewObserver != null && previewObserver.isAlive()) {
+                previewObserver.unregisterFrameCommitCallback(previewCommitted);
+            }
+            previewObserver = null;
+            if (id.equals(owner.sourceId)) owner.completePreparation();
             LevixelSourceViewRegistry.unregisterSource(this);
             if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
             image.setImageDrawable(null);
