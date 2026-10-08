@@ -504,6 +504,7 @@ final class LevixelViewerPageView: UIView {
 
         activityIndicator.isHidden = true
         activityIndicator.color = .white
+        activityIndicator.isUserInteractionEnabled = false
         addSubview(activityIndicator)
         activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
