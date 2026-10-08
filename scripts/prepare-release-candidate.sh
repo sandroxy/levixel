@@ -98,9 +98,11 @@ for artifact in "${artifacts[@]}"; do
   verify_sidecar "${artifact}"
 done
 
-flutter_verify_arguments=()
-if [[ ${allow_dirty} -eq 1 ]]; then flutter_verify_arguments+=(--allow-dirty); fi
-"${script_dir}/verify-flutter-package.sh" "${flutter_verify_arguments[@]}"
+if [[ ${allow_dirty} -eq 1 ]]; then
+  "${script_dir}/verify-flutter-package.sh" --allow-dirty
+else
+  "${script_dir}/verify-flutter-package.sh"
+fi
 
 read -r native_commit native_dirty native_signed < <(ruby -I "${script_dir}" \
   -rjson -rdigest -r native-release-manifest -e '
