@@ -1,0 +1,71 @@
+name: Verify Flutter contracts
+
+on:
+  push:
+    paths:
+      - 'adapters/flutter/**'
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'scripts/test-flutter-source.sh'
+      - '.github/workflows/verify-flutter.yml'
+  pull_request:
+    paths:
+      - 'adapters/flutter/**'
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'scripts/test-flutter-source.sh'
+      - '.github/workflows/verify-flutter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  dart:
+    name: Dart analysis and session contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Install pinned Flutter SDK
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: flutter/flutter
+          ref: '3.47.5'
+          path: .toolchains/flutter
+          persist-credentials: false
+      - name: Cache Flutter SDK artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .toolchains/flutter/bin/cache
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.5-${{ github.job }}
+      - name: Verify SDK identity
+        run: |
+          test "$(git -C .toolchains/flutter rev-parse HEAD)" = 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
+          echo "${GITHUB_WORKSPACE}/.toolchains/flutter/bin" >> "${GITHUB_PATH}"
+      - name: Check Dart source
+        run: ./scripts/test-flutter-source.sh dart
+      - name: Retain formatter diagnostics
+        if: always()
+        run: |
+          mkdir -p dist/development/flutter-source-tests/dart
+          dart format adapters/flutter/lib adapters/flutter/test
+          git diff -- adapters/flutter > dist/development/flutter-source-tests/dart/format.patch
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: flutter-dart-diagnostics
+          path: dist/development/flutter-source-tests/dart/
+          retention-days: 7

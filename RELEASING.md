@@ -80,6 +80,7 @@ Known release-blocking defects must be resolved before publishing.
 | iOS | `Levixel` | Canonical Git tag and GitHub XCFramework asset, consumed by SwiftPM |
 | HarmonyOS | `@sandrox/levixel` | Existing OHPM CLI; mirror the approved HAR afterward |
 | React Native | `@sandrox/levixel` | GitHub `Publish npm` workflow |
+| Flutter | `sandrox_levixel` | Canonical GitHub Release archive |
 | UniApp | `Sandrox-Levixel` | HBuilderX, from the accepted UTS module in its generated consumer |
 | Web | `@sandrox/levixel-web` | GitHub `Publish Web npm` workflow |
 
@@ -337,6 +338,29 @@ maintains the default tag itself. A successful upload prints the package name an
 version, then reports that the submission is under review. Track that review at
 <https://ohpm.openharmony.cn/#/cn/personalCenter/package>. Never paste the
 private key or its passphrase into release logs, commits, or chat.
+
+## Flutter / GitHub Release
+
+Build and verify the Flutter ZIP after the native release manifest and its
+Android Maven repository and iOS XCFramework have been verified:
+
+```sh
+./scripts/package-flutter.sh
+./scripts/verify-flutter-package.sh
+```
+
+The archive contains the Dart API, native bridges, and those exact native
+products. It does not build another copy of the viewer. Candidate preparation
+requires this ZIP and its SHA-256 sidecar. The independent consumer repository
+verifies the installed package on Android and on iOS with both SwiftPM and
+CocoaPods through the declared Flutter acceptance targets.
+
+After acceptance and publication authorization, attach
+`dist/flutter/levixel-flutter-<version>.zip` and its existing `.sha256` file to
+the shared canonical GitHub Release. Do not repack after acceptance or replace
+an existing published file. Consumers extract the archive and declare a local
+path dependency as documented in the [Flutter guide](adapters/flutter/README.md).
+The package's `publish_to: none` prevents accidental publication to pub.dev.
 
 ## React Native / npm
 

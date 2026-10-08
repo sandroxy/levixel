@@ -33,6 +33,17 @@ The command reuses `dist/development/ios-source-tests/DerivedData` and replaces
 serially; retain any needed result bundle before starting another run. Failed
 test results remain available at the same path for diagnosis.
 
+`./scripts/test-flutter-source.sh dart` checks Flutter formatting, static
+analysis, and controller/session contracts. The workflow pins the Flutter SDK identity.
+On macOS, `./scripts/test-flutter-source.sh ios` checks source-restoration
+cleanup ordering with Swift. Native rendering and lifecycle checks still run
+in the independent iOS consumers.
+Consumer applications, source integration, native touch tests, recordings, and
+immutable artifact acceptance belong to the independent consumer repository.
+They consume the public adapter and the Android/iOS cores without becoming
+product build dependencies. See the [Flutter adapter API](adapters/flutter/README.md)
+for controller and source semantics.
+
 Compile the HarmonyOS component with the locally installed DevEco `hvigorw`,
 from `native/harmonyos`:
 
@@ -77,7 +88,7 @@ and artifact-reuse rules remain separate from development cache management.
 ```text
 levixel/
 ├── native/             # Android, iOS, and HarmonyOS native cores
-├── adapters/           # React Native, UniApp, and Web adapters
+├── adapters/           # Flutter, React Native, UniApp, and Web adapters
 ├── uni_modules/        # DCloud Marketplace UTS plugin source
 ├── contract/           # Cross-platform public contract
 ├── packaging/          # Platform artifact templates
@@ -136,6 +147,40 @@ The iOS source-only regression entry point is:
 ```sh
 ./scripts/test-native-ios-source.sh
 ```
+
+## Flutter
+
+Prepare and verify the native release inputs before packaging the Flutter
+adapter. The package tools require Python 3.9 or later, Ruby, Git, Java's `jar`
+command, and the native artifact verification tools described above.
+
+```sh
+./scripts/package-flutter.sh
+./scripts/verify-flutter-package.sh
+```
+
+The builder writes `dist/flutter/levixel-flutter-<version>.zip` and its SHA-256
+sidecar. The ZIP contains a `sandrox_levixel/` package root with Dart and bridge
+source, the native Android Maven repository, the device and simulator iOS
+XCFramework, legal notices, and the original `native-release.json`. It does not
+rebuild native cores. Its input manifest must identify the same source commit,
+and every embedded native input must match the manifest's byte count and hash.
+The iOS source-provenance and adapter API checks also apply.
+
+The verifier is read-only and can inspect an explicit ZIP path as its first
+argument. It checks the checksum, source and legal-file bytes, package identity,
+native contents, and provenance against the current release checkout. Both
+commands require clean source and native inputs unless `--allow-dirty` is used
+for a local rehearsal. The builder verifies temporary output before installing
+it and refuses to overwrite different same-version bytes or an incomplete
+candidate; use `--replace` only after rejecting that local candidate.
+
+`python3 -B scripts/test-flutter-package.py` exercises archive integrity,
+native-input boundaries, and immutable output handling using fixtures. These
+checks do not compile a consumer or accept a release. Exact packaged bytes must
+also pass Android and iOS artifact-only consumer checks, including both iOS
+dependency managers. Installation and controller usage are documented in the
+[Flutter adapter guide](adapters/flutter/README.md).
 
 ## React Native
 

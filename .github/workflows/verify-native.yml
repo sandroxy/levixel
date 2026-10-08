@@ -1,0 +1,97 @@
+name: Verify native source
+
+on:
+  push:
+    paths:
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'LICENSE'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'scripts/test-native-ios-source.sh'
+      - '.github/workflows/verify-native.yml'
+  pull_request:
+    paths:
+      - 'native/android/**'
+      - 'native/ios/**'
+      - 'plugin.yaml'
+      - 'LICENSE'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'scripts/test-native-ios-source.sh'
+      - '.github/workflows/verify-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android build, unit tests, and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            native/android/**/*.gradle
+            native/android/gradle.properties
+            native/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Check Android source
+        run: |
+          native/android/gradlew -p native/android \
+            :levixel:testDebugUnitTest :levixel:assembleDebug :levixel:lintDebug \
+            --no-daemon --console=plain --stacktrace
+
+      - name: Retain Android test and lint reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: native-android-reports
+          path: |
+            native/android/levixel/build/reports/
+            native/android/levixel/build/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  ios:
+    name: iOS simulator source tests
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode and available simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+
+      - name: Check iOS source
+        run: ./scripts/test-native-ios-source.sh
+
+      - name: Retain iOS test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: native-ios-test-results
+          path: dist/development/ios-source-tests/latest.xcresult
+          retention-days: 7
+          if-no-files-found: warn

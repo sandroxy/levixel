@@ -72,6 +72,25 @@ final class LevixelViewerPageViewTests: XCTestCase {
         XCTAssertTrue(pageView.canPageHorizontally)
     }
 
+    func testLoadingIndicatorLeavesImageGesturesReachable() throws {
+        let page = makePageView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+            preview: makeImage(size: CGSize(width: 600, height: 400)),
+            loader: DeferredImageLoader()
+        )
+        defer { page.prepareForReuse() }
+        page.completeOpenTransitionPreviewHandoff()
+        let indicator = try XCTUnwrap(descendants(of: page).compactMap { $0 as? UIActivityIndicatorView }.first)
+        let loading = expectation(for: NSPredicate { _, _ in indicator.isAnimating }, evaluatedWith: indicator)
+        wait(for: [loading], timeout: 2)
+        page.layoutIfNeeded()
+
+        let center = CGPoint(x: page.bounds.midX, y: page.bounds.midY)
+        let target = try XCTUnwrap(page.hitTest(center, with: nil))
+        XCTAssertTrue(target.isDescendant(of: requireImageScrollView(in: page)),
+            "Touches over the loading indicator must reach the image's gestures")
+    }
+
     func testLateThumbnailHandsOffDirectlyToTheZoomableLayer() {
         let thumbnail = makeImage(size: CGSize(width: 600, height: 400))
         let loader = DeferredImageLoader()

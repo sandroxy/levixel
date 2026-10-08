@@ -1,0 +1,391 @@
+part of '../levixel.dart';
+
+/// A Flutter thumbnail registered by stable media identity.
+///
+/// The child remains a Flutter widget. Shared transitions use its decoded image,
+/// layout, opacity, clipping, and uniform [cornerRadius]. Unsupported image
+/// effects or unavailable geometry use the native viewer's fade transition.
+class LevixelSource extends StatefulWidget {
+  const LevixelSource({
+    super.key,
+    required this.controller,
+    required this.itemId,
+    required this.child,
+    this.cornerRadius = 0,
+    this.theme = LevixelTheme.dark,
+    this.actions = const <LevixelAction>[],
+    this.actionLayout = LevixelActionLayout.list,
+    this.actionListIcons = false,
+  });
+
+  final LevixelController controller;
+  final String itemId;
+  final Widget child;
+  final double cornerRadius;
+  final LevixelTheme theme;
+  final List<LevixelAction> actions;
+  final LevixelActionLayout actionLayout;
+  final bool actionListIcons;
+
+  @override
+  State<LevixelSource> createState() => _LevixelSourceState();
+}
+
+class _LevixelSourceState extends State<LevixelSource> {
+  final _contentKey = GlobalKey();
+  final _opacityKey = GlobalKey();
+  final _hiddenBy = <String>{};
+  late String _sourceId;
+  ui.Image? _encodedImage;
+  Uint8List? _png;
+  int _imageVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _register();
+  }
+
+  void _register() {
+    _nonEmpty(widget.itemId, 'itemId');
+    widget.controller._checkAlive();
+    if (!widget.cornerRadius.isFinite || widget.cornerRadius < 0) {
+      throw ArgumentError.value(widget.cornerRadius, 'cornerRadius',
+          'Must be finite and non-negative');
+    }
+    _sourceId = 'source-${++_Bridge.nextId}';
+    widget.controller._sources[_sourceId] = this;
+  }
+
+  @override
+  void didUpdateWidget(LevixelSource oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.itemId != widget.itemId) {
+      oldWidget.controller._sources.remove(_sourceId);
+      _hiddenBy.clear();
+      _encodedImage = null;
+      _png = null;
+      _register();
+    }
+    if (!widget.cornerRadius.isFinite || widget.cornerRadius < 0) {
+      throw ArgumentError.value(widget.cornerRadius, 'cornerRadius');
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller._sources.remove(_sourceId);
+    _png = null;
+    super.dispose();
+  }
+
+  void _setHidden(String requestId, bool hidden) {
+    if (!mounted) {
+      return;
+    }
+    final changed =
+        hidden ? _hiddenBy.add(requestId) : _hiddenBy.remove(requestId);
+    if (changed) {
+      setState(() {});
+    }
+  }
+
+  void _releasePreview() {
+    _encodedImage = null;
+    _png = null;
+  }
+
+  double _paintOpacity(RenderObject object) {
+    if (object == _opacityKey.currentContext?.findRenderObject()) {
+      // The native viewer's visibility lease is separate from host styling.
+      return 1;
+    }
+    if (object is RenderOpacity) {
+      return object.opacity;
+    }
+    if (object is RenderAnimatedOpacity) {
+      return object.opacity.value;
+    }
+    if (object is RenderSliverOpacity) {
+      return object.opacity;
+    }
+    if (object is RenderSliverAnimatedOpacity) {
+      return object.opacity.value;
+    }
+    if (object is RenderImage) {
+      return object.opacity?.value ?? 1;
+    }
+    return 1;
+  }
+
+  double _effectiveOpacity(RenderImage image) {
+    var opacity = 1.0;
+    RenderObject? current = image;
+    while (current != null) {
+      opacity *= _paintOpacity(current);
+      current = current.parent;
+    }
+    return opacity;
+  }
+
+  bool _hasPaintEffects(BuildContext root) {
+    bool unsupported(Widget value) =>
+        value is ColorFiltered ||
+        (value is ImageFiltered && value.enabled) ||
+        value is ShaderMask ||
+        (value is BackdropFilter && value.enabled);
+    var found = false;
+    void visit(Element element) {
+      if (found) {
+        return;
+      }
+      if (element is RenderObjectElement) {
+        final object = element.renderObject;
+        if ((object is RenderOffstage && object.offstage) ||
+            _paintOpacity(object) <= 0) {
+          return;
+        }
+      }
+      found = unsupported(element.widget);
+      if (!found) {
+        element.visitChildElements(visit);
+      }
+    }
+
+    root.visitChildElements(visit);
+    root.visitAncestorElements((element) {
+      found = found || unsupported(element.widget);
+      return !found;
+    });
+    return found;
+  }
+
+  bool _supportedTransform(List<double> m) =>
+      m.every((value) => value.isFinite) &&
+      m[0] > 0 &&
+      m[5] > 0 &&
+      (m[0] - m[5]).abs() <= 0.0001 &&
+      m[1].abs() <= 0.0001 &&
+      m[4].abs() <= 0.0001 &&
+      m[3].abs() <= 0.0001 &&
+      m[7].abs() <= 0.0001 &&
+      (m[15] - 1).abs() <= 0.0001;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        // Rebinding a source cancels any gesture that began on its old media.
+        key: ValueKey<String>(_sourceId),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => unawaited(widget.controller
+            ._open(
+              itemId: widget.itemId,
+              sourceId: _sourceId,
+              theme: widget.theme,
+              actions: widget.actions,
+              actionLayout: widget.actionLayout,
+              actionListIcons: widget.actionListIcons,
+            )
+            .catchError(_Bridge.reportOpenFailure)),
+        child: Opacity(
+          key: _opacityKey,
+          opacity: _hiddenBy.isEmpty ? 1 : 0,
+          child: RepaintBoundary(
+            key: _contentKey,
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(widget.cornerRadius),
+                child: widget.child),
+          ),
+        ),
+      );
+
+  Future<Map<String, Object?>?> _capture({bool allowEncoding = true}) async {
+    if (!mounted) {
+      return null;
+    }
+    final sourceId = _sourceId;
+    final rootContext = _contentKey.currentContext;
+    if (rootContext == null) {
+      return null;
+    }
+    final root = rootContext.findRenderObject();
+    if (root == null || !root.attached) {
+      return null;
+    }
+    if (_hasPaintEffects(rootContext)) {
+      return null;
+    }
+    final sourceClip = root is RenderProxyBox ? root.child : null;
+    final images = <RenderImage>[];
+    void visit(RenderObject object) {
+      if (object is RenderOffstage && object.offstage) {
+        return;
+      }
+      if (_paintOpacity(object) <= 0) {
+        return;
+      }
+      if (object is RenderClipPath || object is RenderClipOval) {
+        return;
+      }
+      if (object is RenderImage && object.image != null) {
+        images.add(object);
+      }
+      object.visitChildren(visit);
+    }
+
+    visit(root);
+    if (images.length != 1) {
+      return null;
+    }
+    final render = images.single;
+    final image = render.image;
+    if (image == null ||
+        !render.hasSize ||
+        render.size.isEmpty ||
+        render.color != null ||
+        render.invertColors ||
+        render.centerSlice != null ||
+        render.matchTextDirection ||
+        render.repeat != ImageRepeat.noRepeat ||
+        render.alignment.resolve(render.textDirection) != Alignment.center) {
+      return null;
+    }
+    final opacity = _effectiveOpacity(render);
+    if (!opacity.isFinite || opacity <= 0 || opacity > 1) {
+      return null;
+    }
+    var fit = render.fit ?? BoxFit.scaleDown;
+    if (fit == BoxFit.scaleDown &&
+        (render.size.width <= image.width / render.scale ||
+            render.size.height <= image.height / render.scale)) {
+      fit = BoxFit.contain;
+    }
+    if (fit != BoxFit.cover && fit != BoxFit.contain && fit != BoxFit.fill) {
+      return null;
+    }
+    final transform = render.getTransformTo(null);
+    final m = transform.storage;
+    if (!_supportedTransform(m)) {
+      return null;
+    }
+    final frame =
+        MatrixUtils.transformRect(transform, Offset.zero & render.size);
+    final view = View.of(context);
+    var clip = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+    RenderObject child = render;
+    while (child.parent != null) {
+      final parent = child.parent!;
+      if (parent is RenderOffstage && parent.offstage) {
+        return null;
+      }
+      if (parent is RenderClipPath || parent is RenderClipOval) {
+        return null;
+      }
+      // Approximate paint clips are semantics bounds, not arbitrary clip
+      // shapes. Only the source's own rounded rectangle has a native radius.
+      if ((parent is RenderClipRect &&
+              parent.clipBehavior != Clip.none &&
+              parent.clipper != null) ||
+          (parent is RenderClipRRect &&
+              parent != sourceClip &&
+              parent.clipBehavior != Clip.none &&
+              (parent.clipper != null ||
+                  parent.borderRadius != BorderRadius.zero)) ||
+          (parent is RenderClipRSuperellipse &&
+              parent.clipBehavior != Clip.none &&
+              (parent.clipper != null ||
+                  parent.borderRadius != BorderRadius.zero)) ||
+          (parent is RenderPhysicalModel &&
+              parent.clipBehavior != Clip.none &&
+              (parent.shape != BoxShape.rectangle ||
+                  (parent.borderRadius ?? BorderRadius.zero) !=
+                      BorderRadius.zero)) ||
+          (parent is RenderPhysicalShape && parent.clipBehavior != Clip.none)) {
+        return null;
+      }
+      final bounds = parent.describeApproximatePaintClip(child);
+      if (bounds != null) {
+        final clipTransform = parent.getTransformTo(null);
+        if (!_supportedTransform(clipTransform.storage)) {
+          return null;
+        }
+        clip = clip.intersect(MatrixUtils.transformRect(clipTransform, bounds));
+      }
+      child = parent;
+    }
+    clip = clip.intersect(frame);
+    if (clip.isEmpty || !frame.isFinite || !clip.isFinite) {
+      return null;
+    }
+    final container = root is RenderBox
+        ? MatrixUtils.transformRect(
+            root.getTransformTo(null), Offset.zero & root.size)
+        : frame;
+    if (widget.cornerRadius > 0 && container != frame) {
+      return null;
+    }
+    if (_encodedImage != image || _png == null) {
+      if (!allowEncoding) {
+        return null;
+      }
+      final retained = image.clone();
+      ui.Image? preview;
+      ui.Picture? picture;
+      try {
+        final longest = math.max(image.width, image.height);
+        final previewSide = math.min(1024,
+            math.max(frame.width, frame.height) * view.devicePixelRatio * 2);
+        final ratio = math.min(1.0, previewSide / longest);
+        final width = math.max(1, (image.width * ratio).round());
+        final height = math.max(1, (image.height * ratio).round());
+        final recorder = ui.PictureRecorder();
+        final canvas = ui.Canvas(recorder);
+        canvas.drawImageRect(
+            retained,
+            ui.Rect.fromLTWH(
+                0, 0, retained.width.toDouble(), retained.height.toDouble()),
+            ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+            ui.Paint()..filterQuality = ui.FilterQuality.medium);
+        picture = recorder.endRecording();
+        preview = await picture.toImage(width, height);
+        final data = await preview.toByteData(format: ui.ImageByteFormat.png);
+        if (!mounted ||
+            _sourceId != sourceId ||
+            render.image != image ||
+            data == null) {
+          return null;
+        }
+        _encodedImage = image;
+        _png = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        _imageVersion++;
+      } finally {
+        preview?.dispose();
+        picture?.dispose();
+        retained.dispose();
+      }
+      // Encoding yields to host updates. Re-read clipping, image effects and
+      // geometry together before handing the source to the native viewer.
+      return _capture(allowEncoding: false);
+    }
+    if (!mounted || _sourceId != sourceId || !render.attached) {
+      return null;
+    }
+    final radius =
+        container == frame ? widget.cornerRadius * math.min(m[0], m[5]) : 0.0;
+    final signature =
+        '$sourceId:${widget.itemId}:$frame:$clip:$radius:$fit:$opacity:$_imageVersion:${view.devicePixelRatio}';
+    return <String, Object?>{
+      'sourceId': sourceId,
+      'itemId': widget.itemId,
+      'frame': <double>[frame.left, frame.top, frame.width, frame.height],
+      'clip': <double>[clip.left, clip.top, clip.width, clip.height],
+      'cornerRadius': radius,
+      'pixelRatio': view.devicePixelRatio,
+      'fit': fit.name,
+      'opacity': opacity,
+      'png': _png,
+      'imageVersion': _imageVersion,
+      'signature': signature,
+    };
+  }
+}
