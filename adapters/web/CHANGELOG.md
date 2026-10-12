@@ -4,6 +4,7 @@
 
 - Supports several identified sources for one media item, exact tapped-source opening, session-retained selection, stable fallback and source-specific visibility events.
 - Adds `updateLevixelSources` for host binding/style updates, live source eligibility and restoration of the original inline visibility. Existing single-source and positional APIs remain supported.
+- Keeps the selected source hidden when hosts replace inline styles during opening, viewing, or closing, then restores its original visibility and priority.
 
 ## 1.4.1
 

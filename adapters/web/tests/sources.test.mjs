@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 export async function verifySources(browser, fixtureURL) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
@@ -29,6 +29,25 @@ export async function verifySources(browser, fixtureURL) {
     });
     const visibility = () => page.evaluate(() => ['cover', 'thumbnail', 'alternate'].map(id =>
       document.getElementById(`multi-${id}`)?.style.visibility ?? null));
+    assert.deepEqual(await visibility(), ['', 'hidden', '']);
+    const styleRefresh = await page.evaluate(async () => {
+      const { api, bindings, result } = window.multiSource;
+      const selected = document.querySelector('#multi-thumbnail');
+      const eventsBefore = window.levixelFixture.events.filter(event => event.type === 'sourceVisibilityChange').length;
+      for (let i = 0; i < 3; i++) {
+        // A renderer can replace the inline style without replacing its DOM node.
+        selected.style.cssText = 'width:100px;height:100px;opacity:.6;overflow:hidden';
+        if (i === 0) await api.updateLevixelSources({ galleryId: result.galleryId, sourceBindings: bindings });
+        // Later updates exercise the observer without another API call. Reasserting
+        // visibility must settle instead of producing an observer feedback loop.
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        if (getComputedStyle(selected).visibility !== 'hidden') return { hidden: false };
+      }
+      return { hidden: true, opacity: selected.style.opacity,
+        priority: selected.style.getPropertyPriority('visibility'),
+        extraEvents: window.levixelFixture.events.filter(event => event.type === 'sourceVisibilityChange').length - eventsBefore };
+    });
+    assert.deepEqual(styleRefresh, { hidden: true, opacity: '0.6', priority: 'important', extraEvents: 0 });
     assert.deepEqual(await visibility(), ['', 'hidden', '']);
     await page.evaluate(async () => {
       const { api, bindings, result } = window.multiSource;
@@ -88,6 +107,8 @@ export async function verifySources(browser, fixtureURL) {
         sawSnapshot ||= !!document.querySelector('[data-levixel-web-root]')?.shadowRoot.querySelector('.snapshot');
       }
       await opening;
+      source.style.cssText = 'position:fixed;left:20px;top:300px;width:120px;height:100px;opacity:.4;visibility:visible!important';
+      await new Promise(resolve => requestAnimationFrame(resolve));
       const hidden = getComputedStyle(source).visibility;
       await api.closeLevixel();
       return { sawSnapshot, hidden, opacity: source.style.opacity, visibility: source.style.visibility,
@@ -95,6 +116,31 @@ export async function verifySources(browser, fixtureURL) {
     });
     assert.deepEqual(unavailableOpening, { sawSnapshot: false, hidden: 'hidden', opacity: '0.4',
       visibility: 'visible', priority: 'important' });
+    const transitionStyleRefresh = await page.evaluate(async () => {
+      const { api, items } = window.multiSource;
+      const source = document.querySelector('#restored-cover');
+      let opened = false;
+      const opening = api.openLevixelFromSelector({ items, initialSourceId: 'cover', sourceBindings: [
+        { itemId: items[0].id, sourceId: 'cover', selector: '#restored-cover' },
+      ] }).then(() => { opened = true; });
+      while (!opened && source.style.visibility !== 'hidden') {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+      const duringOpening = !opened;
+      source.style.setProperty('visibility', 'visible', 'important');
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const openingHidden = getComputedStyle(source).visibility;
+      await opening;
+      const closing = api.closeLevixel();
+      source.style.removeProperty('visibility');
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const closingHidden = getComputedStyle(source).visibility;
+      await closing;
+      return { duringOpening, openingHidden, closingHidden, restored: source.style.visibility,
+        priority: source.style.getPropertyPriority('visibility') };
+    });
+    assert.deepEqual(transitionStyleRefresh, { duringOpening: true, openingHidden: 'hidden', closingHidden: 'hidden',
+      restored: 'visible', priority: 'important' });
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 }

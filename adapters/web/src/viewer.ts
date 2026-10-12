@@ -920,8 +920,12 @@ export class LevixelWebViewer {
   }
 
   private refreshHiddenSource(): void {
-    if (!this.opened || this.closing || this.destroyed || this.options.sourceVisibility !== 'hidden') return;
+    if (this.destroyed || this.options.sourceVisibility !== 'hidden') return;
     const previous = this.hiddenSource;
+    // Hosts can replace inline styles while retaining the selected DOM node,
+    // including during opening or closing. Keep the original restoration value.
+    if (previous) this.ensureSourceElementHidden(previous.element);
+    if (!this.opened || this.closing) return;
     const next = this.sourceElement(this.currentIndex);
     if (previous?.element === next || (!previous && !next)) return;
     this.restoreSourceElement();
@@ -992,7 +996,15 @@ export class LevixelWebViewer {
       ...(sourceId !== undefined ? { sourceId } : {}),
       index,
     };
-    element.style.setProperty('visibility', 'hidden', 'important');
+    this.ensureSourceElementHidden(element);
+  }
+
+  private ensureSourceElementHidden(element: HTMLElement): void {
+    // Avoid feeding our own style mutation back into the observer indefinitely.
+    if (element.style.getPropertyValue('visibility') !== 'hidden'
+      || element.style.getPropertyPriority('visibility') !== 'important') {
+      element.style.setProperty('visibility', 'hidden', 'important');
+    }
   }
 
   private sourceElement(index: number): HTMLElement | null {

@@ -11,6 +11,7 @@
 - Remembers the selected source across paging, image replacement, and updates to other thumbnails. If that source becomes unavailable, return transitions use another visible source of the same media, or fade when none remains.
 - Restores thumbnails to their original opacity after cell reuse, interrupted opening, and dismissal.
 - Keeps Android transition sources hidden when host styles reapply opacity, including React Native prop updates that leave the source image and geometry unchanged.
+- Keeps Web transition sources hidden when hosts replace inline styles, including during opening and closing, while preserving the original visibility for restoration.
 - Adds native source-registration and presentation APIs for containers whose image loaders replace child image views. React Native component, ref, and event APIs remain unchanged.
 - Keeps React Native Android source clipping aligned with transition corners and dispatches viewer commands after native mounting in both architectures, preventing delayed opening in the old architecture.
 - Adds `sourceId` and `initialSourceId` to Web/UniApp selector bindings, plus session-scoped `updateLevixelSources` for mounted-source and geometry updates without reopening. UniApp shares the implementation across both bridges and rejects stale asynchronous updates.
