@@ -226,11 +226,14 @@ public final class LevixelSourceViewRegistry {
         }
         for (HiddenSource source : HIDDEN_SOURCES) {
             View view = targets.get(source);
-            if (view == null || source.view == view) continue;
-            HiddenView hidden = HIDDEN_VIEWS.get(view);
-            if (hidden == null) { hidden = new HiddenView(view); HIDDEN_VIEWS.put(view, hidden); }
-            hidden.owners++;
-            source.view = view;
+            if (view == null) continue;
+            if (source.view != view) {
+                HiddenView hidden = HIDDEN_VIEWS.get(view);
+                if (hidden == null) { hidden = new HiddenView(view); HIDDEN_VIEWS.put(view, hidden); }
+                hidden.owners++;
+                source.view = view;
+            }
+            // Host style updates may reapply alpha while this lease still owns the source.
             view.setAlpha(0f);
         }
     }

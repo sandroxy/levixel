@@ -131,6 +131,49 @@ public final class LevixelSourceViewRegistryTest {
         assertEquals(0.9f, source.getAlpha(), 0f);
     }
 
+    @Test public void reregisteringHiddenSourceReassertsAlphaWithoutAddingOwners() {
+        FrameLayout source = source(0.8f);
+        FrameLayout sibling = source(0.6f);
+        ImageView image = image(source);
+        LevixelSourceViewRegistry.registerSource("media", image, 12f, source, "selected");
+        LevixelSourceViewRegistry.registerSource("media", image(sibling), 6f, sibling, "sibling");
+        LevixelSourceViewRegistry.Selection selection = new LevixelSourceViewRegistry.Selection("media", "selected", root);
+        LevixelSourceViewRegistry.HiddenSource first = hide(selection);
+        LevixelSourceViewRegistry.HiddenSource second = hide(selection);
+
+        for (int i = 0; i < 3; i++) {
+            // A host style transaction reapplies its opacity before refreshing geometry.
+            source.setAlpha(0.8f);
+            LevixelSourceViewRegistry.registerSource("media", image, 24f, source, "selected");
+            assertEquals(0f, source.getAlpha(), 0f);
+            assertEquals(0.6f, sibling.getAlpha(), 0f);
+            assertSame(image, selection.image());
+            assertEquals(24f, LevixelSourceViewRegistry.cornerRadiusForView(image), 0f);
+        }
+
+        first.close();
+        assertEquals(0f, source.getAlpha(), 0f);
+        second.close();
+        second.close();
+        assertEquals(0.8f, source.getAlpha(), 0f);
+        assertEquals(0.6f, sibling.getAlpha(), 0f);
+    }
+
+    @Test public void imageOnlyStyleRefreshPreservesHidingAndOriginalAlpha() {
+        FrameLayout container = source(1f);
+        ImageView image = image(container);
+        image.setAlpha(0.7f);
+        LevixelSourceViewRegistry.register("media", image, 3f);
+        LevixelSourceViewRegistry.HiddenSource lease = hide("media");
+
+        image.setAlpha(0.7f);
+        LevixelSourceViewRegistry.register("media", image, 9f);
+        assertEquals(0f, image.getAlpha(), 0f);
+        assertEquals(1f, container.getAlpha(), 0f);
+        lease.close();
+        assertEquals(0.7f, image.getAlpha(), 0f);
+    }
+
     @Test public void unregisteringOldContainerCannotRemoveTheReplacement() {
         FrameLayout first = source(1f);
         LevixelSourceViewRegistry.registerSource("media", image(first), 0f, first);
@@ -290,7 +333,7 @@ public final class LevixelSourceViewRegistryTest {
         for (int count : new int[] {1, 2, 3, 5, 10}) {
             for (int clicked = 0; clicked < count; clicked++) {
                 for (int changed = 0; changed < count; changed++) {
-                    for (String operation : new String[] {"refresh", "image-gap", "remove", "rebind", "clip", "host-hide"}) {
+                    for (String operation : new String[] {"refresh", "style-refresh", "image-gap", "remove", "rebind", "clip", "host-hide"}) {
                         verifyMutationCombination(count, clicked, changed, operation);
                     }
                 }
@@ -326,6 +369,9 @@ public final class LevixelSourceViewRegistryTest {
             String targetId = "source-" + changed;
             int expected = clicked;
             if ("refresh".equals(operation)) {
+                LevixelSourceViewRegistry.registerSource(key, images.get(changed), 24f, target, targetId);
+            } else if ("style-refresh".equals(operation)) {
+                target.setAlpha(originalAlphas[changed]);
                 LevixelSourceViewRegistry.registerSource(key, images.get(changed), 24f, target, targetId);
             } else if ("image-gap".equals(operation)) {
                 target.removeAllViews();

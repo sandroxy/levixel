@@ -45,10 +45,12 @@ internal class LevixelSourceBinding(
         itemId = id
         sourceId = instanceId
         cornerRadius = radius
-        refresh()
+        // A committed prop batch may reapply opacity without changing the image
+        // or geometry. Let the registry reassert an existing visibility lease.
+        refresh(forceRegistration = true)
     }
 
-    fun refresh() {
+    fun refresh(forceRegistration: Boolean = false) {
         val key = sourceKey
         if (!source.isAttachedToWindow || key == null || itemId == null) {
             source.isClickable = false
@@ -62,7 +64,7 @@ internal class LevixelSourceBinding(
             observer = source.viewTreeObserver.also { it.addOnPreDrawListener(this) }
         }
         val image = findDisplayedImage()
-        if (image !== registeredImage || key != registeredKey || sourceId != registeredSourceId || cornerRadius != registeredCornerRadius) {
+        if (forceRegistration || image !== registeredImage || key != registeredKey || sourceId != registeredSourceId || cornerRadius != registeredCornerRadius) {
             // Update the stable owner atomically, even between drawable loads.
             LevixelSourceViewRegistry.registerSource(key, image, cornerRadius, source, sourceId)
             registeredImage = image

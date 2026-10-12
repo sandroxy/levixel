@@ -78,6 +78,27 @@ class LevixelViewTest {
         closeAndAssertRestored()
     }
 
+    @Test fun opacityOnlyPropUpdatesKeepTheSelectedSourceHidden() {
+        repeat(3) {
+            // RN can reapply styles without changing the image, identity or radius.
+            clicked.alpha = 0.8f
+            clicked.commitSourceBinding()
+            assertClickedSourceIsSelected()
+            sibling.alpha = 0.6f
+            sibling.commitSourceBinding()
+            assertClickedSourceIsSelected()
+        }
+        closeAndAssertRestored()
+    }
+
+    @Test fun opacityAndImageRefreshKeepTheSelectedSourceHidden() {
+        clicked.alpha = 0.8f
+        refreshDuringPropBatch()
+        assertClickedSourceIsSelected()
+        clicked.commitSourceBinding()
+        closeAndAssertRestored()
+    }
+
     private fun assertStableBatch(updatedItems: List<Map<String, String>>, indexFirst: Boolean) {
         if (indexFirst) clicked.initialIndex = 1 else clicked.items = updatedItems
         refreshDuringPropBatch()
