@@ -77,8 +77,9 @@ separate from candidate acceptance. Other targets and options are listed by its
 remain owned by the test repository.
 
 Reuse the existing per-platform consumers when changing source or candidate
-bytes. UNI source projects have fixed `levixel-<mode>-source` names; application
-identifiers and signing inputs remain separate from directory names. The test
+bytes. UNI reuses `levixel-legacy`, `levixel-uts` and `levixel-x` across source,
+artifact and publication work, with explicit input provenance for each phase.
+Application identifiers and signing inputs remain separate from project names. The test
 repository's `verification/levixel/README.md` owns the workspace locations,
 local-file protections and retirement commands. Keep unpublished development
 work when cleaning a completed release, including work paused on local commits.
