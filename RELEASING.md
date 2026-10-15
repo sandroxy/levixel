@@ -29,6 +29,14 @@ candidate manifest, never by the version alone:
   manifest and invalidates previous results for those bytes. Published versions
   can never be rebuilt or replaced.
 
+After public-channel verification and the consumer repository's stable-lock
+update, use its Levixel workspace retirement entry to remove superseded
+consumers and completed source work. Review the preview before applying it.
+Preserve private configuration, candidate files and acceptance evidence; an
+unpublished newer iteration remains active. Workspace cleanup does not rebuild
+or modify release artifacts. See `verification/levixel/README.md` in the
+consumer repository for the maintained procedure.
+
 After all coordinated artifacts have passed their repository self-checks,
 record the current set with:
 
