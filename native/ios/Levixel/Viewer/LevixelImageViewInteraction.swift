@@ -75,6 +75,13 @@ public final class LevixelViewerSession {
 
     public var sessionId: String? { viewerController?.sessionId }
 
+    /// True once dismissal is committed, including native gestures, or after the session ends.
+    /// A drag that can still be cancelled does not close the session. Read on the main thread.
+    public var isClosing: Bool {
+        precondition(Thread.isMainThread, "LevixelViewerSession.isClosing must run on the main thread.")
+        return viewerController?.isClosing ?? true
+    }
+
     /// Retry the current failed media. Call on the main thread, like other UIKit interactions.
     @discardableResult public func retry() -> Bool {
         precondition(Thread.isMainThread, "LevixelViewerSession.retry must run on the main thread.")

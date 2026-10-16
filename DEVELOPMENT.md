@@ -28,6 +28,10 @@ provides the module hooks needed by the HarmonyOS tests and stops on any failure
 `./scripts/test-native-ios-source.sh` separately runs iOS regression tests using
 Xcode and an available iPhone simulator. `LevixelTestHost` supplies a real
 UIWindowScene to tests and is not part of the distributed framework.
+The test target also compiles the DCloud-independent UniApp iOS runtime from
+its canonical adapter directory. Its dismissal regressions exercise late
+source updates during native gesture and programmatic closing in both source
+visibility modes; the runtime is not linked into the distributed native core.
 The command reuses `dist/development/ios-source-tests/DerivedData` and replaces
 `dist/development/ios-source-tests/latest.xcresult` on each run. Run this entry
 serially; retain any needed result bundle before starting another run. Failed
@@ -38,6 +42,18 @@ analysis, and controller/session contracts. The workflow pins the Flutter SDK id
 On macOS, `./scripts/test-flutter-source.sh ios` checks source-restoration
 cleanup ordering with Swift. Native rendering and lifecycle checks still run
 in the independent iOS consumers.
+
+After preparing the existing Flutter Android source-development host, run
+`./gradlew :sandrox_levixel:testDebugUnitTest --tests com.sandrox.levixel.flutter.LevixelSourceUpdatesTest`
+from its `host/android` directory. The adapter tests use Robolectric with the
+real native viewer and method-call handler, checking late source mutations
+during native Back, committed drag dismissal, and action-sheet closing, plus
+updates after a short drag release, a system `ACTION_CANCEL` beyond the dismissal
+threshold, or Back that only closes actions. The consumer source CI runs this
+suite; source development retains these test inputs while
+release packages exclude them. These checks do not establish frame continuity
+on a device.
+
 Consumer applications, source integration, native touch tests, recordings, and
 immutable artifact acceptance belong to the independent consumer repository.
 They consume the public adapter and the Android/iOS cores without becoming
@@ -160,7 +176,7 @@ The iOS source-only regression entry point is:
 
 Prepare and verify the native release inputs before packaging the Flutter
 adapter. The package tools require Python 3.9 or later, Ruby, Git, Java's `jar`
-command, and the native artifact verification tools described above.
+and `javap` commands, and the native artifact verification tools described above.
 
 ```sh
 ./scripts/package-flutter.sh

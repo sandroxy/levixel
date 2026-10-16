@@ -30,7 +30,11 @@ final class LevixelMediaIdentityTests: XCTestCase {
         let closed = expectation(description: "Session closed")
         var configuration = LevixelViewerConfiguration()
         configuration.onEvent = { events.append($0.type) }
-        configuration.onSession = { session in session.close(animated: false) { closed.fulfill() } }
+        configuration.onSession = { session in
+            XCTAssertFalse(session.isClosing)
+            session.close(animated: false) { closed.fulfill() }
+            XCTAssertTrue(session.isClosing, "A queued close must already reject source updates")
+        }
         let session = source.presentLevixelViewer(dataSource: LevixelArrayDataSource(items: [.image(source.image)]),
             configuration: configuration, from: presenter)
         XCTAssertNotNil(session)
@@ -41,6 +45,7 @@ final class LevixelMediaIdentityTests: XCTestCase {
         XCTAssertFalse(events.contains("opened"))
         XCTAssertEqual(events.filter { $0 == "dismiss" }.count, 1)
         XCTAssertNil(session?.sessionId)
+        XCTAssertEqual(session?.isClosing, true)
         XCTAssertNil(presenter.presentedViewController)
         XCTAssertEqual(source.alpha, originalAlpha)
     }

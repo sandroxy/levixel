@@ -193,6 +193,12 @@ viewer open. `viewer.requestClose()` explicitly closes the whole viewer;
 `onOverlayDismissed` reports completion, and the viewer removes itself from its
 parent. `dismissImmediately()` is available when an immediate close is needed.
 
+`viewer.isClosing()` becomes true when dismissal is committed and stays true
+after completion, including while waiting for an action sheet to close. It
+remains false during a cancellable drag or when Back only closes the sheet.
+Adapters that maintain their own source views should check it on the UI thread
+before changing those views or their registrations.
+
 `viewer.retry()` retries the current failed media and returns whether a request
 started. It keeps the same session and does not start another request while
 loading, after close, or when there is no eligible failed item. The viewer also

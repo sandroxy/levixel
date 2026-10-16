@@ -160,7 +160,8 @@ public final class LevixelUniPresenter: NSObject {
     @objc(updateSourcesWithOptions:completion:)
     public func updateSources(options: Any?, completion: @escaping (NSDictionary) -> Void) {
         precondition(Thread.isMainThread)
-        guard let session = activeSession, let viewportView = session.viewportView,
+        guard let session = activeSession, let viewerSession = session.viewerSession,
+            !viewerSession.isClosing, let viewportView = session.viewportView,
             let window = session.anchorHost.window else {
             completion(ok(data: ["updated": false])); return
         }

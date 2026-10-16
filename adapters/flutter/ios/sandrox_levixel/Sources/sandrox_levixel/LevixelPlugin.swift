@@ -53,7 +53,9 @@ public final class LevixelPlugin: NSObject, FlutterPlugin {
             switch call.method {
             case "open": try current.open(); result(nil)
             case "updateSources":
-                if !current.closing { try current.updateSources(array(args, "sources")) }
+                if !current.closing && current.viewer?.isClosing != true {
+                    try current.updateSources(array(args, "sources"))
+                }
                 result(nil)
             case "retry": result(current.viewer?.retry() ?? false)
             case "close":

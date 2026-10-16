@@ -28,6 +28,7 @@ final class LevixelViewerController: UIViewController {
     private var hasFinishedPresentation = false
     private var pendingDismissal = false
     private var hasNotifiedDismissal = false
+    var isClosing: Bool { pendingDismissal || isClosingActionsForDismissal || hasNotifiedDismissal }
     private var dismissalCompletions: [() -> Void] = []
     private var pendingInitialScroll = false
 

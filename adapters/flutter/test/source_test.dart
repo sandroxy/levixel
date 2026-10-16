@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -152,6 +153,249 @@ void main() {
       for (final image in images) {
         image.dispose();
       }
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    }
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  for (final change in [
+    'unrelated image',
+    'replace selected image',
+    'move selected source',
+    'remove selected source',
+    'remove all sources',
+    'open another gallery',
+  ]) {
+    testWidgets('closing snapshots cached sources after $change',
+        (tester) async {
+      const channel = MethodChannel('com.sandrox.levixel/flutter');
+      final calls = <MethodCall>[];
+      var opened = false;
+      final images = (await tester.runAsync(() async => [
+            await createTestImage(width: 160, height: 80, cache: false),
+            await createTestImage(width: 80, height: 80, cache: false),
+          ]))!;
+      final controller = LevixelController(galleryId: 'closing', items: [
+        for (final id in ['selected', 'other'])
+          LevixelMedia(
+              id: id, type: LevixelMediaType.image, url: 'file:///$id.png'),
+      ]);
+      final replacement = LevixelController(galleryId: 'replacement', items: [
+        LevixelMedia(
+            id: 'next', type: LevixelMediaType.image, url: 'file:///next.png'),
+      ]);
+      var changed = false;
+      late StateSetter rebuild;
+      final previousImageCallback = ui.Image.onCreate;
+      var newPreviewCount = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+          (call) async {
+        calls.add(call);
+        if (call.method == 'open') opened = true;
+        return null;
+      });
+      try {
+        await tester.pumpWidget(Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(builder: (context, setState) {
+            rebuild = setState;
+            return Center(
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (!changed ||
+                    (change != 'remove selected source' &&
+                        change != 'remove all sources'))
+                  Transform.translate(
+                    offset: changed && change == 'move selected source'
+                        ? const Offset(24, 12)
+                        : Offset.zero,
+                    child: LevixelSource(
+                      key: const ValueKey<String>('selected'),
+                      controller: controller,
+                      itemId: 'selected',
+                      child: RawImage(
+                          key: const ValueKey<String>('selected-image'),
+                          image: changed && change == 'replace selected image'
+                              ? images.last
+                              : images.first,
+                          width: 100,
+                          height: 80),
+                    ),
+                  ),
+                if (!changed || change != 'remove all sources')
+                  LevixelSource(
+                    key: const ValueKey<String>('other'),
+                    controller: controller,
+                    itemId: 'other',
+                    child: RawImage(
+                        image: changed ? images.last : null,
+                        width: 100,
+                        height: 80),
+                  ),
+              ]),
+            );
+          }),
+        ));
+        final opening = controller.open(itemId: 'selected');
+        await pumpNativeWork(tester, () => opened);
+        await opening;
+        final prepared = calls
+            .firstWhere((call) => call.method == 'prepare')
+            .arguments as Map<Object?, Object?>;
+        final request = prepared['requestId'];
+        expect(prepared['sources'], hasLength(1));
+        ui.Image.onCreate = (created) {
+          previousImageCallback?.call(created);
+          // RawImage may clone its input during rebuild. Only newly rendered
+          // preview images indicate encoding work, not those owned handles.
+          if (!images.any(created.isCloneOf)) newPreviewCount++;
+        };
+        // Commit the host change on the frame awaited by close. There is no
+        // intervening sync frame that could pre-encode the replacement image.
+        rebuild(() => changed = true);
+        var completed = false;
+        final operation = change == 'open another gallery'
+            ? replacement.open()
+            : Future.wait<void>([controller.close(), controller.close()])
+                .then<void>((_) {});
+        final completion = operation.then((_) => completed = true);
+        await pumpNativeWork(tester, () => completed);
+        await completion;
+        expect(newPreviewCount, 0,
+            reason: 'Closing must not encode an unrelated or replaced image');
+        final oldCalls = calls.where((call) =>
+            (call.arguments as Map<Object?, Object?>)['requestId'] == request);
+        expect(oldCalls.where((call) => call.method == 'close'), hasLength(1));
+        expect(oldCalls.where((call) => call.method == 'finish'), hasLength(1));
+        for (final opacity in tester.widgetList<Opacity>(find.descendant(
+            of: find.byType(LevixelSource), matching: find.byType(Opacity)))) {
+          expect(opacity.opacity, 1,
+              reason: 'Closing must release every Flutter visibility lease');
+        }
+        final update = oldCalls
+            .lastWhere((call) => call.method == 'updateSources')
+            .arguments as Map<Object?, Object?>;
+        final sources = (update['sources']! as List<Object?>)
+            .cast<Map<Object?, Object?>>();
+        if (change == 'replace selected image' ||
+            change == 'remove selected source' ||
+            change == 'remove all sources') {
+          expect(sources, isEmpty,
+              reason: 'Missing or changed previews must not return stale pixels');
+        } else {
+          final frame = tester
+              .getRect(find.byKey(const ValueKey<String>('selected-image')));
+          expect(sources, hasLength(1));
+          expect(sources.single['itemId'], 'selected');
+          expect(sources.single['frame'],
+              [frame.left, frame.top, frame.width, frame.height]);
+          final initial = (prepared['sources']! as List<Object?>)
+              .single! as Map<Object?, Object?>;
+          expect(sources.single['png'], initial['png'],
+              reason: 'Return geometry must reuse the existing preview bytes');
+        }
+        if (change == 'open another gallery') {
+          final nextPrepare = calls.lastWhere((call) => call.method == 'prepare');
+          expect(calls.indexOf(nextPrepare),
+              greaterThan(calls.indexOf(oldCalls.last)));
+          var closed = false;
+          final closing = replacement.close().then((_) => closed = true);
+          await pumpNativeWork(tester, () => closed);
+          await closing;
+        }
+        expect(tester.takeException(), isNull);
+      } finally {
+        ui.Image.onCreate = previousImageCallback;
+        controller.dispose();
+        replacement.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        for (final image in images) {
+          image.dispose();
+        }
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
+  testWidgets('closing restores cached pixels while a source update is pending',
+      (tester) async {
+    const channel = MethodChannel('com.sandrox.levixel/flutter');
+    final calls = <MethodCall>[];
+    final pendingReply = Completer<void>();
+    var opened = false;
+    var updatePending = false;
+    var visible = true;
+    late StateSetter rebuild;
+    final image = (await tester.runAsync(
+        () => createTestImage(width: 160, height: 80, cache: false)))!;
+    final controller = LevixelController(galleryId: 'pending-update', items: [
+      LevixelMedia(
+          id: 'photo', type: LevixelMediaType.image, url: 'file:///photo.png'),
+    ]);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
+      calls.add(call);
+      if (call.method == 'open') opened = true;
+      if (call.method == 'updateSources' && !updatePending) {
+        final args = call.arguments as Map<Object?, Object?>;
+        if ((args['sources']! as List<Object?>).isEmpty) {
+          updatePending = true;
+          await pendingReply.future;
+        }
+      }
+      return null;
+    });
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: StatefulBuilder(builder: (context, setState) {
+          rebuild = setState;
+          return Center(
+            child: Opacity(
+              opacity: visible ? 1 : 0,
+              child: LevixelSource(
+                controller: controller,
+                itemId: 'photo',
+                child: RawImage(image: image, width: 100, height: 80),
+              ),
+            ),
+          );
+        }),
+      ));
+      final opening = controller.open();
+      await pumpNativeWork(tester, () => opened);
+      await opening;
+      final prepared = calls
+          .singleWhere((call) => call.method == 'prepare')
+          .arguments as Map<Object?, Object?>;
+      final initial = (prepared['sources']! as List<Object?>)
+          .single! as Map<Object?, Object?>;
+      rebuild(() => visible = false);
+      await pumpNativeWork(tester, () => updatePending);
+      rebuild(() => visible = true);
+      var closed = false;
+      final closing = controller.close().then((_) => closed = true);
+      await pumpNativeWork(tester, () => closed);
+      await closing;
+      expect(pendingReply.isCompleted, isFalse);
+      final update = calls
+          .lastWhere((call) => call.method == 'updateSources')
+          .arguments as Map<Object?, Object?>;
+      final restored = (update['sources']! as List<Object?>)
+          .single! as Map<Object?, Object?>;
+      expect(restored['sourceId'], initial['sourceId']);
+      expect(restored['png'], initial['png'],
+          reason: 'A removed native anchor needs pixels even before its reply');
+      expect(calls.where((call) => call.method == 'close'), hasLength(1));
+      expect(calls.where((call) => call.method == 'finish'), hasLength(1));
+      pendingReply.complete();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    } finally {
+      if (!pendingReply.isCompleted) pendingReply.complete();
+      controller.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
+      image.dispose();
       tester.binding.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null);
     }

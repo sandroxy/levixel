@@ -5,6 +5,7 @@ on:
     paths:
       - 'native/android/**'
       - 'native/ios/**'
+      - 'adapters/uniapp/ios/LevixelUniRuntime/**'
       - 'plugin.yaml'
       - 'LICENSE'
       - 'THIRD_PARTY_NOTICES.md'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'native/android/**'
       - 'native/ios/**'
+      - 'adapters/uniapp/ios/LevixelUniRuntime/**'
       - 'plugin.yaml'
       - 'LICENSE'
       - 'THIRD_PARTY_NOTICES.md'

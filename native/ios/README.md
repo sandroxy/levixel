@@ -197,6 +197,11 @@ viewerSession?.close { [weak self] in
 }
 ```
 
+Read `session.isClosing` on the main thread before applying asynchronous source
+updates. It becomes true when a native gesture or close command commits to
+dismissal, before the return animation finishes, and remains true after the
+session ends. An uncommitted or cancelled dismissal drag leaves it false.
+
 Call `session.retry()` on the main thread to retry the current failed media;
 it returns whether a retry started. Retry keeps the session and is a no-op when
 there is no eligible failed media, another load is in progress, or the session

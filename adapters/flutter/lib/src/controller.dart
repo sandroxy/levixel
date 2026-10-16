@@ -320,6 +320,9 @@ class _Session {
       {String? openingItemId, String? preferredSourceId}) async {
     final allowed = items.map((item) => item.id).toSet();
     for (final source in controller._sources.values.toList()) {
+      if (closing) {
+        break;
+      }
       if (!allowed.contains(source.widget.itemId) ||
           !controller.items.any((item) => item.id == source.widget.itemId)) {
         continue;
@@ -337,8 +340,13 @@ class _Session {
         break;
       }
     }
+    return snapshotSources();
+  }
+
+  Future<List<Map<String, Object?>>> snapshotSources() async {
     // Encoding another thumbnail can yield to removal, rebinding or repainting
     // of an earlier one. Sample the complete batch without further encoding.
+    final allowed = items.map((item) => item.id).toSet();
     final mounted = controller.items.map((item) => item.id).toSet();
     final sources = controller._sources.values.toList();
     final snapshots = await Future.wait([
@@ -415,7 +423,11 @@ class _Session {
         try {
           await _Bridge.nextFrame();
           if (WidgetsBinding.instance.framesEnabled) {
-            final sources = await captureSources();
+            // Refresh return geometry without starting or awaiting preview work.
+            // Changed images without a matching cache use the native fade.
+            final sources = await snapshotSources();
+            // An earlier update can still be awaiting its native reply. Include
+            // cached pixels so a source it removed can be registered again.
             await _Bridge.channel.invokeMethod<void>('updateSources',
                 <String, Object?>{...arguments, 'sources': sources});
           }

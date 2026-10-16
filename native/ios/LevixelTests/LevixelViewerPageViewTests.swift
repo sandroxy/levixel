@@ -402,6 +402,7 @@ final class LevixelViewerPageViewTests: XCTestCase {
         let page = try XCTUnwrap(descendants(of: viewer.view).compactMap { $0 as? LevixelViewerPageView }.first)
         viewer.levixelViewerPageViewDidLongPress(page)
         session?.close { closed.fulfill() }
+        XCTAssertEqual(session?.isClosing, true, "Closing the action sheet must already freeze source updates")
         wait(for: [closed], timeout: 4)
         XCTAssertNil(presenter.presentedViewController)
         XCTAssertEqual(events.filter { $0 == "dismiss" }.count, 1)

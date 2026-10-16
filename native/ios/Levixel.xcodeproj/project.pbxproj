@@ -87,6 +87,11 @@
 			path = LevixelTests;
 			sourceTree = "<group>";
 		};
+		B37A56C14E804F0C922A1701 /* LevixelUniRuntime */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ../../adapters/uniapp/ios/LevixelUniRuntime;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +136,7 @@
 			children = (
 				8B68E6582F87329600109120 /* Levixel */,
 				8B68E6652F87329600109120 /* LevixelTests */,
+				B37A56C14E804F0C922A1701 /* LevixelUniRuntime */,
 				8B68E66F2F87329600109120 /* Frameworks */,
 				8B68E6572F87329600109120 /* Products */,
 				6F6DBD085A6EBF57F93A43BB /* LevixelTestHost */,
@@ -214,6 +220,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				8B68E6652F87329600109120 /* LevixelTests */,
+				B37A56C14E804F0C922A1701 /* LevixelUniRuntime */,
 			);
 			name = LevixelTests;
 			productName = LevixelTests;

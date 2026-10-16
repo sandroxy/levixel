@@ -46,6 +46,7 @@ required_declarations=(
   'public struct LevixelAction'
   'public struct LevixelViewerEvent'
   'public func retry() -> Swift.Bool'
+  'public var isClosing: Swift.Bool'
   'public var onEvent:'
   'public class LevixelSourceRegistration'
   'sourceIdentifier: Swift.String, imageViewProvider:'
@@ -56,7 +57,7 @@ for declaration in "${required_declarations[@]}"; do
   if ! grep -Fq "${declaration}" "${interface_path}"; then
     echo "Levixel iOS core is incompatible with the current adapters." >&2
     echo "Missing public API: ${declaration}" >&2
-    echo "Build and accept a next-version native iOS candidate before packaging React Native or UniApp." >&2
+    echo "Build and accept a compatible native iOS candidate before packaging Flutter, React Native or UniApp." >&2
     exit 1
   fi
 done

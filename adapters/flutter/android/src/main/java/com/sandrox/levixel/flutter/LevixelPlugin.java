@@ -107,7 +107,11 @@ public final class LevixelPlugin implements FlutterPlugin, ActivityAware, Method
             switch (call.method) {
                 case "open": current.open(); result.success(null); break;
                 case "updateSources":
-                    if (!current.closing) current.updateSources(list(args, "sources"));
+                    // Native gestures and Back start dismissal before the completion
+                    // callback marks this bridge session as closing.
+                    if (!current.closing && (current.overlay == null || !current.overlay.isClosing())) {
+                        current.updateSources(list(args, "sources"));
+                    }
                     result.success(null); break;
                 case "retry": result.success(current.overlay != null && current.overlay.retry()); break;
                 case "close":

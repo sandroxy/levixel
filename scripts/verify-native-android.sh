@@ -24,6 +24,11 @@ if ! grep -q '^com/sandrox/levixel/LevixelViewerOverlayView.class$' <<<"${class_
     printf '%s\n' "Levixel viewer classes are missing from ${artifact_path}" >&2
     exit 1
 fi
+viewer_api="$(javap -public -classpath "${inspection_dir}/classes.jar" com.sandrox.levixel.LevixelViewerOverlayView)"
+if ! grep -Fq 'public boolean isClosing();' <<<"${viewer_api}"; then
+    printf '%s\n' "Levixel viewer closing state required by the Flutter adapter is missing from ${artifact_path}" >&2
+    exit 1
+fi
 if ! grep -q '^META-INF/LEVIXEL_LICENSE$' <<<"${class_listing}" \
     || ! grep -q '^META-INF/THIRD_PARTY_NOTICES.md$' <<<"${class_listing}"; then
     printf '%s\n' "Levixel legal notices are missing from ${artifact_path}" >&2

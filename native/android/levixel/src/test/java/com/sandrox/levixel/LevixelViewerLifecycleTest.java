@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Looper;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -64,7 +66,10 @@ public final class LevixelViewerLifecycleTest {
     }
 
     @Test public void hostRemovalOfLastChildDoesNotReenterRemoval() {
+        assertFalse(overlay.isClosing());
         container.removeView(overlay);
+        assertTrue(overlay.isClosing());
+        assertEquals(0, dismissals);
         assertEquals(0, container.getChildCount());
         assertDismissedOnce();
     }
@@ -111,8 +116,10 @@ public final class LevixelViewerLifecycleTest {
     @Test public void dismissalDuringOpeningRestoresTheWholeSource() {
         FrameLayout source = registerSource();
         startOpening();
+        assertFalse(overlay.isClosing());
         assertEquals(0f, source.getAlpha(), 0f);
         overlay.dismissImmediately();
+        assertTrue(overlay.isClosing());
         assertEquals(0.6f, source.getAlpha(), 0f);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
         assertEquals(0.6f, source.getAlpha(), 0f);
@@ -131,12 +138,56 @@ public final class LevixelViewerLifecycleTest {
         LevixelSourceViewRegistry.registerSource(sourceKey(), replacement, 0f, source);
         assertEquals(0f, source.getAlpha(), 0f);
 
+        assertFalse(overlay.isClosing());
         overlay.requestClose();
+        assertTrue(overlay.isClosing());
+        assertEquals(0, dismissals);
         assertEquals(0f, source.getAlpha(), 0f);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
         assertEquals(0.6f, source.getAlpha(), 0f);
         assertEquals(1f, replacement.getAlpha(), 0f);
         assertEquals(1, dismissals);
+        assertTrue(overlay.isClosing());
+    }
+
+    @Test public void systemCancelPastDismissThresholdRestoresDragAndAllowsAnotherGesture() {
+        FrameLayout source = registerSource();
+        startOpening();
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        assertTrue(events.contains("opened"));
+
+        long time = SystemClock.uptimeMillis();
+        View target = dragPastDismissThreshold(time);
+        // CANCEL coordinates need not describe a final finger position. The
+        // existing translation is already large enough to dismiss on ACTION_UP.
+        touch(time, time + 700, MotionEvent.ACTION_CANCEL, 0);
+        assertFalse(overlay.isClosing());
+        assertEquals(0, dismissals);
+        assertFalse(ReflectionHelpers.<Boolean>getField(overlay, "dragging"));
+        assertNull(ReflectionHelpers.getField(overlay, "velocityTracker"));
+        assertNull(ReflectionHelpers.getField(overlay, "dragTarget"));
+        assertNull(ReflectionHelpers.getField(overlay, "dragPageView"));
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        assertEquals(0f, target.getTranslationY(), .001f);
+        assertEquals(1f, target.getScaleX(), .001f);
+        assertEquals(1f, target.getScaleY(), .001f);
+        View background = ReflectionHelpers.getField(overlay, "backgroundView");
+        assertEquals(1f, background.getAlpha(), .001f);
+        assertSame(container, overlay.getParent());
+        assertFalse(overlay.isClosing());
+        assertEquals(0, Collections.frequency(events, "dismiss"));
+        assertEquals(0f, source.getAlpha(), 0f);
+
+        // A subsequent deliberate release still closes once and restores the
+        // source; cancelling must not leave gesture state locked or dangling.
+        time = SystemClock.uptimeMillis();
+        dragPastDismissThreshold(time);
+        touch(time, time + 700, MotionEvent.ACTION_UP, overlay.getHeight() * .73f);
+        assertTrue(overlay.isClosing());
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        assertEquals(1, dismissals);
+        assertEquals(1, Collections.frequency(events, "dismiss"));
+        assertEquals(0.6f, source.getAlpha(), 0f);
     }
 
     @Test public void recyclingDuringOpeningCannotBeRehiddenByAnimationCompletion() {
@@ -342,6 +393,26 @@ public final class LevixelViewerLifecycleTest {
                 View.MeasureSpec.makeMeasureSpec(500, View.MeasureSpec.EXACTLY));
         root.layout(0, 0, 500, 500);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20));
+    }
+
+    private View dragPastDismissThreshold(long time) {
+        float height = overlay.getHeight();
+        touch(time, time, MotionEvent.ACTION_DOWN, height * .35f);
+        touch(time, time + 100, MotionEvent.ACTION_MOVE, height * .43f);
+        assertTrue(ReflectionHelpers.<Boolean>getField(overlay, "dragging"));
+        touch(time, time + 300, MotionEvent.ACTION_MOVE, height * .73f);
+        View target = ReflectionHelpers.getField(overlay, "dragTarget");
+        assertNotNull(target);
+        assertTrue("The drag must pass the 16% dismissal threshold",
+                target.getTranslationY() > height * .16f);
+        assertFalse(overlay.isClosing());
+        return target;
+    }
+
+    private void touch(long down, long time, int action, float y) {
+        MotionEvent event = MotionEvent.obtain(down, time, action, overlay.getWidth() * .5f, y, 0);
+        try { overlay.dispatchTouchEvent(event); }
+        finally { event.recycle(); }
     }
 
     private void assertDismissedOnce() {

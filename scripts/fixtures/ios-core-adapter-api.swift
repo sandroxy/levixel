@@ -16,6 +16,7 @@ func verifyLevixelAdapterAPI() {
     let session = sourceView.presentLevixelViewer(dataSource: LevixelArrayDataSource(items: items), configuration: configuration)
     _ = session?.retry()
     _ = session?.sessionId
+    _ = session?.isClosing
     session?.close(animated: false, completion: {})
     sourceView.unregisterLevixelSource()
     let source = LevixelSourceRegistration(view: sourceView, sourceIdentifier: "probe-source",

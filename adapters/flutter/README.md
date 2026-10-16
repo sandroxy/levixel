@@ -91,6 +91,9 @@ An opening request replaced, closed, or suspended before presentation fails with
 cancellation without reporting an application error. When Flutter has stopped
 scheduling frames, `close()` dismisses without animation and releases the
 session without waiting for a foreground frame.
+Closing refreshes source geometry using cached previews without waiting for
+thumbnail encoding. If a source has changed images and its new preview is not
+ready, the viewer uses an eligible alternative source or fades out.
 
 Assign `controller.items` when the host gallery changes. An open viewer retains
 its opening media and action snapshots, so events always identify that session's

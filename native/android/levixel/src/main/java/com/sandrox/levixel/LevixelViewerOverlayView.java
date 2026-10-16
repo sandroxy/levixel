@@ -346,13 +346,21 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
                 }
                 syncPagerGesturePolicy();
                 break;
-            case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                // Cancellation never commits dismissal, even past the distance
+                // threshold. Let children receive CANCEL to end their gestures too.
+                needReanchorAfterMultiTouch = false;
+                releaseVelocityTracker();
+                if (dragging) {
+                    dragging = false;
+                    animateBackToCenter();
+                }
+                dragTarget = null;
+                dragPageView = null;
+                syncPagerGesturePolicy();
+                break;
+            case MotionEvent.ACTION_UP:
                 if (needReanchorAfterMultiTouch) {
-                    if (action == MotionEvent.ACTION_CANCEL) {
-                        needReanchorAfterMultiTouch = false;
-                        syncPagerGesturePolicy();
-                    }
                     releaseVelocityTracker();
                     super.dispatchTouchEvent(event);
                     return true;
@@ -415,6 +423,13 @@ public final class LevixelViewerOverlayView extends FrameLayout implements Levix
     }
 
     @NonNull public String getSessionId() { return sessionId; }
+
+    /**
+     * Read on the UI thread before changing adapter-owned source views. True from
+     * committed dismissal (including waiting for actions to close) through completion.
+     * A drag that can still return to center, or closing only actions, remains open.
+     */
+    public boolean isClosing() { return closing || finished; }
 
     private LevixelViewerEvent emit(String type, int index, @Nullable String actionId) {
         LevixelViewerEvent event = new LevixelViewerEvent(type, sessionId,
